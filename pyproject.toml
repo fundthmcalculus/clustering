@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clustering"
+version = "0.1.0"
+authors = [
+  { name="Scott Phillips", email="polygonguru@gmail.com" },
+]
+description = "An optimized Visualization Assessment Tendency (VAT) clustering package"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/fundthmcalculus/clustering"
+"Bug Tracker" = "https://github.com/fundthmcalculus/clustering/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clustering"]
