@@ -16,6 +16,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "numba",
+    "numpy",
+    "numba-progress",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/fundthmcalculus/clustering"
@@ -23,3 +28,4 @@ classifiers = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/clustering"]
+
