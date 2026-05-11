@@ -19,7 +19,15 @@ classifiers = [
 dependencies = [
     "numba",
     "numpy",
+    "scipy",
     "numba-progress",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ucimlrepo",
+    "matplotlib",
+    "pytest"
 ]
 
 [project.urls]

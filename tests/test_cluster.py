@@ -1,16 +1,54 @@
 import time
 
 import numpy as np
-from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq, compute_ivat, fcm
+
+from clustering.util import pairwise_distances
+from src.clustering import vat_prim_mst_seq, compute_ivat, fcm
 from matplotlib import pyplot as plt
 from numpy import ndarray
-from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
-from sklearn.metrics import pairwise_distances
-from test_combinatorics import circle_random_clusters
 
 
-def test_cluster_sequencing():
-    print("\n")
+def _random_cities(
+    center_x, center_y, n_cities: int = 10, cluster_diameter: float = 3.0
+) -> np.ndarray:
+    if n_cities == 1:
+        return np.array([[center_x, center_y]])
+    # Randomly distribute cities in a uniform circle?
+    theta = np.linspace(0, 2 * np.pi, n_cities + 1, dtype=np.float32)
+    theta = theta[:-1]
+    # Add slight random scramble to locations
+    scramble = np.random.uniform(
+        -cluster_diameter * 0.05, cluster_diameter * 0.05, size=(n_cities, 2)
+    )
+    city_x = np.cos(theta) * cluster_diameter / 2.0 + center_x + scramble[:, 0]
+    city_y = np.sin(theta) * cluster_diameter / 2.0 + center_y + scramble[:, 1]
+    return np.c_[city_x, city_y]
+
+
+def _circle_random_clusters(
+    n_clusters: int = 10,
+    n_cities: int = 10,
+    cluster_diameter: float = 2.0,
+    cluster_spacing: float = 10.0,
+) -> np.ndarray:
+    city_locations = np.zeros(shape=(0, 2), dtype=np.float32)
+    for theta in np.linspace(0, 2 * np.pi, n_clusters):
+        theta *= n_clusters / (n_clusters + 1)
+        cx = cluster_spacing * np.cos(theta)
+        cy = cluster_spacing * np.sin(theta)
+        city_locations = np.concatenate(
+            (
+                city_locations,
+                _random_cities(
+                    cx, cy, n_cities=n_cities, cluster_diameter=cluster_diameter
+                ),
+            ),
+            axis=0,
+        )
+    return city_locations
+
+
+def _test_cluster_sequencing():
     from ucimlrepo import fetch_ucirepo
 
     # fetch dataset
@@ -36,113 +74,20 @@ def test_cluster_sequencing():
     print(f"Elapsed time for {len(X)} data points: {t1-t0:.02f}")
 
 
-def test_vat_scaling():
-    city_count: list[int] = []
-    merge_time: list[float] = []
-    lib_time: list[float] = []
-    o1 = 7
-    o2 = 10
-    n = 2 * (o2 - o1 + 1)
-    for group_count in np.logspace(o1, o2, n, base=2, dtype="int"):
-        city_count.append(group_count)
-        # print(f"City count: {group_count}")
-        all_cities = circle_random_clusters(n_clusters=group_count, n_cities=1)
-        matrix_of_pairwise_distance = pairwise_distances(all_cities)
-        # Scramble the order to ensure we sort it!
-        cols = np.arange(len(all_cities), dtype="int")
-        rand_col_order = np.random.permutation(cols)
-        matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
-            rand_col_order, :
-        ]
-        # Cluster using our VAT
-        t0 = time.time()
-        ordered_matrix2, path_merge, path_ivat = compute_ordered_dis_njit_merge(
-            matrix_of_pairwise_distance, inplace=False
-        )
-        t1 = time.time()
-        # Cluster using the library VAT
-        ordered_matrix = compute_ordered_dis_njit(matrix_of_pairwise_distance.copy())
-        # ordered_matrix = 0 * ordered_matrix2
-        t2 = time.time()
-
-        # Print the results
-        merge_time.append(t1 - t0)
-        lib_time.append(t2 - t1)
-
-    # Chop the smallest entry off - that has the njit compilation time baked in.
-    city_count = city_count[1:]
-    merge_time = merge_time[1:]
-    lib_time = lib_time[1:]
-
-    # Prepare data for regression
-    city_array = np.array(city_count)
-    merge_array = np.array(merge_time)
-    lib_array = np.array(lib_time)
-    city_count_scl = city_array[:] / city_array[0]
-    merge_count_scl = merge_array[:] / merge_array[0]
-    lib_count_scl = lib_array[:] / lib_array[0]
-
-    # Plot scaling variance
-    plt.figure()
-    plt.plot(city_count_scl, merge_count_scl, "o-", label="Merge VAT")
-    plt.plot(city_count_scl, lib_count_scl, "o-", label="Lib VAT")
-    plt.plot(city_count_scl, city_count_scl**2, "-", label="$O(N)=N^2$")
-    plt.plot(
-        city_count_scl,
-        city_count_scl**2 * np.log(city_count_scl + 1),
-        "-",
-        label="$O(N)=N^2*log(N)$",
-    )
-    plt.plot(city_count_scl, city_count_scl**3, "-", label="$O(N)=N^3$")
-    plt.xlabel("N Scaling")
-    plt.ylabel("Time Scaling")
-    plt.legend()
-    plt.title("VAT Scaling Test")
-    # plt.savefig('vat_scaling_comparison.eps', format='eps')
-    # plt.close()
-
-    plt.figure()
-    plt.loglog(city_count, merge_time, "o", label="Merge VAT")
-    plt.loglog(city_count, lib_time, "o", label="Lib VAT")
-    plt.xlabel("Number of Cities")
-    plt.ylabel("Time (seconds)")
-    plt.legend()
-    plt.title("VAT Scaling Test")
-    # plt.savefig('vat_scaling_time.eps', format='eps')
-    # plt.close()
-
-    # Plot the results
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-    fig.suptitle(f"VAT Scaling Test (N={group_count})")
-    im1 = ax1.imshow(ordered_matrix, cmap="viridis")
-    ax1.set_title(f"Library VAT Result: {t2-t1:.2f} seconds")
-    plt.colorbar(im1, ax=ax1)
-
-    im2 = ax2.imshow(ordered_matrix2, cmap="viridis")
-    ax2.set_title(f"Merge Sort VAT Result: {t1-t0:.2f} seconds")
-    plt.colorbar(im2, ax=ax2)
-
-    plt.tight_layout()
-    # plt.savefig('vat_comparison.eps', format='eps')
-    # plt.close()
-    plt.show()
-
-
 def test_merge_ivat():
-    all_cities = circle_random_clusters(n_clusters=10, n_cities=1)
+    all_cities = _circle_random_clusters(
+        n_clusters=10, n_cities=5, cluster_spacing=5.0, cluster_diameter=1
+    )
+    # Scramble the order of the cities
+    scramble_order = np.random.permutation(len(all_cities))
+    all_cities = all_cities[scramble_order]
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    # Scramble the order to ensure we sort it!
-    cols = np.arange(len(all_cities), dtype="int")
-    rand_col_order = np.random.permutation(cols)
-    matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
-        rand_col_order, :
-    ]
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
     plot_vat_ivat(ivat_mst, vat_mst)
 
 
-def plot_vat_ivat(ivat_mst, vat_mst):
+def plot_vat_ivat(ivat_mst: np.ndarray, vat_mst: np.ndarray):
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
     im1 = ax1.imshow(vat_mst, cmap="viridis")
@@ -153,38 +98,12 @@ def plot_vat_ivat(ivat_mst, vat_mst):
     ax2.set_title("iVAT Matrix")
     plt.colorbar(im2, ax=ax2)
     plt.tight_layout()
-
-
-def test_plot_scaling():
-    n = np.logspace(1, 5.1, 96)
-    plt.plot(n, n**3, label="$N^3$")
-    plt.plot(n, n**2 * np.log(n), label="$N^2 \log N$")
-    plt.xlabel("Number of Elements")
-    plt.ylabel("Time Complexity")
-    plt.title("Scaling Time Complexity")
-    plt.legend()
-    plt.show()
-
-
-def test_show_fibb_bin_heap():
-    v = np.logspace(1, 4)
-    e = (v**2 - v) // 2
-    arr_v = v**2
-    bin_h_v = e * np.log2(v)
-    fibb_h_v = e + v * np.log2(v)
-    plt.plot(v, arr_v, label="Array")
-    plt.plot(v, bin_h_v, label="Binary Heap")
-    plt.plot(v, fibb_h_v, label="Fibonacci Heap")
-    plt.xlabel("Number of Elements")
-    plt.ylabel("Time Complexity")
-    plt.title("Heap Time Complexity Comparison")
-    plt.legend()
     plt.show()
 
 
 def test_fuzzy_c_means():
-    n_clusters = 10
-    all_cities = circle_random_clusters(
+    n_clusters: int = 10
+    all_cities = _circle_random_clusters(
         n_clusters=n_clusters, n_cities=20, cluster_spacing=5, cluster_diameter=0.5
     )
     # Scramble the order of the cities
@@ -312,7 +231,6 @@ def test_fuzzy_c_means():
     ax.set_ylabel("Y Coordinate")
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
-    plt.savefig("fuzzy_c_means_membership.eps", format="eps", bbox_inches="tight")
     plt.show()
 
 
@@ -358,7 +276,6 @@ def plot_diagonal(
         linestyle="--",
         label=f"Threshold: {peaks_threshold:.2f}",
     )
-    # ax2.axhline(y=peaks_threshold, color='r', linestyle='--', label=f'Threshold: {peaks_threshold:.2f}')
     ax2.text(
         0.02,
         0.98,

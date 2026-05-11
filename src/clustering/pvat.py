@@ -7,23 +7,29 @@ from numpy import ndarray
 
 
 def compute_ivat(
-    matrix_of_pairwise_distance: np.ndarray,
+    matrix_of_pairwise_distance: np.ndarray, inplace: bool = False
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
-        matrix_of_pairwise_distance, False
+        matrix_of_pairwise_distance, inplace=inplace
     )
     N = d_star.shape[0]
     # TODO - In-place modification?
-    d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
+    if not inplace:
+        d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
+    else:
+        d_p_star = d_star
     argmin_seq = []
     for r in range(1, N):
         jj = np.argmin(d_star[r, :r])
         argmin_seq.append(jj)
+
+        # TODO - Handle doing just upper-triangular matrix for memory savings?
+        d_p_star[r, jj] = d_star[r, jj]
+        d_p_star[jj, r] = d_star[r, jj]
         # jj = as_seq[r-1]
         for c in range(r):
-            d_p_star[c, r] = d_p_star[r, c] = (
-                max(d_star[r, jj], d_p_star[jj, c]) if jj != c else d_star[r, c]
-            )
+            if c != jj:
+                d_p_star[c, r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c])
 
     return d_p_star, d_star, argmin_seq, p_seq
 
@@ -32,7 +38,7 @@ def compute_ivat(
 def compute_ordered_dis_njit_merge(
     matrix_of_pairwise_distance: np.ndarray,
     inplace: bool = False,
-    progress_bar: ProgressBar = None,
+    progress_bar: ProgressBar | None = None,
 ) -> tuple[np.ndarray, list[int], list[int]]:
     N = matrix_of_pairwise_distance.shape[0]
     if inplace:
@@ -94,57 +100,57 @@ def shuffle_ordered_column(
 
 
 @njit(cache=True)
-def _set_bit(bitmask, row, col):
+def _set_bit(bitmask: np.ndarray, row: int, col: int) -> None:
     bitmask[row, col // 8] |= 1 << (col % 8)
 
 
 @njit(cache=True)
-def _get_bit(bitmask, row, col):
+def _get_bit(bitmask: np.ndarray, row: int, col: int) -> int:
     return (bitmask[row, col // 8] >> (col % 8)) & 1
 
 
 @njit(cache=True)
-def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarray:
-    N = len(adj)
+def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar | None = None) -> np.ndarray:
+    N: int = len(adj)
 
     # Find the column of the maximum value.
-    max_adj = np.argmax(adj)
-    src_i = max_adj // N
-    src_j = max_adj % N
-    src_key = adj[src_i, src_j]
+    max_adj: int = np.argmax(adj)
+    src_i: int = max_adj // N
+    src_j: int = max_adj % N
+    src_key: float = np.max(adj)
 
     # Create a list for keys and initialize all keys as infinite (INF)
-    key: np.ndarray = np.full(N, float("inf"), dtype=adj.dtype)
+    key: np.ndarray = np.full(N, np.inf, dtype=adj.dtype)
 
     # To store the parent array which, in turn, stores MST
     parent: np.ndarray = np.full(N, -1, dtype=np.int32)
 
     # To keep track of vertices included in MST
-    in_mst = np.full(N, False, dtype=np.bool_)
+    in_mst: np.ndarray = np.full(N, False, dtype=np.bool_)
 
     # Insert the source itself into the priority queue and initialize its key as 0
     pq: list[tuple[float, int, int]] = [
-        (src_key, src_j, src_i)
+        (src_key, src_i, src_j)
     ]  # Priority queue to store vertices that are being processed
-    key[src_j] = src_key
+    key[src_i] = src_key
 
     # The final sequence of vertices in MST
     heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
-    heap_seq_idx = 0
+    heap_seq_idx: int = 0
 
     # Parent sequences of vertices in MST (for iVAT)
     parent_seq: np.ndarray = np.zeros(N, dtype=np.int32)
-    parent_seq_idx = 0
+    parent_seq_idx: int = 0
 
     # Preallocated
-    vertices = np.arange(N)
+    vertices: np.ndarray = np.arange(N)
 
     # Loop until the priority queue becomes empty
     while pq:
         # The first vertex in the pair is the minimum key vertex
         # Extract it from the priority queue
         # The vertex label is stored in the second of the pair
-        w, u, v = heapq.heappop(pq)
+        w, u, v0 = heapq.heappop(pq)
 
         # Different key values for the same vertex may exist in the priority queue.
         # The one with the least key value is always processed first.
@@ -156,7 +162,7 @@ def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarra
         heap_seq[heap_seq_idx] = u
         heap_seq_idx += 1
 
-        parent_seq[parent_seq_idx] = v
+        parent_seq[parent_seq_idx] = v0
         parent_seq_idx += 1
 
         if progress_bar is not None:

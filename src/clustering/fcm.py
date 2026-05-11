@@ -1,7 +1,6 @@
-from typing import Callable
-
 import numpy as np
 from numpy import ndarray
+from scipy.optimize import minimize
 
 
 def _j_w_c(x: np.ndarray, c: np.ndarray, m: float) -> float:
@@ -23,16 +22,6 @@ def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
     return w_ij
 
 
-def _minimize(f: Callable[[np.ndarray], float], x0: ndarray) -> np.ndarray:
-    # TODO - Allow something else
-    h = 1e-6
-    # TODO - Nesterov's method?
-    # https://www.educative.io/answers/what-is-nesterov-accelerated-gradient
-    # Use a simple gradient descent method
-    def grad_f(x: ndarray) -> ndarray:
-        return np.gradient(f(x), x)
-
-
 def fuzzy_c_means(
     x: np.ndarray, n: int, m: float = 2.0
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -48,7 +37,7 @@ def fuzzy_c_means(
         c_reshaped = c_opt.reshape(n, x.shape[1])
         return _j_w_c(x, c_reshaped, m)
 
-    result = _minimize(optim_j_w_c, c.flatten(), method="BFGS")
+    result = minimize(optim_j_w_c, c.flatten(), method="BFGS")
     c = result.x.reshape(n, x.shape[1])
 
     # Calculate membership matrix
