@@ -29,17 +29,28 @@ def fuzzy_c_means(
     x: np.ndarray,
     n: int,
     m: float = 2.0,
+    *,
     indices: Optional[np.ndarray | list[int]] = None,
+    initial_guess: Optional[np.ndarray] = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute the fuzzy c-means"""
+    if initial_guess is not None and indices is not None:
+        raise ValueError("initial_guess and indices cannot both be provided")
     # 1. Create the candidate centers
-    if indices is None:
+    if indices is not None:
+        c = x[indices, :]
+    elif initial_guess is not None:
+        if initial_guess.shape != (n, x.shape[1]):
+            raise ValueError(
+                f"initial_guess must have shape ({n}, {x.shape[1]}), "
+                f"got {initial_guess.shape}"
+            )
+        c = initial_guess
+    else:
         indices = np.random.choice(x.shape[0], size=n * 2, replace=False)
         c = x[indices, :]
         # Combine every two rows into one so no cluster center exactly matches a data-point
         c = c.reshape(n, 2, x.shape[1]).mean(axis=1)
-    else:
-        c = x[indices, :]
 
     # 2. Iteratively refine with a gradient descent method
     def optim_j_w_c(c_opt: np.ndarray) -> float:

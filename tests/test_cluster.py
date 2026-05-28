@@ -1,11 +1,12 @@
 import time
+from typing import Any
 
 import numpy as np
 
 from clustering.util import pairwise_distances
 from src.clustering import vat_prim_mst_seq, compute_ivat, fcm
 from matplotlib import pyplot as plt
-from numpy import ndarray
+from numpy import ndarray, dtype
 
 
 def _random_cities(
@@ -141,21 +142,31 @@ def test_fcm_with_center_on_datapoint():
 
 
 def test_fuzzy_c_means():
-    n_clusters: int = 10
+    n_total: int = 400
+    n_clusters: int = 20
+    n_cities: int = n_total // n_clusters
     all_cities = _circle_random_clusters(
-        n_clusters=n_clusters, n_cities=20, cluster_spacing=5, cluster_diameter=0.5
+        n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
     )
     # Scramble the order of the cities
     scramble_order = np.random.permutation(len(all_cities))
     all_cities = all_cities[scramble_order]
 
-    matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
+    # Time the elbow method (multiple FCM calls with varying cluster counts)
+    start_elbow = time.time()
+    elbow_results = []
+    cluster_range = range(2, n_clusters + 1)
+    for k in cluster_range:
+        centers, weights = fcm.fuzzy_c_means(all_cities, k, 2)
+        elbow_results.append((k, centers, weights))
+    end_elbow = time.time()
+    elbow_time = end_elbow - start_elbow
 
+
+    start_ivat = time.time()
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
     # Compute the IVAT
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
-    # Plot it.
-    plot_vat_ivat(ivat_mst, vat_mst)
     # Look down the off-by-1 diagonal and count the number of substantial changes.
     diagonal_values = np.diag(ivat_mst, k=1)
     # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
@@ -170,13 +181,6 @@ def test_fuzzy_c_means():
     max_diff_index = np.argmax(diagonal_diffs)
     peaks_threshold = sorted_diagonal[max_diff_index + 1]
     abrupt_change_indices = np.where(diagonal_values >= peaks_threshold)[0]
-    plot_diagonal(
-        diagonal_values,
-        max_diff_index,
-        peaks_threshold,
-        sorted_diagonal,
-        abrupt_change_indices,
-    )
 
     # Use each section as a cluster endpoint, inclusive.
     cluster_groups = np.concatenate(
@@ -189,11 +193,39 @@ def test_fuzzy_c_means():
         # Use the VAT order to pick out the cities in each cluster
         cluster_city_ids.append(vat_order[cg_start:cg_end])
 
+    # Compute the initial guess as the centroid of each city cluster
+    initial_centroids = np.array([
+        np.mean(all_cities[cluster_ids], axis=0)
+        for cluster_ids in cluster_city_ids
+    ])
+
+    # Time the single FCM call
+    start_single = time.time()
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids)
+    mid_single = time.time()
+    _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
+    end_single = time.time()
+    smart_fcm_time = mid_single - start_single
+    single_fcm_time = end_single - mid_single
+    single_ivat_time = start_single - start_ivat
+
+    # Print performance comparison
+    print(f"\n{'=' * 60}")
+    print(f"Performance Comparison:")
+    print(f"{'=' * 60}")
+    print(f"Elbow Method (n=2 to {n_clusters}): {elbow_time:.4f} seconds")
+    print(f"Single FCM (n={n_clusters}):     {single_fcm_time:.4f} seconds")
+    print(f"Smart FCM (n={n_clusters}):     {smart_fcm_time:.4f} seconds")
+    print(f"IVAT (n={n_clusters}):           {single_ivat_time:.4f} seconds")
+    print(f"Time difference:          {elbow_time - single_ivat_time:.4f} seconds")
+    print(f"Elbow method is {elbow_time/single_ivat_time:.2f}x slower")
+    print(f"{'='*60}\n")
+
     # Assert that every city has been allocated to a cluster
     all_allocated_cities = np.concatenate(cluster_city_ids)
     all_allocated_cities = np.sort(all_allocated_cities)
-    print(f"All cities:\n{np.r_[0:len(all_cities)]}")
-    print(f"Allocated Cities:\n{all_allocated_cities}")
+    # print(f"All cities:\n{np.r_[0:len(all_cities)]}")
+    # print(f"Allocated Cities:\n{all_allocated_cities}")
     assert len(all_allocated_cities) == len(
         all_cities
     ), f"Not all cities allocated: {len(all_allocated_cities)} allocated out of {len(all_cities)} total"
@@ -201,6 +233,22 @@ def test_fuzzy_c_means():
         all_cities
     ), f"Duplicate city allocations detected"
 
+    plot_vat_ivat(ivat_mst, vat_mst)
+
+    plot_diagonal(
+        diagonal_values,
+        max_diff_index,
+        peaks_threshold,
+        sorted_diagonal,
+        abrupt_change_indices,
+    )
+
+    plot_membership(all_cities, cluster_city_ids, meth_c, w_c)
+    plt.show()
+
+
+def plot_membership(all_cities: ndarray[tuple[Any, ...], dtype[Any]], cluster_city_ids: list[Any],
+                    meth_c: ndarray[tuple[Any, ...], dtype[Any]], w_c: ndarray[tuple[Any, ...], dtype[Any]]):
     # Create a color map for clusters
     colors = plt.cm.rainbow(np.linspace(0, 1, meth_c.shape[0]))
 
@@ -271,7 +319,6 @@ def test_fuzzy_c_means():
     # ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
     ax.legend()
     plt.tight_layout()
-    plt.show()
 
 
 def plot_diagonal(
