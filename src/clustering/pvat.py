@@ -13,7 +13,6 @@ def compute_ivat(
         matrix_of_pairwise_distance, inplace=inplace
     )
     N = d_star.shape[0]
-    # TODO - In-place modification?
     if not inplace:
         d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
     else:
@@ -26,6 +25,7 @@ def compute_ivat(
         # TODO - Handle doing just upper-triangular matrix for memory savings?
         d_p_star[r, jj] = d_star[r, jj]
         d_p_star[jj, r] = d_star[r, jj]
+        # TODO - Get from the prim-mst sequence?
         # jj = as_seq[r-1]
         for c in range(r):
             if c != jj:
@@ -77,9 +77,9 @@ def compute_ordered_dis_njit_merge(
 
 @njit(cache=True)
 def shuffle_ordered_column(
-    N: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray
+    n: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray
 ):
-    for jk in range(ij, N):
+    for jk in range(ij, n):
         if _get_bit(visited, ij, jk):
             continue
         # Walk this loop, and store which visited
@@ -111,39 +111,39 @@ def _get_bit(bitmask: np.ndarray, row: int, col: int) -> int:
 
 @njit(cache=True)
 def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar | None = None) -> np.ndarray:
-    N: int = len(adj)
+    n: int = len(adj)
 
     # Find the column of the maximum value.
-    max_adj: int = np.argmax(adj)
-    src_i: int = max_adj // N
-    src_j: int = max_adj % N
-    src_key: float = np.max(adj)
+    max_adj = np.argmax(adj)
+    src_i: int = max_adj // n
+    src_j: int = max_adj % n
+    src_key = adj[src_i, src_j]
 
     # Create a list for keys and initialize all keys as infinite (INF)
-    key: np.ndarray = np.full(N, np.inf, dtype=adj.dtype)
+    key: np.ndarray = np.full(n, np.inf, dtype=adj.dtype)
 
     # To store the parent array which, in turn, stores MST
-    parent: np.ndarray = np.full(N, -1, dtype=np.int32)
+    parent: np.ndarray = np.full(n, -1, dtype=np.int32)
 
     # To keep track of vertices included in MST
-    in_mst: np.ndarray = np.full(N, False, dtype=np.bool_)
+    in_mst: np.ndarray = np.full(n, False, dtype=np.bool_)
 
     # Insert the source itself into the priority queue and initialize its key as 0
     pq: list[tuple[float, int, int]] = [
-        (src_key, src_i, src_j)
+        (src_key, src_j, src_i)
     ]  # Priority queue to store vertices that are being processed
-    key[src_i] = src_key
+    key[src_j] = src_key
 
     # The final sequence of vertices in MST
-    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq: np.ndarray = np.zeros(n, dtype=np.int32)
     heap_seq_idx: int = 0
 
     # Parent sequences of vertices in MST (for iVAT)
-    parent_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    parent_seq: np.ndarray = np.zeros(n, dtype=np.int32)
     parent_seq_idx: int = 0
 
     # Preallocated
-    vertices: np.ndarray = np.arange(N)
+    vertices: np.ndarray = np.arange(n)
 
     # Loop until the priority queue becomes empty
     while pq:
@@ -170,7 +170,7 @@ def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar | None = None) -> np
 
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
-        mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
+        mask = (vertices != u) & ~in_mst & (key[vertices] >= adj[u, vertices])
         key[mask] = adj[u, mask]
         for v in vertices[mask]:
             heapq.heappush(pq, (key[v], v, heap_seq_idx))

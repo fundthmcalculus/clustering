@@ -229,7 +229,8 @@ def test_fuzzy_c_means():
     ax.set_title("Fuzzy C-Means Clustering with Membership-based Colors")
     ax.set_xlabel("X Coordinate")
     ax.set_ylabel("Y Coordinate")
-    ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    # ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    ax.legend()
     plt.tight_layout()
     plt.show()
 
