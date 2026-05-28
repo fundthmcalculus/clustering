@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 
 import numpy as np
 from numpy import ndarray
@@ -25,11 +25,17 @@ def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
     return w_ij
 
 
+def _get_v_ij(w_ij: ndarray, m: float, x: ndarray) -> ndarray:
+    v_ij = np.sum(w_ij[:, :, np.newaxis]**m * (x[:, np.newaxis, :]), axis=0) / np.sum(w_ij ** m, axis=0)[:, np.newaxis]
+    return v_ij
+
+
 def fuzzy_c_means(
     x: np.ndarray,
     n: int,
     m: float = 2.0,
     *,
+    method: Literal["gd","iter"] = "iter",
     indices: Optional[np.ndarray | list[int]] = None,
     initial_guess: Optional[np.ndarray] = None
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -57,8 +63,19 @@ def fuzzy_c_means(
         c_reshaped = c_opt.reshape(n, x.shape[1])
         return _j_w_c(x, c_reshaped, m)
 
-    result = minimize(optim_j_w_c, c.flatten(), method="BFGS")
-    c = result.x.reshape(n, x.shape[1])
+    if method == "gd":
+        result = minimize(optim_j_w_c, c.flatten(), method="BFGS")
+        c = result.x.reshape(n, x.shape[1])
+    elif method == "iter":
+        # Max of 100 iterations
+        for _ in range(100):
+            w_ij = _get_weights(c, m, x)
+            c_new = _get_v_ij(w_ij, m, x)
+            if np.allclose(c_new, c, rtol=1e-5, atol=1e-8):
+                break
+            c = c_new
+    else:
+        raise ValueError(f"Invalid method: {method}. Choose 'gd' or 'iter'.")
 
     # Calculate membership matrix
     w_ij = _get_weights(c, m, x)

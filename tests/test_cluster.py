@@ -142,8 +142,8 @@ def test_fcm_with_center_on_datapoint():
 
 
 def test_fuzzy_c_means():
-    n_total: int = 400
-    n_clusters: int = 20
+    n_total: int = 1024
+    n_clusters: int = 32
     n_cities: int = n_total // n_clusters
     all_cities = _circle_random_clusters(
         n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
@@ -161,7 +161,6 @@ def test_fuzzy_c_means():
         elbow_results.append((k, centers, weights))
     end_elbow = time.time()
     elbow_time = end_elbow - start_elbow
-
 
     start_ivat = time.time()
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
@@ -205,8 +204,11 @@ def test_fuzzy_c_means():
     mid_single = time.time()
     _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
     end_single = time.time()
+    _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2, method='gd')
+    end_gd = time.time()
     smart_fcm_time = mid_single - start_single
     single_fcm_time = end_single - mid_single
+    iter_fcm_time = end_gd - end_single
     single_ivat_time = start_single - start_ivat
 
     # Print performance comparison
@@ -214,7 +216,8 @@ def test_fuzzy_c_means():
     print(f"Performance Comparison:")
     print(f"{'=' * 60}")
     print(f"Elbow Method (n=2 to {n_clusters}): {elbow_time:.4f} seconds")
-    print(f"Single FCM (n={n_clusters}):     {single_fcm_time:.4f} seconds")
+    print(f"Single iter-FCM (n={n_clusters}):     {single_fcm_time:.4f} seconds")
+    print(f"Single GD-FCM (n={n_clusters}):     {iter_fcm_time:.4f} seconds")
     print(f"Smart FCM (n={n_clusters}):     {smart_fcm_time:.4f} seconds")
     print(f"IVAT (n={n_clusters}):           {single_ivat_time:.4f} seconds")
     print(f"Time difference:          {elbow_time - single_ivat_time:.4f} seconds")
