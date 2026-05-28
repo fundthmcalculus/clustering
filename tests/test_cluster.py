@@ -101,6 +101,39 @@ def plot_vat_ivat(ivat_mst: np.ndarray, vat_mst: np.ndarray):
     plt.show()
 
 
+def test_fcm_with_center_on_datapoint():
+    """Test FCM behavior when a cluster center coincides with a data point"""
+    # Create 5 points on a line: (1,0), (3,0), (5,0), (7,0), (9,0)
+    data_points = np.array([[1.0, 0.0], [3.0, 0.0], [5.0, 0.0], [7.0, 0.0], [9.0, 0.0]])
+
+    # Run FCM with 2 clusters
+    n_clusters = 2
+    for idx0 in range(len(data_points)):
+        for idx1 in range(idx0 + 1, len(data_points)):
+            cluster_centers, membership_weights = fcm.fuzzy_c_means(
+                data_points, n_clusters, m=2.0, indices=[idx0, idx1]
+            )
+
+            # Verify that we got 2 cluster centers
+            assert cluster_centers.shape == (
+                n_clusters,
+                2,
+            ), f"Expected shape {(n_clusters, 2)}, got {cluster_centers.shape}"
+
+            # Verify that membership weights sum to 1 for each data point
+            membership_sums = np.sum(membership_weights, axis=1)
+            np.testing.assert_array_almost_equal(
+                membership_sums,
+                np.ones(len(data_points)),
+                err_msg="Membership weights should sum to 1 for each data point",
+            )
+
+            # Verify all membership weights are between 0 and 1
+            assert np.all(membership_weights >= 0) and np.all(
+                membership_weights <= 1
+            ), "All membership weights should be between 0 and 1"
+
+
 def test_fuzzy_c_means():
     n_clusters: int = 10
     all_cities = _circle_random_clusters(

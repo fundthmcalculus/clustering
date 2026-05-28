@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 from numpy import ndarray
 from scipy.optimize import minimize
@@ -19,18 +21,25 @@ def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
     distances_to_jj = distances[:, :, np.newaxis]
     distances_to_all = distances[:, np.newaxis, :]
     w_ij = 1.0 / np.sum((distances_to_jj / distances_to_all) ** (2.0 / (m - 1)), axis=2)
+    w_ij = np.where(np.isnan(w_ij) | np.isinf(w_ij), 0.0, w_ij)
     return w_ij
 
 
 def fuzzy_c_means(
-    x: np.ndarray, n: int, m: float = 2.0
+    x: np.ndarray,
+    n: int,
+    m: float = 2.0,
+    indices: Optional[np.ndarray | list[int]] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute the fuzzy c-means"""
     # 1. Create the candidate centers
-    indices = np.random.choice(x.shape[0], size=n * 2, replace=False)
-    c = x[indices, :]
-    # Combine every two rows into one so no cluster center exactly matches a data-point
-    c = c.reshape(n, 2, x.shape[1]).mean(axis=1)
+    if indices is None:
+        indices = np.random.choice(x.shape[0], size=n * 2, replace=False)
+        c = x[indices, :]
+        # Combine every two rows into one so no cluster center exactly matches a data-point
+        c = c.reshape(n, 2, x.shape[1]).mean(axis=1)
+    else:
+        c = x[indices, :]
 
     # 2. Iteratively refine with a gradient descent method
     def optim_j_w_c(c_opt: np.ndarray) -> float:

@@ -20,13 +20,13 @@ def compute_ivat(
     argmin_seq = []
     for r in range(1, N):
         jj = np.argmin(d_star[r, :r])
+        # TODO - Get from the prim-mst sequence?
+        # jj = as_seq[r-1]
         argmin_seq.append(jj)
 
         # TODO - Handle doing just upper-triangular matrix for memory savings?
         d_p_star[r, jj] = d_star[r, jj]
         d_p_star[jj, r] = d_star[r, jj]
-        # TODO - Get from the prim-mst sequence?
-        # jj = as_seq[r-1]
         for c in range(r):
             if c != jj:
                 d_p_star[c, r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c])
@@ -110,7 +110,9 @@ def _get_bit(bitmask: np.ndarray, row: int, col: int) -> int:
 
 
 @njit(cache=True)
-def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar | None = None) -> np.ndarray:
+def vat_prim_mst(
+    adj: np.ndarray, progress_bar: ProgressBar | None = None
+) -> np.ndarray:
     n: int = len(adj)
 
     # Find the column of the maximum value.
@@ -130,9 +132,9 @@ def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar | None = None) -> np
 
     # Insert the source itself into the priority queue and initialize its key as 0
     pq: list[tuple[float, int, int]] = [
-        (src_key, src_j, src_i)
+        (src_key, src_i, src_j)
     ]  # Priority queue to store vertices that are being processed
-    key[src_j] = src_key
+    key[src_i] = src_key
 
     # The final sequence of vertices in MST
     heap_seq: np.ndarray = np.zeros(n, dtype=np.int32)
@@ -181,13 +183,13 @@ def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar | None = None) -> np
 
 @njit(cache=True)
 def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
-    N = len(samples)
+    n = len(samples)
 
     # Find the column of the maximum value.
     max_adj = -np.inf
     max_idx = (-1, -1)
-    for ij in range(N):
-        for jk in range(ij, N):
+    for ij in range(n):
+        for jk in range(ij, n):
             cur_dist = _get_dist(samples, ij, jk)
             if cur_dist > max_adj:
                 max_adj = cur_dist
@@ -197,13 +199,13 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
     src_key = max_adj
 
     # Create a list for keys and initialize all keys as infinite (INF)
-    key: np.ndarray = np.full(N, float("inf"))
+    key: np.ndarray = np.full(n, float("inf"))
 
     # To store the parent array which, in turn, stores MST
-    parent: np.ndarray = np.full(N, -1)
+    parent: np.ndarray = np.full(n, -1)
 
     # To keep track of vertices included in MST
-    in_mst = np.full(N, False)
+    in_mst = np.full(n, False)
 
     # Insert the source itself into the priority queue and initialize its key as 0
     pq: list[tuple[float, int]] = [
@@ -212,11 +214,11 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
     key[src] = src_key
 
     # The final sequence of vertices in MST
-    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq: np.ndarray = np.zeros(n, dtype=np.int32)
     heap_seq_idx = 0
 
     # Preallocated
-    vertices = np.arange(N)
+    vertices = np.arange(n)
 
     # Loop until the priority queue becomes empty
     while pq:
