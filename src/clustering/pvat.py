@@ -40,7 +40,7 @@ def compute_ordered_dis_njit_merge(
     inplace: bool = False,
     progress_bar: ProgressBar | None = None,
 ) -> tuple[np.ndarray, list[int], list[int]]:
-    N = matrix_of_pairwise_distance.shape[0]
+    n = matrix_of_pairwise_distance.shape[0]
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
     else:
@@ -49,22 +49,22 @@ def compute_ordered_dis_njit_merge(
         )
     p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
     # Step 3 - since this is symmetric, we only have to do half
-    n_bit_mask = int(np.ceil(N / 8))
+    n_bit_mask = int(np.ceil(n / 8))
     # Boolean is stored as a byte, so this is smaller
-    visited = np.zeros((N, n_bit_mask), dtype=np.uint8)
+    visited = np.zeros((n, n_bit_mask), dtype=np.uint8)
 
     if progress_bar is not None:
         progress_bar.set(0)
 
     if inplace:
         # Due to loop-walking, we cannot use the parallel operations since we cannot know a-priori which loops are different.
-        for ij in range(N):
-            shuffle_ordered_column(N, ij, ordered_matrix, p, visited)
+        for ij in range(n):
+            shuffle_ordered_column(n, ij, ordered_matrix, p, visited)
             if progress_bar is not None:
                 progress_bar.update(1)
     else:
-        for ij in prange(N):
-            for jk in range(ij, N):
+        for ij in prange(n):
+            for jk in range(ij, n):
                 ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = (
                     matrix_of_pairwise_distance[p[ij], p[jk]]
                 )
@@ -112,13 +112,13 @@ def _get_bit(bitmask: np.ndarray, row: int, col: int) -> int:
 @njit(cache=True)
 def vat_prim_mst(
     adj: np.ndarray, progress_bar: ProgressBar | None = None
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     n: int = len(adj)
 
     # Find the column of the maximum value.
-    max_adj = np.argmax(adj)
-    src_i: int = max_adj // n
-    src_j: int = max_adj % n
+    max_adj: np.signedinteger = np.argmax(adj)
+    src_i: np.signedinteger = max_adj // n
+    src_j: np.signedinteger = max_adj % n
     src_key = adj[src_i, src_j]
 
     # Create a list for keys and initialize all keys as infinite (INF)
@@ -131,7 +131,7 @@ def vat_prim_mst(
     in_mst: np.ndarray = np.full(n, False, dtype=np.bool_)
 
     # Insert the source itself into the priority queue and initialize its key as 0
-    pq: list[tuple[float, int, int]] = [
+    pq: list[tuple[float, np.signedinteger, np.signedinteger]] = [
         (src_key, src_i, src_j)
     ]  # Priority queue to store vertices that are being processed
     key[src_i] = src_key
