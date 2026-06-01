@@ -32,8 +32,3 @@ jobs:
 
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      # Note: For this to work with Trusted Publishing, the user must configure
-      # the repository on PyPI to trust this GitHub workflow.
-      # If using an API token, uncomment the following line and set up secrets.
-      # with:
-      #   password: ${{ secrets.PYPI_API_TOKEN }}

@@ -39,7 +39,17 @@ def fuzzy_c_means(
     indices: Optional[np.ndarray | list[int]] = None,
     initial_guess: Optional[np.ndarray] = None
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute the fuzzy c-means"""
+    """
+    Compute the fuzzy c-means clustering algorithm.
+
+    :param x: Input data points, shape (n_samples, n_features)
+    :param n: Number of clusters
+    :param m: Fuzziness parameter, default 2.0
+    :param method: Clustering method, either 'gd' (gradient descent) or 'iter' (iterative), default 'iter'
+    :param indices: Indices of initial cluster centers, if provided
+    :param initial_guess: Initial cluster centers, if provided
+    :return: Tuple of membership matrix (shape (n_samples, n_clusters)) and cluster centers (shape (n_clusters, n_features))
+    """
     if initial_guess is not None and indices is not None:
         raise ValueError("initial_guess and indices cannot both be provided")
     # 1. Create the candidate centers
