@@ -3,6 +3,10 @@ from .pvat import (
     vat_prim_mst_seq,
     compute_vat,
     compute_ivat,
+    get_ivat_levels,
+    get_ivat_hierarchy,
+    ClusterNode,
+    IvatMeansResult,
 )
 
 from .fcm import (

@@ -3,9 +3,9 @@ from numba import prange, njit
 
 
 @njit(cache=True, parallel=True, nogil=True)
-def pairwise_distances(data: np.ndarray) -> np.ndarray:
+def pairwise_distances(data: np.ndarray, norm_only: bool = False) -> np.ndarray:
     is_1d: bool = data.shape[1] == 1
-    if is_1d:
+    if is_1d and not norm_only:
         # Vectorized computation for 1D case
         return np.abs(data.T - data)
     else:

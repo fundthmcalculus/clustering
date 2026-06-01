@@ -4,11 +4,20 @@ from typing import Any, Union
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 from numpy import ndarray
 from scipy.spatial import Voronoi, voronoi_plot_2d, QhullError
 
 from clustering.util import pairwise_distances, circle_random_clusters, _random_cities
-from src.clustering import vat_prim_mst_seq, compute_ivat, fcm
+from clustering import (
+    vat_prim_mst_seq,
+    compute_ivat,
+    fcm,
+    get_ivat_levels,
+    get_ivat_hierarchy,
+    ClusterNode,
+    IvatMeansResult,
+)
 
 
 def _hierarchical_circle_clusters(
@@ -74,32 +83,6 @@ def _hierarchical_circle_clusters(
 
     # Start recursion from the origin
     return _create_level(0.0, 0.0, 0)
-
-
-def _test_cluster_sequencing():
-    from ucimlrepo import fetch_ucirepo
-
-    # fetch dataset
-    # 59 is letter recognition
-    # 827 is sepsis survival (allocates 80+ GB RAM)
-    # 148 is shuttle stat log (allocates 50 GB RAM)
-    letter_recognition = fetch_ucirepo(id=59)
-
-    # data (as pandas dataframes)
-    X = np.array(letter_recognition.data.features)
-
-    # metadata
-    print(f"Metadata: {letter_recognition.metadata}")
-
-    # variable information
-    print(f"Variable Information: {letter_recognition.variables}")
-
-    # Compute the pairwise distances
-    t0 = time.time()
-    ordered_matrix = vat_prim_mst_seq(X)
-    t1 = time.time()
-
-    print(f"Elapsed time for {len(X)} data points: {t1-t0:.02f}")
 
 
 def test_merge_ivat():
@@ -187,12 +170,22 @@ def test_heirarchy_ivat_means():
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
     # Get cluster information from iVAT
-    res = _get_ivat_means(all_cities, ivat_mst, vat_order, n_levels=3)
+    res = get_ivat_levels(all_cities, ivat_mst, vat_order, n_levels=3)
     # Run FCM with iVAT-derived initial guess
     n_clusters = len(res[0].initial_centroids)
     meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res[0].initial_centroids)
 
     print(f"Detected {n_clusters} clusters using iVAT")
+
+    # Test hierarchy
+    root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=3)
+    assert len(root.children) == len(res[0].cluster_city_ids)
+    
+    # Check tree structure (recursive count of leaves or similar)
+    def count_nodes(node):
+        return 1 + sum(count_nodes(child) for child in node.children)
+    
+    print(f"Hierarchy tree has {count_nodes(root)} nodes")
 
     # Visualize results
     plot_vat_ivat(ivat_mst, vat_mst)
@@ -224,30 +217,46 @@ def plot_voronoi(all_cities, centroids):
 def test_multi_dim_pairwise_dist_perf():
     results = []
     # Do 1 pairwise distances to reduce nogil/numba randomness
-    pairwise_distances(np.zeros((100, 3)))
+    pairwise_distances(np.zeros((100, 3)), False)
+    pairwise_distances(np.zeros((100, 3)), True)
 
-    dims = [1, 2]
-    sizes = [1000, 2000, 3000, 5000, 8000, 10000, 20000]
-    # sizes = [1000, 2000]
-    for dim in dims:
+    norms_only = [False, True]
+    dim = 1
+    sizes = [1000, 2000, 3000, 5000, 8000, 10_000, 20_000, 30_000]
+    # sizes = [1000, 2000, 3000, 5000]
+    for norm_only in norms_only:
         for size in sizes:
             data = np.random.rand(size, dim)
             start = time.time()
-            pairwise_distances(data)
+            pairwise_distances(data, norm_only)
             end = time.time()
             elapsed = end - start
-            results.append((dim, size, elapsed))
+            results.append((norm_only, size, elapsed))
 
     # Plot results
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots()
 
     # Group results by dimension
-    colors = plt.cm.viridis(np.linspace(0, 1, len(dims)))
-
-    for dim, color in zip(dims, colors):
-        dim_results = [(size, time) for d, size, time in results if d == dim]
+    for norm in norms_only:
+        dim_results = [(size, time) for d, size, time in results if d == norm]
         sizes, times = zip(*dim_results)
-        ax.plot(sizes, times, marker='o', label=f'Dim={dim}', color=color, linewidth=2)
+        sizes_arr = np.array(sizes)
+        times_arr = np.array(times)
+
+        ax.plot(sizes, times, marker='o', label=f'L2-only={norm} (data)', linewidth=2)
+
+        # Fit quadratic polynomial (degree 2)
+        quadratic_coeffs = np.polyfit(sizes_arr, times_arr, 2)
+        quadratic_poly = np.poly1d(quadratic_coeffs)
+
+        # Generate smooth x-values for plotting curves
+        x_smooth = np.linspace(min(sizes), max(sizes), 200)
+
+        # Plot polynomial fits
+        ax.plot(x_smooth, quadratic_poly(x_smooth),
+                linestyle='--',
+                label=f'L2-only={norm} (quadratic fit): {quadratic_coeffs[0]:.2e}x² + {quadratic_coeffs[1]:.2e}x + {quadratic_coeffs[2]:.2e}',
+                linewidth=1.5, alpha=0.7)
 
     ax.set_xlabel('Data Size', fontsize=12)
     ax.set_ylabel('Time (seconds)', fontsize=12)
@@ -255,6 +264,31 @@ def test_multi_dim_pairwise_dist_perf():
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
+
+    # Plot ratio of the two datasets
+    fig_ratio, ax_ratio = plt.subplots()
+
+    # Extract times for each norm_only value
+    false_results = [(size, time) for norm, size, time in results if norm == False]
+    true_results = [(size, time) for norm, size, time in results if norm == True]
+
+    # Compute ratios (False / True)
+    ratios = []
+    ratio_sizes = []
+    for (size_f, time_f), (size_t, time_t) in zip(false_results, true_results):
+        assert size_f == size_t, "Size mismatch between datasets"
+        ratios.append(time_f / time_t)
+        ratio_sizes.append(size_f)
+
+    ax_ratio.plot(ratio_sizes, ratios, marker='o', linewidth=2, label='Ratio (L2-only=False / L2-only=True)')
+    ax_ratio.axhline(y=np.mean(ratios), color='r', linestyle='--', label=f'Mean Ratio: {np.mean(ratios):.2f}')
+    ax_ratio.set_xlabel('Data Size', fontsize=12)
+    ax_ratio.set_ylabel('Time Ratio (False/True)', fontsize=12)
+    ax_ratio.set_title('Performance Ratio: Full Distance Matrix vs L2-Norm Only', fontsize=14)
+    ax_ratio.legend()
+    ax_ratio.grid(True, alpha=0.3)
+    plt.tight_layout()
+
     plt.show()
 
 
@@ -283,7 +317,7 @@ def test_fuzzy_c_means():
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
     # Compute the IVAT
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
-    res = _get_ivat_means(all_cities, ivat_mst, vat_order)
+    res = get_ivat_levels(all_cities, ivat_mst, vat_order)
 
     # Time the single FCM call
     start_single = time.time()
@@ -334,88 +368,6 @@ def test_fuzzy_c_means():
 
     plot_membership(all_cities, res.cluster_city_ids, meth_c, w_c)
     plt.show()
-
-
-@dataclass
-class IvatMeansResult:
-    abrupt_change_indices: ndarray
-    cluster_city_ids: list[ndarray]
-    diagonal_values: ndarray
-    initial_centroids: ndarray
-    max_diff_index: int
-    peak_threshold: float
-    sorted_diagonal: ndarray
-
-
-def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1) -> Union[IvatMeansResult, list[IvatMeansResult]]:
-    # Look down the off-by-1 diagonal and count the number of substantial changes.
-    diagonal_values = np.diag(ivat_mst, k=1)
-    # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
-    # Expand this to the original size for convenience.
-    diagonal_values = np.concatenate(
-        [np.array([diagonal_values[0]]), diagonal_values], axis=0
-    )
-    # Sort the diagonal values
-    sorted_diagonal = np.sort(diagonal_values)
-    # Find the maximum difference and the index thereof
-    diagonal_diffs = np.diff(sorted_diagonal)
-    max_diff_indices = _arg_max(diagonal_diffs, n_levels)
-    peaks_threshold = sorted_diagonal[max_diff_indices + 1]
-
-    # Sort peaks_threshold in decreasing order and reorder max_diff_indices accordingly
-    sort_order = np.argsort(peaks_threshold)[::-1]
-    peaks_threshold = peaks_threshold[sort_order]
-    max_diff_indices = max_diff_indices[sort_order]
-
-    results = []
-    for index, peak_th in enumerate(peaks_threshold):
-        # Prevent weird floating-point comparisons.
-        abrupt_change_idx = np.where(diagonal_values >= 0.99*peak_th)[0]
-
-        # Use each section as a cluster endpoint, inclusive.
-        cluster_group = np.concatenate([np.array([0]), abrupt_change_idx, np.array([len(all_cities)])])
-        cluster_city_indexs = []
-        for idx in range(0, len(cluster_group) - 1):
-            cg_start = cluster_group[idx]
-            cg_end = cluster_group[idx + 1]
-            # Use the VAT order to pick out the cities in each cluster
-            cluster_city_indexs.append(vat_order[cg_start:cg_end])
-
-        # Compute the initial guess as the centroid of each city cluster
-        initial_centroids_item = np.array([
-            np.mean(all_cities[cluster_ids], axis=0)
-            for cluster_ids in cluster_city_indexs
-        ])
-
-        results.append(IvatMeansResult(
-            abrupt_change_indices=abrupt_change_idx,
-            cluster_city_ids=cluster_city_indexs,
-            diagonal_values=diagonal_values,
-            initial_centroids=initial_centroids_item,
-            max_diff_index=int(max_diff_indices[index]),
-            peak_threshold=float(peak_th),
-            sorted_diagonal=sorted_diagonal
-        ))
-
-    if n_levels == 1:
-        return results[0]
-    return results
-
-
-def get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray) -> tuple[ndarray, list[Any], ndarray]:
-    res = _get_ivat_means(all_cities, ivat_mst, vat_order)
-    return [res.initial_centroids], [res.cluster_city_ids], np.array([res.peak_threshold])
-
-
-def _arg_max(a: ndarray, n: int = 1) -> ndarray:
-    """Get the indexes of the n-largest values in the array."""
-    if n >= len(a):
-        return np.argsort(a)[::-1]
-    # Use argpartition to find the n largest elements efficiently
-    partitioned_indices = np.argpartition(a, -n)[-n:]
-    # Sort these indices by their corresponding values in descending order
-    sorted_indices = partitioned_indices[np.argsort(a[partitioned_indices])[::-1]]
-    return sorted_indices
 
 
 def plot_membership(all_cities: ndarray, cluster_city_ids: list[Any],
@@ -536,3 +488,145 @@ def plot_diagonal(
         verticalalignment="top",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )
+
+
+def test_ivat_hierarchy_logic():
+    # Create simple hierarchical data: 2 clusters of 10 points each
+    # Each cluster consists of 2 subclusters of 5 points each
+    # Total 20 points
+    cluster1 = np.random.randn(10, 2) + [10, 10]
+    cluster1[:5] += [1, 1]
+    cluster1[5:] += [-1, -1]
+    
+    cluster2 = np.random.randn(10, 2) + [-10, -10]
+    cluster2[:5] += [1, 1]
+    cluster2[5:] += [-1, -1]
+    
+    all_cities = np.vstack([cluster1, cluster2])
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    
+    # We want 2 levels: level 1 should have 2 clusters, level 2 should have 4 clusters
+    root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=2)
+    
+    # We should have a root with some children
+    assert len(root.children) >= 2
+    
+    # Check that children of root are parents of the next level
+    total_grandchildren = 0
+    for child in root.children:
+        total_grandchildren += len(child.children)
+        # Check that children indices are subset of parent indices
+        for grandchild in child.children:
+            assert np.all(np.isin(grandchild.indices, child.indices))
+            
+    assert total_grandchildren > len(root.children)
+
+
+def plot_tree(root: ClusterNode):
+    """Plot the hierarchical structure as a tree."""
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.set_axis_off()
+
+    positions = {}
+
+    def get_width(node):
+        if not node.children:
+            return 1
+        return sum(get_width(child) for child in node.children)
+
+    def assign_pos(node, depth, left, right):
+        width = right - left
+        x = left + width / 2
+        y = -depth
+        positions[id(node)] = (x, y)
+
+        if node.children:
+            current_left = left
+            total_child_width = sum(get_width(c) for c in node.children)
+            for child in node.children:
+                child_width = get_width(child)
+                norm_child_width = (child_width / total_child_width) * width
+                assign_pos(child, depth + 1, current_left, current_left + norm_child_width)
+                current_left += norm_child_width
+
+    assign_pos(root, 0, 0, 1)
+
+    def draw(node):
+        x, y = positions[id(node)]
+        ax.scatter(x, y, s=500, c='skyblue', edgecolors='black', zorder=2)
+        ax.text(x, y, str(len(node.indices)), ha='center', va='center', fontsize=8, zorder=3)
+
+        for child in node.children:
+            cx, cy = positions[id(child)]
+            ax.plot([x, cx], [y, cy], c='gray', zorder=1, alpha=0.5)
+            draw(child)
+
+    draw(root)
+    ax.set_title("Hierarchical Cluster Tree (numbers indicate points in cluster)")
+    plt.tight_layout()
+    return fig
+
+
+def animate_hierarchical_clustering(all_cities, root: ClusterNode):
+    """Create an animation showing clusters at each level of the hierarchy."""
+    levels = []
+
+    def collect_levels(node, depth):
+        if len(levels) <= depth:
+            levels.append([])
+        levels[depth].append(node)
+        for child in node.children:
+            collect_levels(child, depth + 1)
+
+    collect_levels(root, 0)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    def update(frame):
+        ax.clear()
+        nodes = levels[frame]
+        colors = plt.cm.rainbow(np.linspace(0, 1, len(nodes)))
+
+        for i, node in enumerate(nodes):
+            points = all_cities[node.indices]
+            ax.scatter(points[:, 0], points[:, 1], color=colors[i], label=f'Cluster {i}', s=15, alpha=0.6)
+
+        ax.set_title(f"Hierarchy Level {frame} ({len(nodes)} clusters)")
+        ax.set_aspect('equal')
+        if len(nodes) < 10:
+            ax.legend(loc='upper right', markerscale=2)
+
+    anim = FuncAnimation(fig, update, frames=len(levels), interval=1500, repeat=True)
+    return anim
+
+
+def test_visualize_hierarchy():
+    """Test and visualize the hierarchical breakdown with a tree plot and animation."""
+    # 3 top-level clusters, each with 3 sub-clusters, each with 5 points (3*3*5 = 45 points)
+    all_cities = _hierarchical_circle_clusters(
+        clusters_per_level=[3, 3, 5],
+        diameters_per_level=[20.0, 5.0, 1.0]
+    )
+
+    # Scramble the order
+    all_cities = all_cities[np.random.permutation(len(all_cities))]
+
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+
+    # Get hierarchy (3 levels)
+    root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=3)
+
+    # Plot tree
+    fig_tree = plot_tree(root)
+
+    # Animate
+    anim = animate_hierarchical_clustering(all_cities, root)
+
+    # In a real test environment, we might save these
+    anim.save('hierarchy_animation.gif', writer='imagemagick')
+    fig_tree.savefig('hierarchy_tree.png')
+
+    plt.show()
+    assert len(root.children) > 0
