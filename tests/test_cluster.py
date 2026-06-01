@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy import ndarray
-from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy.spatial import Voronoi, voronoi_plot_2d, QhullError
 
 from clustering.util import pairwise_distances, circle_random_clusters, _random_cities
 from src.clustering import vat_prim_mst_seq, compute_ivat, fcm
@@ -210,11 +210,14 @@ def test_heirarchy_ivat_means():
 
 
 def plot_voronoi(all_cities, centroids):
-    v = Voronoi(centroids)
-    fig = voronoi_plot_2d(v)
-    fig.axes[0].set_title("Voronoi plot")
-    fig.axes[0].scatter(all_cities[:, 0], all_cities[:, 1])
-    fig.show()
+    try:
+        v = Voronoi(centroids)
+        fig = voronoi_plot_2d(v)
+        fig.axes[0].set_title("Voronoi plot")
+        fig.axes[0].scatter(all_cities[:, 0], all_cities[:, 1])
+        fig.show()
+    except QhullError:
+        pass
 
 
 def test_multi_dim_pairwise_dist_perf():
