@@ -2,11 +2,12 @@ import time
 from typing import Any
 
 import numpy as np
+from matplotlib import pyplot as plt
+from numpy import ndarray
+from scipy.spatial import Voronoi, voronoi_plot_2d
 
 from clustering.util import pairwise_distances
 from src.clustering import vat_prim_mst_seq, compute_ivat, fcm
-from matplotlib import pyplot as plt
-from numpy import ndarray, dtype
 
 
 def _random_cities(
@@ -47,6 +48,71 @@ def _circle_random_clusters(
             axis=0,
         )
     return city_locations
+
+
+def _hierarchical_circle_clusters(
+        clusters_per_level: list[int],
+        diameters_per_level: list[float],
+) -> np.ndarray:
+    """
+    Create hierarchical clusters arranged in circles around circles recursively.
+
+    Args:
+        clusters_per_level: Number of clusters at each hierarchical level (e.g., [3, 4, 5] means 3 top-level clusters, 
+                           each containing 4 mid-level clusters, each containing 5 leaf clusters)
+        diameters_per_level: Diameter for clusters at each level
+
+    Returns:
+        Array of point coordinates (N, 2)
+
+    Raises:
+        ValueError: If configuration would create more than 16000 points
+    """
+    if len(clusters_per_level) != len(diameters_per_level):
+        raise ValueError("clusters_per_level and diameters_per_level must have the same length")
+
+    # Calculate total number of points
+    total_points = np.prod(clusters_per_level)
+
+    if total_points > 16000:
+        raise ValueError(
+            f"Configuration would create {total_points} points, which exceeds the limit of 16000. "
+            f"Reduce clusters_per_level, diameters_per_level, or points_per_leaf."
+        )
+
+    def _create_level(
+            center_x: float,
+            center_y: float,
+            level_idx: int,
+    ) -> np.ndarray:
+        """Recursively create clusters at the current level"""
+        n_clusters = clusters_per_level[level_idx]
+        diameter = diameters_per_level[level_idx]
+        # Last level gets a bit of noise
+        if level_idx == len(clusters_per_level)-1:
+            # Base case: create leaf points
+            return _random_cities(
+                center_x, center_y,
+                n_cities=n_clusters,
+                cluster_diameter=diameter
+            )
+
+        all_points = np.zeros(shape=(0, 2), dtype=np.float32)
+
+        for theta in np.linspace(0, 2 * np.pi, n_clusters, endpoint=False):
+            # Calculate position of sub-cluster center
+            sub_cx = center_x + diameter * np.cos(theta)
+            sub_cy = center_y + diameter * np.sin(theta)
+
+            # Recursively create points for this sub-cluster
+            sub_points = _create_level(sub_cx, sub_cy,level_idx + 1)
+
+            all_points = np.concatenate((all_points, sub_points), axis=0)
+
+        return all_points
+
+    # Start recursion from the origin
+    return _create_level(0.0, 0.0, 0)
 
 
 def _test_cluster_sequencing():
@@ -141,9 +207,96 @@ def test_fcm_with_center_on_datapoint():
             ), "All membership weights should be between 0 and 1"
 
 
+def test_heirarchy_ivat_means():
+    """Test hierarchical circle clusters with iVAT and FCM"""
+    # Example: 3 top-level clusters, each with 4 mid-level, each with 5 leaf clusters (3*4*5*10 = 600 points)
+    all_cities = _hierarchical_circle_clusters(
+        clusters_per_level=[3, 4, 5],
+        diameters_per_level=[15.0, 5.0, 1.0]
+    )
+
+    # Scramble the order of the cities
+    scramble_order = np.random.permutation(len(all_cities))
+    all_cities = all_cities[scramble_order]
+
+    print(f"Created {len(all_cities)} hierarchical points")
+
+    # Compute pairwise distances and iVAT
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+
+    # Get cluster information from iVAT
+    abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(
+        all_cities, ivat_mst, vat_order)
+    # Run FCM with iVAT-derived initial guess
+    n_clusters = len(initial_centroids)
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids[0])
+
+    print(f"Detected {n_clusters} clusters using iVAT")
+
+    # Visualize results
+    plot_vat_ivat(ivat_mst, vat_mst)
+    for idx in range(len(initial_centroids)):
+        # plot_membership(all_cities, cluster_city_ids[idx], meth_c, w_c)
+        plot_diagonal(
+            diagonal_values,
+            [max_diff_indices[idx]],
+            peaks_threshold[idx],
+            sorted_diagonal,
+            abrupt_change_indices[idx],
+        )
+        plot_voronoi(all_cities, initial_centroids[idx])
+    plt.show()
+
+
+def plot_voronoi(all_cities, centroids):
+    v = Voronoi(centroids)
+    fig = voronoi_plot_2d(v)
+    fig.axes[0].set_title("Voronoi plot")
+    fig.axes[0].scatter(all_cities[:, 0], all_cities[:, 1])
+    fig.show()
+
+
+def test_multi_dim_pairwise_dist_perf():
+    results = []
+    # Do 1 pairwise distances to reduce nogil/numba randomness
+    pairwise_distances(np.zeros((100, 3)))
+
+    dims = [1, 2]
+    sizes = [1000, 2000, 3000, 5000, 8000, 10000, 20000]
+    # sizes = [1000, 2000]
+    for dim in dims:
+        for size in sizes:
+            data = np.random.rand(size, dim)
+            start = time.time()
+            pairwise_distances(data)
+            end = time.time()
+            elapsed = end - start
+            results.append((dim, size, elapsed))
+
+    # Plot results
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Group results by dimension
+    colors = plt.cm.viridis(np.linspace(0, 1, len(dims)))
+
+    for dim, color in zip(dims, colors):
+        dim_results = [(size, time) for d, size, time in results if d == dim]
+        sizes, times = zip(*dim_results)
+        ax.plot(sizes, times, marker='o', label=f'Dim={dim}', color=color, linewidth=2)
+
+    ax.set_xlabel('Data Size', fontsize=12)
+    ax.set_ylabel('Time (seconds)', fontsize=12)
+    ax.set_title('Pairwise Distance Computation Performance', fontsize=14)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+
 def test_fuzzy_c_means():
-    n_total: int = 1024
-    n_clusters: int = 32
+    n_total: int = 256
+    n_clusters: int = 16
     n_cities: int = n_total // n_clusters
     all_cities = _circle_random_clusters(
         n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
@@ -166,37 +319,8 @@ def test_fuzzy_c_means():
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
     # Compute the IVAT
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
-    # Look down the off-by-1 diagonal and count the number of substantial changes.
-    diagonal_values = np.diag(ivat_mst, k=1)
-    # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
-    # Expand this to the original size for convenience.
-    diagonal_values = np.concatenate(
-        [np.array([diagonal_values[0]]), diagonal_values], axis=0
-    )
-    # Sort the diagonal values
-    sorted_diagonal = np.sort(diagonal_values)
-    # Find the maximum difference and the index thereof
-    diagonal_diffs = np.diff(sorted_diagonal)
-    max_diff_index = np.argmax(diagonal_diffs)
-    peaks_threshold = sorted_diagonal[max_diff_index + 1]
-    abrupt_change_indices = np.where(diagonal_values >= peaks_threshold)[0]
-
-    # Use each section as a cluster endpoint, inclusive.
-    cluster_groups = np.concatenate(
-        [np.array([0]), abrupt_change_indices, np.array([len(all_cities)])]
-    )
-    cluster_city_ids = []
-    for idx in range(0, len(cluster_groups) - 1):
-        cg_start = cluster_groups[idx]
-        cg_end = cluster_groups[idx + 1]
-        # Use the VAT order to pick out the cities in each cluster
-        cluster_city_ids.append(vat_order[cg_start:cg_end])
-
-    # Compute the initial guess as the centroid of each city cluster
-    initial_centroids = np.array([
-        np.mean(all_cities[cluster_ids], axis=0)
-        for cluster_ids in cluster_city_ids
-    ])
+    abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(
+        all_cities, ivat_mst, vat_order)
 
     # Time the single FCM call
     start_single = time.time()
@@ -225,8 +349,7 @@ def test_fuzzy_c_means():
     print(f"{'='*60}\n")
 
     # Assert that every city has been allocated to a cluster
-    all_allocated_cities = np.concatenate(cluster_city_ids)
-    all_allocated_cities = np.sort(all_allocated_cities)
+    all_allocated_cities = np.sort(np.concatenate(cluster_city_ids))
     # print(f"All cities:\n{np.r_[0:len(all_cities)]}")
     # print(f"Allocated Cities:\n{all_allocated_cities}")
     assert len(all_allocated_cities) == len(
@@ -240,7 +363,7 @@ def test_fuzzy_c_means():
 
     plot_diagonal(
         diagonal_values,
-        max_diff_index,
+        max_diff_indices,
         peaks_threshold,
         sorted_diagonal,
         abrupt_change_indices,
@@ -250,8 +373,67 @@ def test_fuzzy_c_means():
     plt.show()
 
 
-def plot_membership(all_cities: ndarray[tuple[Any, ...], dtype[Any]], cluster_city_ids: list[Any],
-                    meth_c: ndarray[tuple[Any, ...], dtype[Any]], w_c: ndarray[tuple[Any, ...], dtype[Any]]):
+def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray,
+                   vat_order: ndarray) -> tuple[ndarray, list[Any], ndarray, ndarray, list[int], ndarray, ndarray]:
+    # Look down the off-by-1 diagonal and count the number of substantial changes.
+    diagonal_values = np.diag(ivat_mst, k=1)
+    # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
+    # Expand this to the original size for convenience.
+    diagonal_values = np.concatenate(
+        [np.array([diagonal_values[0]]), diagonal_values], axis=0
+    )
+    # Sort the diagonal values
+    sorted_diagonal = np.sort(diagonal_values)
+    # Find the maximum difference and the index thereof
+    diagonal_diffs = np.diff(sorted_diagonal)
+    max_diff_indices = _arg_max(diagonal_diffs, 3)
+    peaks_threshold = sorted_diagonal[max_diff_indices + 1]
+    abrupt_change_indices = []
+    cluster_groups = []
+    cluster_city_ids = []
+    initial_centroids = []
+    for index, peak_th in enumerate(peaks_threshold):
+        abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
+        abrupt_change_indices.append(abrupt_change_idx)
+
+        # Use each section as a cluster endpoint, inclusive.
+        cluster_group = np.concatenate([np.array([0]), abrupt_change_idx, np.array([len(all_cities)])])
+        cluster_groups.append(cluster_group)
+        cluster_city_indexs = []
+        for idx in range(0, len(cluster_group) - 1):
+            cg_start = cluster_group[idx]
+            cg_end = cluster_group[idx + 1]
+            # Use the VAT order to pick out the cities in each cluster
+            cluster_city_indexs.append(vat_order[cg_start:cg_end])
+
+        # Compute the initial guess as the centroid of each city cluster
+        initial_centroids.append(np.array([
+            np.mean(all_cities[cluster_ids], axis=0)
+            for cluster_ids in cluster_city_indexs
+        ]))
+        cluster_city_ids.append(cluster_city_indexs)
+
+    return abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal
+
+
+def get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray) -> tuple[ndarray, list[Any], ndarray]:
+    abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(all_cities, ivat_mst, vat_order)
+    return initial_centroids, cluster_city_ids, peaks_threshold
+
+
+def _arg_max(a: ndarray, n: int = 1) -> ndarray:
+    """Get the indexes of the n-largest values in the array. You can assume it's a 1D array"""
+    if n >= len(a):
+        return np.argsort(a)[::-1]
+    # Use argpartition to find the n largest elements efficiently
+    partitioned_indices = np.argpartition(a, -n)[-n:]
+    # Sort these indices by their corresponding values in descending order
+    sorted_indices = partitioned_indices[np.argsort(a[partitioned_indices])[::-1]]
+    return sorted_indices
+
+
+def plot_membership(all_cities: ndarray, cluster_city_ids: list[Any],
+                    meth_c: ndarray, w_c: ndarray):
     # Create a color map for clusters
     colors = plt.cm.rainbow(np.linspace(0, 1, meth_c.shape[0]))
 
@@ -326,7 +508,7 @@ def plot_membership(all_cities: ndarray[tuple[Any, ...], dtype[Any]], cluster_ci
 
 def plot_diagonal(
     diagonal_values: ndarray,
-    max_diff_index: int,
+    max_diff_indices: list[int],
     peaks_threshold,
     sorted_diagonal: ndarray,
     abrupt_change_indices: ndarray,
@@ -339,19 +521,13 @@ def plot_diagonal(
     ax1.grid(True)
 
     ax2.plot(sorted_diagonal, marker="o")
-    ax2.axvline(
-        x=max_diff_index,
-        color="r",
-        linestyle="--",
-        label=f"Max diff at index {max_diff_index}",
-    )
-    ax2.plot(
-        [max_diff_index, max_diff_index + 1],
-        [sorted_diagonal[max_diff_index], sorted_diagonal[max_diff_index + 1]],
-        "ro-",
-        linewidth=3,
-        markersize=8,
-    )
+    for idx in max_diff_indices:
+        ax2.axvline(
+            x=idx,
+            color="r",
+            linestyle="--",
+            label=f"Max diff at index {idx}",
+        )
     ax2.legend()
     ax2.set_title("Sorted Off-by-One Diagonal of iVAT Matrix")
     ax2.set_xlabel("Index")
@@ -374,5 +550,3 @@ def plot_diagonal(
         verticalalignment="top",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )
-
-    return abrupt_change_indices
