@@ -187,10 +187,10 @@ def test_heirarchy_ivat_means():
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
     # Get cluster information from iVAT
-    res = _get_ivat_means(all_cities, ivat_mst, vat_order)
+    res = _get_ivat_means(all_cities, ivat_mst, vat_order, n_levels=3)
     # Run FCM with iVAT-derived initial guess
-    n_clusters = len(res.initial_centroids)
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res.initial_centroids)
+    n_clusters = len(res[0].initial_centroids)
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res[0].initial_centroids)
 
     print(f"Detected {n_clusters} clusters using iVAT")
 
@@ -362,9 +362,15 @@ def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, 
     max_diff_indices = _arg_max(diagonal_diffs, n_levels)
     peaks_threshold = sorted_diagonal[max_diff_indices + 1]
 
+    # Sort peaks_threshold in decreasing order and reorder max_diff_indices accordingly
+    sort_order = np.argsort(peaks_threshold)[::-1]
+    peaks_threshold = peaks_threshold[sort_order]
+    max_diff_indices = max_diff_indices[sort_order]
+
     results = []
     for index, peak_th in enumerate(peaks_threshold):
-        abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
+        # Prevent weird floating-point comparisons.
+        abrupt_change_idx = np.where(diagonal_values >= 0.99*peak_th)[0]
 
         # Use each section as a cluster endpoint, inclusive.
         cluster_group = np.concatenate([np.array([0]), abrupt_change_idx, np.array([len(all_cities)])])
@@ -402,7 +408,7 @@ def get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray) -
 
 
 def _arg_max(a: ndarray, n: int = 1) -> ndarray:
-    """Get the indexes of the n-largest values in the array. You can assume it's a 1D array"""
+    """Get the indexes of the n-largest values in the array."""
     if n >= len(a):
         return np.argsort(a)[::-1]
     # Use argpartition to find the n largest elements efficiently
