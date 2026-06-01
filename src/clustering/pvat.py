@@ -9,6 +9,12 @@ from numpy import ndarray
 def compute_ivat(
     matrix_of_pairwise_distance: np.ndarray, inplace: bool = False
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Computes the improved VAT (IVAT) for the provided dissimilarity (distance) matrix
+    :param matrix_of_pairwise_distance: dissimilarity matrix, typically an L2-norm matrix, it must be symmetric and positive semi-definite
+    :param inplace: whether to perform the computation in-place on the input matrix
+    :return: tuple of the IVAT matrix, the VAT matrix, the sequence of IVAT indices, and the sequence of permutation (VAT) indices
+    """
     d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance, inplace=inplace
     )
@@ -32,6 +38,19 @@ def compute_ivat(
                 d_p_star[c, r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c])
 
     return d_p_star, d_star, argmin_seq, p_seq
+
+
+def compute_vat(matrix_of_pairwise_distance: np.ndarray, inplace: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Computes the visualization assessment of cluster tendency (VAT) for the provided dissimilarity (distance) matrix
+    :param matrix_of_pairwise_distance: dissimilarity matrix, typically an L2-norm matrix, it must be symmetric and positive semi-definite
+    :param inplace: whether to perform the computation in-place on the input matrix
+    :return: tuple of the permuted distance (VAT) matrix and the permutation (VAT) sequence
+    """
+    d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
+        matrix_of_pairwise_distance, inplace=inplace
+    )
+    return d_star, p_seq
 
 
 @njit(cache=True, parallel=True, nogil=True)

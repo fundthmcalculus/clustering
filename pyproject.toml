@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "clustering"
+name = "tribble-clustering"
 version = "0.1.0"
 authors = [
   { name="Scott Phillips", email="polygonguru@gmail.com" },
 ]
-description = "An optimized Visualization Assessment Tendency (VAT) clustering package"
+description = "An optimized Visualization Assessment Tendency (VAT/IVAT) and fuzzy clustering (FCM) package"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
@@ -17,10 +17,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numba",
-    "numpy>=2.0.0",
-    "scipy",
-    "numba-progress",
+    "numba==0.65.1",
+    "numpy==2.4.6",
+    "scipy==1.17.1",
+    "numba-progress==1.2.0",
 ]
 
 [project.optional-dependencies]
