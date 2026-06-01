@@ -189,7 +189,7 @@ def test_heirarchy_ivat_means():
     abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(
         all_cities, ivat_mst, vat_order)
     # Run FCM with iVAT-derived initial guess
-    n_clusters = len(initial_centroids)
+    n_clusters = len(initial_centroids[0])
     meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids[0])
 
     print(f"Detected {n_clusters} clusters using iVAT")
@@ -287,7 +287,7 @@ def test_fuzzy_c_means():
 
     # Time the single FCM call
     start_single = time.time()
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids)
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids[0])
     mid_single = time.time()
     _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
     end_single = time.time()
@@ -312,7 +312,7 @@ def test_fuzzy_c_means():
     print(f"{'='*60}\n")
 
     # Assert that every city has been allocated to a cluster
-    all_allocated_cities = np.sort(np.concatenate(cluster_city_ids))
+    all_allocated_cities = np.sort(np.concatenate(cluster_city_ids[0]))
     # print(f"All cities:\n{np.r_[0:len(all_cities)]}")
     # print(f"Allocated Cities:\n{all_allocated_cities}")
     assert len(all_allocated_cities) == len(
@@ -327,17 +327,16 @@ def test_fuzzy_c_means():
     plot_diagonal(
         diagonal_values,
         max_diff_indices,
-        peaks_threshold,
+        peaks_threshold[0],
         sorted_diagonal,
-        abrupt_change_indices,
+        abrupt_change_indices[0],
     )
 
     plot_membership(all_cities, cluster_city_ids, meth_c, w_c)
     plt.show()
 
 
-def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray,
-                   vat_order: ndarray) -> tuple[ndarray, list[Any], ndarray, ndarray, list[int], ndarray, ndarray]:
+def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1) -> tuple[ndarray, list[Any], ndarray, ndarray, list[int], ndarray, ndarray]:
     # Look down the off-by-1 diagonal and count the number of substantial changes.
     diagonal_values = np.diag(ivat_mst, k=1)
     # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
@@ -349,7 +348,7 @@ def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray,
     sorted_diagonal = np.sort(diagonal_values)
     # Find the maximum difference and the index thereof
     diagonal_diffs = np.diff(sorted_diagonal)
-    max_diff_indices = _arg_max(diagonal_diffs, 3)
+    max_diff_indices = _arg_max(diagonal_diffs, n_levels)
     peaks_threshold = sorted_diagonal[max_diff_indices + 1]
     abrupt_change_indices = []
     cluster_groups = []
@@ -472,7 +471,7 @@ def plot_membership(all_cities: ndarray, cluster_city_ids: list[Any],
 def plot_diagonal(
     diagonal_values: ndarray,
     max_diff_indices: list[int],
-    peaks_threshold,
+    peaks_threshold: float,
     sorted_diagonal: ndarray,
     abrupt_change_indices: ndarray,
 ) -> ndarray:
