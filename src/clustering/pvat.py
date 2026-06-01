@@ -18,13 +18,13 @@ def compute_ivat(
     d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance, inplace=inplace
     )
-    N = d_star.shape[0]
+    n = d_star.shape[0]
     if not inplace:
         d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
     else:
         d_p_star = d_star
     argmin_seq = []
-    for r in range(1, N):
+    for r in range(1, n):
         jj = np.argmin(d_star[r, :r])
         # TODO - Get from the prim-mst sequence?
         # jj = as_seq[r-1]
