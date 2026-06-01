@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 import time
-from typing import Any
+from typing import Any, Union
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -186,26 +187,26 @@ def test_heirarchy_ivat_means():
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
     # Get cluster information from iVAT
-    abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(
-        all_cities, ivat_mst, vat_order)
+    res = _get_ivat_means(all_cities, ivat_mst, vat_order)
     # Run FCM with iVAT-derived initial guess
-    n_clusters = len(initial_centroids[0])
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids[0])
+    n_clusters = len(res.initial_centroids)
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res.initial_centroids)
 
     print(f"Detected {n_clusters} clusters using iVAT")
 
     # Visualize results
     plot_vat_ivat(ivat_mst, vat_mst)
-    for idx in range(len(initial_centroids)):
-        # plot_membership(all_cities, cluster_city_ids[idx], meth_c, w_c)
+    ivat_results = [res] if isinstance(res, IvatMeansResult) else res
+    for r in ivat_results:
+        # plot_membership(all_cities, r.cluster_city_ids, meth_c, w_c)
         plot_diagonal(
-            diagonal_values,
-            [max_diff_indices[idx]],
-            peaks_threshold[idx],
-            sorted_diagonal,
-            abrupt_change_indices[idx],
+            r.diagonal_values,
+            [r.max_diff_index],
+            r.peak_threshold,
+            r.sorted_diagonal,
+            r.abrupt_change_indices,
         )
-        plot_voronoi(all_cities, initial_centroids[idx])
+        plot_voronoi(all_cities, r.initial_centroids)
     plt.show()
 
 
@@ -282,12 +283,11 @@ def test_fuzzy_c_means():
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
     # Compute the IVAT
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
-    abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(
-        all_cities, ivat_mst, vat_order)
+    res = _get_ivat_means(all_cities, ivat_mst, vat_order)
 
     # Time the single FCM call
     start_single = time.time()
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=initial_centroids[0])
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res.initial_centroids)
     mid_single = time.time()
     _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
     end_single = time.time()
@@ -312,7 +312,7 @@ def test_fuzzy_c_means():
     print(f"{'='*60}\n")
 
     # Assert that every city has been allocated to a cluster
-    all_allocated_cities = np.sort(np.concatenate(cluster_city_ids[0]))
+    all_allocated_cities = np.sort(np.concatenate(res.cluster_city_ids))
     # print(f"All cities:\n{np.r_[0:len(all_cities)]}")
     # print(f"Allocated Cities:\n{all_allocated_cities}")
     assert len(all_allocated_cities) == len(
@@ -325,18 +325,29 @@ def test_fuzzy_c_means():
     plot_vat_ivat(ivat_mst, vat_mst)
 
     plot_diagonal(
-        diagonal_values,
-        max_diff_indices,
-        peaks_threshold[0],
-        sorted_diagonal,
-        abrupt_change_indices[0],
+        res.diagonal_values,
+        [res.max_diff_index],
+        res.peak_threshold,
+        res.sorted_diagonal,
+        res.abrupt_change_indices,
     )
 
-    plot_membership(all_cities, cluster_city_ids, meth_c, w_c)
+    plot_membership(all_cities, res.cluster_city_ids, meth_c, w_c)
     plt.show()
 
 
-def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1) -> tuple[ndarray, list[Any], ndarray, ndarray, list[int], ndarray, ndarray]:
+@dataclass
+class IvatMeansResult:
+    abrupt_change_indices: ndarray
+    cluster_city_ids: list[ndarray]
+    diagonal_values: ndarray
+    initial_centroids: ndarray
+    max_diff_index: int
+    peak_threshold: float
+    sorted_diagonal: ndarray
+
+
+def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1) -> Union[IvatMeansResult, list[IvatMeansResult]]:
     # Look down the off-by-1 diagonal and count the number of substantial changes.
     diagonal_values = np.diag(ivat_mst, k=1)
     # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
@@ -350,17 +361,13 @@ def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, 
     diagonal_diffs = np.diff(sorted_diagonal)
     max_diff_indices = _arg_max(diagonal_diffs, n_levels)
     peaks_threshold = sorted_diagonal[max_diff_indices + 1]
-    abrupt_change_indices = []
-    cluster_groups = []
-    cluster_city_ids = []
-    initial_centroids = []
+
+    results = []
     for index, peak_th in enumerate(peaks_threshold):
         abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
-        abrupt_change_indices.append(abrupt_change_idx)
 
         # Use each section as a cluster endpoint, inclusive.
         cluster_group = np.concatenate([np.array([0]), abrupt_change_idx, np.array([len(all_cities)])])
-        cluster_groups.append(cluster_group)
         cluster_city_indexs = []
         for idx in range(0, len(cluster_group) - 1):
             cg_start = cluster_group[idx]
@@ -369,18 +376,29 @@ def _get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, 
             cluster_city_indexs.append(vat_order[cg_start:cg_end])
 
         # Compute the initial guess as the centroid of each city cluster
-        initial_centroids.append(np.array([
+        initial_centroids_item = np.array([
             np.mean(all_cities[cluster_ids], axis=0)
             for cluster_ids in cluster_city_indexs
-        ]))
-        cluster_city_ids.append(cluster_city_indexs)
+        ])
 
-    return abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal
+        results.append(IvatMeansResult(
+            abrupt_change_indices=abrupt_change_idx,
+            cluster_city_ids=cluster_city_indexs,
+            diagonal_values=diagonal_values,
+            initial_centroids=initial_centroids_item,
+            max_diff_index=int(max_diff_indices[index]),
+            peak_threshold=float(peak_th),
+            sorted_diagonal=sorted_diagonal
+        ))
+
+    if n_levels == 1:
+        return results[0]
+    return results
 
 
 def get_ivat_means(all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray) -> tuple[ndarray, list[Any], ndarray]:
-    abrupt_change_indices, cluster_city_ids, diagonal_values, initial_centroids, max_diff_indices, peaks_threshold, sorted_diagonal = _get_ivat_means(all_cities, ivat_mst, vat_order)
-    return initial_centroids, cluster_city_ids, peaks_threshold
+    res = _get_ivat_means(all_cities, ivat_mst, vat_order)
+    return [res.initial_centroids], [res.cluster_city_ids], np.array([res.peak_threshold])
 
 
 def _arg_max(a: ndarray, n: int = 1) -> ndarray:
