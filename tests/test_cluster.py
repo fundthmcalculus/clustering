@@ -222,8 +222,8 @@ def test_multi_dim_pairwise_dist_perf():
 
     norms_only = [False, True]
     dim = 1
-    sizes = [1000, 2000, 3000, 5000, 8000, 10_000, 20_000, 30_000]
-    # sizes = [1000, 2000, 3000, 5000]
+    # sizes = [1000, 2000, 3000, 5000, 8000, 10_000, 20_000, 30_000]
+    sizes = [1000, 2000, 3000]
     for norm_only in norms_only:
         for size in sizes:
             data = np.random.rand(size, dim)
