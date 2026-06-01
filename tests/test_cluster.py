@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from numpy import ndarray
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-from clustering.util import pairwise_distances
+from clustering.util import pairwise_distances, circle_random_clusters, _random_cities
 from src.clustering import vat_prim_mst_seq, compute_ivat, fcm
 
 
@@ -102,7 +102,7 @@ def _test_cluster_sequencing():
 
 
 def test_merge_ivat():
-    all_cities = _circle_random_clusters(
+    all_cities = circle_random_clusters(
         n_clusters=10, n_cities=5, cluster_spacing=5.0, cluster_diameter=1
     )
     # Scramble the order of the cities
@@ -258,7 +258,7 @@ def test_fuzzy_c_means():
     n_total: int = 256
     n_clusters: int = 16
     n_cities: int = n_total // n_clusters
-    all_cities = _circle_random_clusters(
+    all_cities = circle_random_clusters(
         n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
     )
     # Scramble the order of the cities
