@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "tribble-clustering"
@@ -34,7 +34,4 @@ dev = [
 [project.urls]
 "Homepage" = "https://github.com/fundthmcalculus/clustering"
 "Bug Tracker" = "https://github.com/fundthmcalculus/clustering/issues"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/tribbleclustering"]
 

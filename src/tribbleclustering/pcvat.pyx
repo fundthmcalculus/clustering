@@ -2,7 +2,7 @@
 
 import numpy as np
 cimport cython
-from libc.math cimport INFINITY
+from libc.math cimport INFINITY, INFINITY as INFINITY_F
 from libc.stdlib cimport malloc, free
 from cython.parallel cimport prange, threadid
 cimport openmp
@@ -14,18 +14,9 @@ cdef int _PAR_THRESHOLD = 512
 
 
 # ---------------------------------------------------------------------------
-# Core MST kernel — dense array-based Prim (no heap).
-#
-# For a complete graph (a distance matrix is complete), a binary-heap Prim is
-# O(n^2 log n) — every one of the O(n^2) edges can trigger an O(log n) heap
-# operation. The dense array variant is O(n^2): each of the n rounds does a
-# single fused linear pass that BOTH relaxes neighbor keys AND tracks the
-# minimum-key unvisited vertex for the next round. One sequential pass over
-# contiguous memory per round — SIMD-friendly, no pointer chasing, no log factor.
-#
-# No allocation, no GIL, no Python calls. Caller supplies all buffers.
+# Core MST kernel — float64 variant
 # ---------------------------------------------------------------------------
-cdef void _prim_mst_kernel(
+cdef void _prim_mst_kernel_64(
     const double* adj, int n,
     int* act_vert, double* act_key, int* act_par,
     int* out_seq, int* out_par_seq
@@ -89,18 +80,11 @@ cdef void _prim_mst_kernel(
 
 
 # ---------------------------------------------------------------------------
-# Parallel compact dense Prim. Identical algorithm and active-set compaction
-# as _prim_mst_kernel, but the two O(n^2) phases are threaded:
-#   * global-max search: each thread reduces a static row stripe;
-#   * each round's fused relax + next-min: each thread owns a static slot
-#     stripe of the active set, writing only its own (best, idx) scratch slot.
-# The O(1) swap-removal and the tiny per-thread reduction stay serial between
-# rounds. Once the active set shrinks below _INNER_SERIAL, the round is cheaper
-# to run serially than to fork — so we fall through to a plain loop.
+# Parallel compact dense Prim — float64 variant
 # ---------------------------------------------------------------------------
 cdef int _INNER_SERIAL = 1024
 
-cdef void _prim_mst_kernel_par(
+cdef void _prim_mst_kernel_par_64(
     const double* adj, int n,
     int* act_vert, double* act_key, int* act_par,
     int* out_seq, int* out_par_seq,
@@ -185,11 +169,9 @@ cdef void _prim_mst_kernel_par(
 
 
 # ---------------------------------------------------------------------------
-# Shared helper: allocate working buffers, run kernel, free buffers.
-# Raises MemoryError on failure; runs kernel with nogil.
-# Dispatches to the parallel kernel above _PAR_THRESHOLD, else serial.
+# Shared helper: allocate working buffers, run kernel, free buffers — float64
 # ---------------------------------------------------------------------------
-cdef _run_mst(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
+cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
     cdef int*    act_vert = <int*>   malloc(n * sizeof(int))
     cdef double* act_key  = <double*>malloc(n * sizeof(double))
     cdef int*    act_par  = <int*>   malloc(n * sizeof(int))
@@ -209,7 +191,7 @@ cdef _run_mst(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
             raise MemoryError("MST workspace allocation failed")
         with nogil:
-            _prim_mst_kernel_par(
+            _prim_mst_kernel_par_64(
                 adj_ptr, n,
                 act_vert, act_key, act_par,
                 &heap_seq[0], &parent_seq[0],
@@ -218,7 +200,7 @@ cdef _run_mst(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
         free(sd); free(si)
     else:
         with nogil:
-            _prim_mst_kernel(
+            _prim_mst_kernel_64(
                 adj_ptr, n,
                 act_vert, act_key, act_par,
                 &heap_seq[0], &parent_seq[0]
@@ -228,11 +210,11 @@ cdef _run_mst(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
 
 
 # ---------------------------------------------------------------------------
-# Public: Prim's MST only
+# Public: Prim's MST only — float64
 # ---------------------------------------------------------------------------
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def vat_prim_mst_c(double[:, ::1] adj):
+def vat_prim_mst_c_64(double[:, ::1] adj):
     """
     Optimized Prim's MST via decrease-key binary heap (O(n) heap size, nogil).
     Returns (heap_seq, parent_seq) as int32 numpy arrays.
@@ -243,18 +225,18 @@ def vat_prim_mst_c(double[:, ::1] adj):
     cdef int[:] heap_seq   = heap_seq_np
     cdef int[:] parent_seq = parent_seq_np
 
-    _run_mst(&adj[0, 0], n, heap_seq, parent_seq)
+    _run_mst_64(&adj[0, 0], n, heap_seq, parent_seq)
     return heap_seq_np, parent_seq_np
 
 
 # ---------------------------------------------------------------------------
-# Public: full VAT pipeline  (MST + permutation gather, OpenMP parallel)
+# Public: full VAT pipeline — float64 (MST + permutation gather, OpenMP parallel)
 # ---------------------------------------------------------------------------
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def compute_vat_c(double[:, ::1] adj):
+def compute_vat_c_64(double[:, ::1] adj):
     """
-    C/OpenMP implementation of compute_ordered_dis_njit_merge.
+    C/OpenMP implementation of compute_ordered_dis_njit_merge (float64).
 
     Steps:
       1. Decrease-key Prim's MST to get permutation p (all nogil, O(n) heap).
@@ -281,20 +263,9 @@ def compute_vat_c(double[:, ::1] adj):
     cdef int[:]  invp        = invp_np
 
     # Step 1: MST (nogil)
-    _run_mst(&adj[0, 0], n, p, q)
+    _run_mst_64(&adj[0, 0], n, p, q)
 
     # Step 2: Permutation re-order, out[i, j] = adj[p[i], p[j]].
-    #
-    # A permutation reads each source element exactly once — there is no
-    # temporal reuse, so throughput is set by cache-line utilisation. Reading
-    # the source row in permuted column order (adj[p[i], p[j]]) touches a row's
-    # cache lines in random order: poor prefetch, partial line use.
-    #
-    # Instead read the source row sequentially and SCATTER through the inverse
-    # permutation: out[i, invp[c]] = adj[p[i], c]. The source read is now fully
-    # sequential (hardware prefetch, every line fully used); the random write
-    # lands inside the current output row, which fits in L1 for the sizes of
-    # interest. Each thread owns a contiguous block of output rows.
     cdef const double* A = &adj[0, 0]
     cdef double* O       = &out[0, 0]
     cdef const int* P    = &p[0]
@@ -314,3 +285,302 @@ def compute_vat_c(double[:, ::1] adj):
                 dst[IP[c]] = src[c]
 
     return out_np, heap_seq_np, parent_seq_np
+
+
+# =========================================================================
+# FLOAT32 IMPLEMENTATIONS
+# =========================================================================
+
+# ---------------------------------------------------------------------------
+# Core MST kernel — float32 variant
+# ---------------------------------------------------------------------------
+cdef void _prim_mst_kernel_32(
+    const float* adj, int n,
+    int* act_vert, float* act_key, int* act_par,
+    int* out_seq, int* out_par_seq
+) noexcept nogil:
+    cdef int i, j, w, u, bk, rnd, m
+    cdef int src_i = 0, src_j = 0
+    cdef float max_val = -INFINITY
+    cdef float d, best
+    cdef const float* row
+
+    for i in range(n):
+        act_vert[i] = i
+        act_key[i]  = INFINITY
+        act_par[i]  = -1
+
+    for i in range(n):
+        row = adj + i * n
+        for j in range(n):
+            if row[j] > max_val:
+                max_val = row[j]
+                src_i = i
+                src_j = j
+
+    act_key[src_i] = max_val
+    act_par[src_i] = src_j
+    bk = src_i
+    m  = n
+
+    for rnd in range(n):
+        u = act_vert[bk]
+        out_seq[rnd]     = u
+        out_par_seq[rnd] = act_par[bk]
+
+        m -= 1
+        act_vert[bk] = act_vert[m]
+        act_key[bk]  = act_key[m]
+        act_par[bk]  = act_par[m]
+
+        row  = adj + u * n
+        best = INFINITY
+        bk   = -1
+        for i in range(m):
+            w = act_vert[i]
+            d = row[w]
+            if d < act_key[i]:
+                act_key[i] = d
+                act_par[i] = rnd + 1
+            if act_key[i] < best:
+                best = act_key[i]
+                bk   = i
+
+
+# ---------------------------------------------------------------------------
+# Parallel compact dense Prim — float32 variant
+# ---------------------------------------------------------------------------
+cdef void _prim_mst_kernel_par_32(
+    const float* adj, int n,
+    int* act_vert, float* act_key, int* act_par,
+    int* out_seq, int* out_par_seq,
+    float* sd, int* si, int nthreads
+) noexcept nogil:
+    cdef int i, j, w, u, bk, rnd, m, tid
+    cdef int src_i = 0, src_j = 0
+    cdef float max_val = -INFINITY
+    cdef float d, best
+    cdef const float* row
+
+    for i in range(n):
+        act_vert[i] = i
+        act_key[i]  = INFINITY
+        act_par[i]  = -1
+
+    # Parallel global-max search over row stripes
+    for tid in range(nthreads):
+        sd[tid] = -INFINITY
+        si[tid] = 0
+    for i in prange(n, schedule='static', num_threads=nthreads):
+        tid = threadid()
+        for j in range(n):
+            if adj[i * n + j] > sd[tid]:
+                sd[tid] = adj[i * n + j]
+                si[tid] = i * n + j
+    for tid in range(nthreads):
+        if sd[tid] > max_val:
+            max_val = sd[tid]
+            src_i = si[tid] // n
+            src_j = si[tid] % n
+
+    act_key[src_i] = max_val
+    act_par[src_i] = src_j
+    bk = src_i
+    m  = n
+
+    for rnd in range(n):
+        u = act_vert[bk]
+        out_seq[rnd]     = u
+        out_par_seq[rnd] = act_par[bk]
+
+        m -= 1
+        act_vert[bk] = act_vert[m]
+        act_key[bk]  = act_key[m]
+        act_par[bk]  = act_par[m]
+
+        row  = adj + u * n
+        best = INFINITY
+        bk   = -1
+
+        if m >= _INNER_SERIAL:
+            for tid in range(nthreads):
+                sd[tid] = INFINITY
+                si[tid] = -1
+            for i in prange(m, schedule='static', num_threads=nthreads):
+                tid = threadid()
+                w = act_vert[i]
+                d = row[w]
+                if d < act_key[i]:
+                    act_key[i] = d
+                    act_par[i] = rnd + 1
+                if act_key[i] < sd[tid]:
+                    sd[tid] = act_key[i]
+                    si[tid] = i
+            for tid in range(nthreads):
+                if sd[tid] < best:
+                    best = sd[tid]
+                    bk   = si[tid]
+        else:
+            for i in range(m):
+                w = act_vert[i]
+                d = row[w]
+                if d < act_key[i]:
+                    act_key[i] = d
+                    act_par[i] = rnd + 1
+                if act_key[i] < best:
+                    best = act_key[i]
+                    bk   = i
+
+
+# ---------------------------------------------------------------------------
+# Shared helper: allocate working buffers, run kernel, free buffers — float32
+# ---------------------------------------------------------------------------
+cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
+    cdef int*   act_vert = <int*>  malloc(n * sizeof(int))
+    cdef float* act_key  = <float*>malloc(n * sizeof(float))
+    cdef int*   act_par  = <int*>  malloc(n * sizeof(int))
+
+    cdef int nthreads = openmp.omp_get_max_threads()
+    cdef float* sd = NULL
+    cdef int* si   = NULL
+
+    if not (act_vert and act_key and act_par):
+        free(act_vert); free(act_key); free(act_par)
+        raise MemoryError("MST workspace allocation failed")
+
+    if n >= _PAR_THRESHOLD and nthreads > 1:
+        sd = <float*>malloc(nthreads * sizeof(float))
+        si = <int*>  malloc(nthreads * sizeof(int))
+        if not (sd and si):
+            free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+            raise MemoryError("MST workspace allocation failed")
+        with nogil:
+            _prim_mst_kernel_par_32(
+                adj_ptr, n,
+                act_vert, act_key, act_par,
+                &heap_seq[0], &parent_seq[0],
+                sd, si, nthreads
+            )
+        free(sd); free(si)
+    else:
+        with nogil:
+            _prim_mst_kernel_32(
+                adj_ptr, n,
+                act_vert, act_key, act_par,
+                &heap_seq[0], &parent_seq[0]
+            )
+
+    free(act_vert); free(act_key); free(act_par)
+
+
+# ---------------------------------------------------------------------------
+# Public: Prim's MST only — float32
+# ---------------------------------------------------------------------------
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def vat_prim_mst_c_32(float[:, ::1] adj):
+    """
+    Optimized Prim's MST via decrease-key binary heap (O(n) heap size, nogil) — float32.
+    Returns (heap_seq, parent_seq) as int32 numpy arrays.
+    """
+    cdef int n = adj.shape[0]
+    heap_seq_np   = np.empty(n, dtype=np.int32)
+    parent_seq_np = np.empty(n, dtype=np.int32)
+    cdef int[:] heap_seq   = heap_seq_np
+    cdef int[:] parent_seq = parent_seq_np
+
+    _run_mst_32(&adj[0, 0], n, heap_seq, parent_seq)
+    return heap_seq_np, parent_seq_np
+
+
+# ---------------------------------------------------------------------------
+# Public: full VAT pipeline — float32 (MST + permutation gather, OpenMP parallel)
+# ---------------------------------------------------------------------------
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def compute_vat_c_32(float[:, ::1] adj):
+    """
+    C/OpenMP implementation of compute_ordered_dis_njit_merge (float32).
+
+    Steps:
+      1. Decrease-key Prim's MST to get permutation p (all nogil, O(n) heap).
+      2. Parallel gather: ordered[i,j] = adj[p[i], p[j]]
+         Each OpenMP thread owns a stripe of output rows — sequential writes,
+         within-row gather of adj[p[i],:] which fits in L1/L2 cache.
+
+    Returns (ordered_matrix, p_seq, q_seq).
+    """
+    cdef int n = adj.shape[0]
+    cdef int i, c, pi
+    cdef Py_ssize_t base, orow
+    cdef const float* src
+    cdef float* dst
+
+    out_np        = np.empty((n, n), dtype=np.float32)
+    heap_seq_np   = np.empty(n, dtype=np.int32)
+    parent_seq_np = np.empty(n, dtype=np.int32)
+    invp_np       = np.empty(n, dtype=np.int32)
+
+    cdef float[:, ::1] out = out_np
+    cdef int[:]  p          = heap_seq_np
+    cdef int[:]  q          = parent_seq_np
+    cdef int[:]  invp       = invp_np
+
+    # Step 1: MST (nogil)
+    _run_mst_32(&adj[0, 0], n, p, q)
+
+    # Step 2: Permutation re-order, out[i, j] = adj[p[i], p[j]].
+    cdef const float* A = &adj[0, 0]
+    cdef float* O       = &out[0, 0]
+    cdef const int* P   = &p[0]
+    cdef const int* IP  = &invp[0]
+
+    for i in range(n):
+        invp[P[i]] = i
+
+    with nogil:
+        for i in prange(n, schedule='static'):
+            pi   = P[i]
+            base = <Py_ssize_t>pi * n
+            orow = <Py_ssize_t>i * n
+            src  = A + base
+            dst  = O + orow
+            for c in range(n):
+                dst[IP[c]] = src[c]
+
+    return out_np, heap_seq_np, parent_seq_np
+
+
+# ---------------------------------------------------------------------------
+# Public dispatch: automatic dtype selection
+# ---------------------------------------------------------------------------
+def vat_prim_mst_c(adj):
+    """
+    Optimized Prim's MST via decrease-key binary heap.
+    Automatically dispatches to float32 or float64 based on input dtype.
+    Returns (heap_seq, parent_seq) as int32 numpy arrays.
+    """
+    if adj.dtype == np.float32:
+        adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        return vat_prim_mst_c_32(adj_c)
+    elif adj.dtype == np.float64:
+        adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        return vat_prim_mst_c_64(adj_c)
+    else:
+        raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
+
+
+def compute_vat_c(adj):
+    """
+    C/OpenMP implementation of compute_ordered_dis_njit_merge.
+    Automatically dispatches to float32 or float64 based on input dtype.
+    Returns (ordered_matrix, p_seq, q_seq).
+    """
+    if adj.dtype == np.float32:
+        adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        return compute_vat_c_32(adj_c)
+    elif adj.dtype == np.float64:
+        adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        return compute_vat_c_64(adj_c)
+    else:
+        raise TypeError(f"Expected float32 or float64, got {adj.dtype}")

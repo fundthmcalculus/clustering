@@ -210,8 +210,8 @@ class TestPerformance:
 
         mean_c, two_sig_c = [], []
         mean_orig, two_sig_orig = [], []
-        # sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000]
-        sizes = [25, 100, 500, 1000, 2000]
+        sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000]
+        # sizes = [25, 100, 500, 1000, 2000]
 
         print('\ncompute_vat vs compute_vat_c  (mean +/- 2 sigma, ms):')
         print(f"{'Size':>6} | {'heapq (ms)':>20} | {'C (ms)':>20} | {'C/heapq':>9}")
@@ -219,7 +219,7 @@ class TestPerformance:
 
         for size in sizes:
             data = np.random.randn(size, 5)
-            distances = squareform(pdist(data, metric='euclidean')).astype(np.float64)
+            distances = squareform(pdist(data, metric='euclidean')).astype(np.float32)
 
             s_orig = _bench(compute_vat, distances)
             s_c = _bench(compute_vat_c, distances)
