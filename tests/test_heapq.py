@@ -187,13 +187,12 @@ class TestPerformance:
         """Test that performance scales reasonably with input size."""
         np.random.seed(42)
 
-        times_numba = []
-        times_orig = []
         times_c = []
-        sizes = [25, 100, 500, 1000, 2000, 5000]
+        times_orig = []
+        sizes = [25, 100, 500, 1000, 2000, 5000, 10000,15000]
 
         print('\nPerformance Scaling Comparison:')
-        print(f"{'Size':>6} | {'heapq ms':>10} | {'numba ms':>10} | {'C ms':>10} | {'C/heapq':>9} | {'C/numba':>9}")
+        print(f"{'Size':>6} | {'heapq ms':>10} | {'C ms':>10} | {'C/heapq':>9}")
         print('-' * 72)
 
         for size in sizes:
@@ -238,7 +237,7 @@ class TestPerformance:
         print("\nPlot saved to 'vat_scaling_performance.png'")
 
         # Times should generally increase with size (not a strict requirement, but expected)
-        assert times_c[1] >= times_c[0] * 0.5  # Allow some variance
+        assert times_c[-1] >= times_c[-2]
 
     def test_scaling_behavior(self):
         """Test that performance scales reasonably with input size."""
@@ -246,13 +245,12 @@ class TestPerformance:
 
         np.random.seed(42)
 
-        times_numba = []
         times_orig = []
         times_c = []
-        sizes = [25, 100, 500, 1000,2000,5000]
+        sizes = [25, 100, 500, 1000,2000,5000, 10000, 15000]
 
         print('\nPerformance Scaling Comparison:')
-        print(f"{'Size':>6} | {'heapq ms':>10} | {'numba ms':>10} | {'C ms':>10} | {'C/heapq':>9} | {'C/numba':>9}")
+        print(f"{'Size':>6} | {'heapq ms':>10} | {'C ms':>10} | {'C/heapq':>9}")
         print('-' * 72)
 
         for size in sizes:
@@ -260,7 +258,6 @@ class TestPerformance:
             distances = squareform(pdist(data, metric='euclidean')).astype(np.float64)
 
             # Warm up all versions
-            vat_prim_mst_numba(distances)
             vat_prim_mst(distances)
             vat_prim_mst_c(distances)
 
@@ -271,26 +268,18 @@ class TestPerformance:
             times_orig.append(elapsed_orig / N)
 
             start = time.time()
-            for _ in range(N): vat_prim_mst_numba(distances)
-            elapsed_numba = time.time() - start
-            times_numba.append(elapsed_numba / N)
-
-            start = time.time()
             for _ in range(N): vat_prim_mst_c(distances)
             elapsed_c = time.time() - start
             times_c.append(elapsed_c / N)
 
             orig_ms  = elapsed_orig  / N * 1000
-            numba_ms = elapsed_numba / N * 1000
             c_ms     = elapsed_c     / N * 1000
 
-            print(f"{size:>6} | {orig_ms:>10.3f} | {numba_ms:>10.3f} | {c_ms:>10.3f}"
-                  f" | {c_ms/orig_ms:>8.2f}x{'✓' if c_ms < orig_ms else '✗'}"
-                  f" | {c_ms/numba_ms:>8.2f}x{'✓' if c_ms < numba_ms else '✗'}")
+            print(f"{size:>6} | {orig_ms:>10.3f} | {c_ms:>10.3f}"
+                  f" | {c_ms/orig_ms:>8.2f}x{'✓' if c_ms < orig_ms else '✗'}")
 
         # Plot comparison
         plt.figure()
-        plt.plot(sizes, [t*1000 for t in times_numba], 'o-', label='vat_prim_mst_numba', linewidth=2, markersize=8)
         plt.plot(sizes, [t*1000 for t in times_orig], 's-', label='vat_prim_mst (heapq)', linewidth=2, markersize=8)
         plt.plot(sizes, [t*1000 for t in times_c], '^-', label='vat_prim_mst_c (C extension)', linewidth=2, markersize=8)
         plt.xlabel('Matrix Size (n)', fontsize=12)
@@ -303,7 +292,7 @@ class TestPerformance:
         print("\nPlot saved to 'scaling_performance.png'")
 
         # Times should generally increase with size (not a strict requirement, but expected)
-        assert times_numba[1] >= times_numba[0] * 0.5  # Allow some variance
+        assert times_c[-1] >= times_c[-2]
 
 
 class TestEdgeCases:
