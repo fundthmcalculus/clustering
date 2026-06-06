@@ -2,10 +2,12 @@ import numpy as np
 import pytest
 from scipy.spatial.distance import pdist, squareform
 import time
+import matplotlib.pyplot as plt
 
+from tribbleclustering import compute_vat
 from tribbleclustering.pvat import vat_prim_mst
 from tribbleclustering.pqvat import vat_prim_mst_numba
-from tribbleclustering.pcvat import vat_prim_mst_c
+from tribbleclustering.pcvat import vat_prim_mst_c, compute_vat_c
 
 
 @pytest.fixture
@@ -180,6 +182,63 @@ class TestPerformance:
 
         print(f"\nLarge matrix (n=200): {numba_time/3*1000:.3f}ms per call")
         assert numba_time > 0
+
+    def test_vat_scaling_behavior(self):
+        """Test that performance scales reasonably with input size."""
+        np.random.seed(42)
+
+        times_numba = []
+        times_orig = []
+        times_c = []
+        sizes = [25, 100, 500, 1000, 2000, 5000]
+
+        print('\nPerformance Scaling Comparison:')
+        print(f"{'Size':>6} | {'heapq ms':>10} | {'numba ms':>10} | {'C ms':>10} | {'C/heapq':>9} | {'C/numba':>9}")
+        print('-' * 72)
+
+        for size in sizes:
+            data = np.random.randn(size, 5)
+            distances = squareform(pdist(data, metric='euclidean')).astype(np.float64)
+
+            # Warm up all versions
+            compute_vat(distances)
+            compute_vat_c(distances)
+
+            N = 5
+            start = time.time()
+            for _ in range(N):
+                compute_vat(distances)
+            elapsed_orig = time.time() - start
+            times_orig.append(elapsed_orig / N)
+
+            start = time.time()
+            for _ in range(N):
+                compute_vat_c(distances)
+            elapsed_c = time.time() - start
+            times_c.append(elapsed_c / N)
+
+            orig_ms = elapsed_orig / N * 1000
+            c_ms = elapsed_c / N * 1000
+
+            print(f"{size:>6} | {orig_ms:>10.3f} | {c_ms:>10.3f}"
+                  f" | {c_ms / orig_ms:>8.2f}x{'✓' if c_ms < orig_ms else '✗'}")
+
+        # Plot comparison
+        plt.figure()
+        plt.plot(sizes, [t * 1000 for t in times_orig], 's-', label='compute_vat (heapq)', linewidth=2, markersize=8)
+        plt.plot(sizes, [t * 1000 for t in times_c], '^-', label='compute_vat_c (C extension)', linewidth=2,
+                 markersize=8)
+        plt.xlabel('Matrix Size (n)', fontsize=12)
+        plt.ylabel('Time (ms)', fontsize=12)
+        plt.title('Performance Comparison: Original vs C Extension', fontsize=14)
+        plt.legend(fontsize=11)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig('vat_scaling_performance.png', dpi=150)
+        print("\nPlot saved to 'vat_scaling_performance.png'")
+
+        # Times should generally increase with size (not a strict requirement, but expected)
+        assert times_c[1] >= times_c[0] * 0.5  # Allow some variance
 
     def test_scaling_behavior(self):
         """Test that performance scales reasonably with input size."""

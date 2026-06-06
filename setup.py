@@ -7,7 +7,8 @@ extensions = [
         "tribbleclustering.pcvat",
         ["src/tribbleclustering/pcvat.pyx"],
         include_dirs=[numpy.get_include()],
-        extra_compile_args=["-O3", "-march=native"],
+        extra_compile_args=["-O3", "-march=native", "-fopenmp"],
+        extra_link_args=["-fopenmp"],
     )
 ]
 
