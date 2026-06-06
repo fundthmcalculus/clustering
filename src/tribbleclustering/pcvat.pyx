@@ -22,7 +22,7 @@ cdef void _prim_mst_kernel_64(
     const double* adj, int n,
     int* act_vert, double* act_key, int* act_par,
     int* out_seq, int* out_par_seq,
-    double* sd, int* si, int nthreads
+    double* sd, int* sbi, int* sbj, int nthreads
 ) noexcept nogil:
     # Compact-active-set dense Prim. `act_*` are parallel arrays over the
     # currently-unvisited vertices, packed into slots [0, m). Removing a vertex
@@ -47,27 +47,32 @@ cdef void _prim_mst_kernel_64(
 
     # Find global maximum to seed the source vertex.
     if nthreads > 1:
-        # Parallel global-max over row stripes; per-thread (value, flat-index)
-        # then a serial combine. Static schedule gives thread t the lowest
-        # contiguous block of rows, and every comparison is strict `>`, so ties
-        # resolve to the lowest flat index — identical to the serial scan.
+        # Parallel global-max over row stripes; each thread keeps its best
+        # (value, row, col), then a serial combine. Static schedule gives
+        # thread t the lowest contiguous block of rows, and every comparison is
+        # strict `>`, so ties resolve to the lowest (i, j) — identical to the
+        # serial scan. Row/col are stored separately (each < n) rather than a
+        # packed i*n+j, which overflows int32 once n >~ 46340. The matrix offset
+        # itself is computed in Py_ssize_t for the same reason.
         for tid in range(nthreads):
-            sd[tid] = -INFINITY
-            si[tid] = 0
+            sd[tid]  = -INFINITY
+            sbi[tid] = 0
+            sbj[tid] = 0
         for i in prange(n, schedule='static', num_threads=nthreads):
             tid = threadid()
             for j in range(n):
-                if adj[i * n + j] > sd[tid]:
-                    sd[tid] = adj[i * n + j]
-                    si[tid] = i * n + j
+                if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+                    sd[tid]  = adj[<Py_ssize_t>i * n + j]
+                    sbi[tid] = i
+                    sbj[tid] = j
         for tid in range(nthreads):
             if sd[tid] > max_val:
                 max_val = sd[tid]
-                src_i = si[tid] // n
-                src_j = si[tid] % n
+                src_i = sbi[tid]
+                src_j = sbj[tid]
     else:
         for i in range(n):
-            row = adj + i * n
+            row = adj + <Py_ssize_t>i * n
             for j in range(n):
                 if row[j] > max_val:
                     max_val = row[j]
@@ -92,7 +97,7 @@ cdef void _prim_mst_kernel_64(
         act_par[bk]  = act_par[m]
 
         # Fused relax of the remaining active set + next-min selection (serial).
-        row  = adj + u * n
+        row  = adj + <Py_ssize_t>u * n
         best = INFINITY
         bk   = -1
         for i in range(m):
@@ -118,18 +123,21 @@ cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_se
     cdef int nthreads = openmp.omp_get_max_threads()
     if n < _PAR_THRESHOLD or nthreads < 2:
         nthreads = 1
-    cdef double* sd = NULL
-    cdef int* si    = NULL
+    cdef double* sd  = NULL
+    cdef int*    sbi = NULL
+    cdef int*    sbj = NULL
 
     if not (act_vert and act_key and act_par):
         free(act_vert); free(act_key); free(act_par)
         raise MemoryError("MST workspace allocation failed")
 
     if nthreads > 1:
-        sd = <double*>malloc(nthreads * sizeof(double))
-        si = <int*>   malloc(nthreads * sizeof(int))
-        if not (sd and si):
-            free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+        sd  = <double*>malloc(nthreads * sizeof(double))
+        sbi = <int*>   malloc(nthreads * sizeof(int))
+        sbj = <int*>   malloc(nthreads * sizeof(int))
+        if not (sd and sbi and sbj):
+            free(act_vert); free(act_key); free(act_par)
+            free(sd); free(sbi); free(sbj)
             raise MemoryError("MST workspace allocation failed")
 
     with nogil:
@@ -137,10 +145,10 @@ cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_se
             adj_ptr, n,
             act_vert, act_key, act_par,
             &heap_seq[0], &parent_seq[0],
-            sd, si, nthreads
+            sd, sbi, sbj, nthreads
         )
 
-    free(sd); free(si)
+    free(sd); free(sbi); free(sbj)
     free(act_vert); free(act_key); free(act_par)
 
 
@@ -238,7 +246,7 @@ cdef void _prim_mst_kernel_32(
     const float* adj, int n,
     int* act_vert, float* act_key, int* act_par,
     int* out_seq, int* out_par_seq,
-    float* sd, int* si, int nthreads
+    float* sd, int* sbi, int* sbj, int nthreads
 ) noexcept nogil:
     cdef int i, j, w, u, bk, rnd, m, tid
     cdef int src_i = 0, src_j = 0
@@ -252,23 +260,28 @@ cdef void _prim_mst_kernel_32(
         act_par[i]  = -1
 
     if nthreads > 1:
+        # Per-thread best (value, row, col); row/col stored separately to avoid
+        # the int32 overflow of a packed i*n+j, and the matrix offset is taken
+        # in Py_ssize_t. See the float64 kernel for the full rationale.
         for tid in range(nthreads):
-            sd[tid] = -INFINITY
-            si[tid] = 0
+            sd[tid]  = -INFINITY
+            sbi[tid] = 0
+            sbj[tid] = 0
         for i in prange(n, schedule='static', num_threads=nthreads):
             tid = threadid()
             for j in range(n):
-                if adj[i * n + j] > sd[tid]:
-                    sd[tid] = adj[i * n + j]
-                    si[tid] = i * n + j
+                if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+                    sd[tid]  = adj[<Py_ssize_t>i * n + j]
+                    sbi[tid] = i
+                    sbj[tid] = j
         for tid in range(nthreads):
             if sd[tid] > max_val:
                 max_val = sd[tid]
-                src_i = si[tid] // n
-                src_j = si[tid] % n
+                src_i = sbi[tid]
+                src_j = sbj[tid]
     else:
         for i in range(n):
-            row = adj + i * n
+            row = adj + <Py_ssize_t>i * n
             for j in range(n):
                 if row[j] > max_val:
                     max_val = row[j]
@@ -290,7 +303,7 @@ cdef void _prim_mst_kernel_32(
         act_key[bk]  = act_key[m]
         act_par[bk]  = act_par[m]
 
-        row  = adj + u * n
+        row  = adj + <Py_ssize_t>u * n
         best = INFINITY
         bk   = -1
         for i in range(m):
@@ -315,18 +328,21 @@ cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq
     cdef int nthreads = openmp.omp_get_max_threads()
     if n < _PAR_THRESHOLD or nthreads < 2:
         nthreads = 1
-    cdef float* sd = NULL
-    cdef int* si   = NULL
+    cdef float* sd  = NULL
+    cdef int*   sbi = NULL
+    cdef int*   sbj = NULL
 
     if not (act_vert and act_key and act_par):
         free(act_vert); free(act_key); free(act_par)
         raise MemoryError("MST workspace allocation failed")
 
     if nthreads > 1:
-        sd = <float*>malloc(nthreads * sizeof(float))
-        si = <int*>  malloc(nthreads * sizeof(int))
-        if not (sd and si):
-            free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+        sd  = <float*>malloc(nthreads * sizeof(float))
+        sbi = <int*>  malloc(nthreads * sizeof(int))
+        sbj = <int*>  malloc(nthreads * sizeof(int))
+        if not (sd and sbi and sbj):
+            free(act_vert); free(act_key); free(act_par)
+            free(sd); free(sbi); free(sbj)
             raise MemoryError("MST workspace allocation failed")
 
     with nogil:
@@ -334,10 +350,10 @@ cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq
             adj_ptr, n,
             act_vert, act_key, act_par,
             &heap_seq[0], &parent_seq[0],
-            sd, si, nthreads
+            sd, sbi, sbj, nthreads
         )
 
-    free(sd); free(si)
+    free(sd); free(sbi); free(sbj)
     free(act_vert); free(act_key); free(act_par)
 
 

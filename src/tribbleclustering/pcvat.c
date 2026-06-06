@@ -2889,9 +2889,9 @@ static PyObject *contiguous = 0;
 static PyObject *indirect_contiguous = 0;
 static int __pyx_memoryview_thread_locks_used;
 static PyThread_type_lock __pyx_memoryview_thread_locks[8];
-static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const *, int, int *, double *, int *, int *, int *, double *, int *, int); /*proto*/
+static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const *, int, int *, double *, int *, int *, int *, double *, int *, int *, int); /*proto*/
 static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *, int, __Pyx_memviewslice, __Pyx_memviewslice); /*proto*/
-static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *, int, int *, float *, int *, int *, int *, float *, int *, int); /*proto*/
+static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *, int, int *, float *, int *, int *, int *, float *, int *, int *, int); /*proto*/
 static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *, int, __Pyx_memviewslice, __Pyx_memviewslice); /*proto*/
 static int __pyx_array_allocate_buffer(struct __pyx_array_obj *); /*proto*/
 static struct __pyx_array_obj *__pyx_array_new(PyObject *, Py_ssize_t, char *, char const *, char *); /*proto*/
@@ -15803,7 +15803,7 @@ static PyObject *__pyx_unpickle_Enum__set_state(struct __pyx_MemviewEnum_obj *__
  *     int* act_vert, double* act_key, int* act_par,
 */
 
-static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const *__pyx_v_adj, int __pyx_v_n, int *__pyx_v_act_vert, double *__pyx_v_act_key, int *__pyx_v_act_par, int *__pyx_v_out_seq, int *__pyx_v_out_par_seq, double *__pyx_v_sd, int *__pyx_v_si, int __pyx_v_nthreads) {
+static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const *__pyx_v_adj, int __pyx_v_n, int *__pyx_v_act_vert, double *__pyx_v_act_key, int *__pyx_v_act_par, int *__pyx_v_out_seq, int *__pyx_v_out_par_seq, double *__pyx_v_sd, int *__pyx_v_sbi, int *__pyx_v_sbj, int __pyx_v_nthreads) {
   int __pyx_v_i;
   int __pyx_v_j;
   int __pyx_v_w;
@@ -15889,46 +15889,55 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
  * 
  *     # Find global maximum to seed the source vertex.
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         # Parallel global-max over row stripes; per-thread (value, flat-index)
- *         # then a serial combine. Static schedule gives thread t the lowest
+ *         # Parallel global-max over row stripes; each thread keeps its best
+ *         # (value, row, col), then a serial combine. Static schedule gives
 */
   __pyx_t_4 = (__pyx_v_nthreads > 1);
   if (__pyx_t_4) {
 
-    /* "tribbleclustering/pcvat.pyx":54
- *         # contiguous block of rows, and every comparison is strict `>`, so ties
- *         # resolve to the lowest flat index  identical to the serial scan.
+    /* "tribbleclustering/pcvat.pyx":57
+ *         # packed i*n+j, which overflows int32 once n >~ 46340. The matrix offset
+ *         # itself is computed in Py_ssize_t for the same reason.
  *         for tid in range(nthreads):             # <<<<<<<<<<<<<<
- *             sd[tid] = -INFINITY
- *             si[tid] = 0
+ *             sd[tid]  = -INFINITY
+ *             sbi[tid] = 0
 */
     __pyx_t_1 = __pyx_v_nthreads;
     __pyx_t_2 = __pyx_t_1;
     for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
       __pyx_v_tid = __pyx_t_3;
 
-      /* "tribbleclustering/pcvat.pyx":55
- *         # resolve to the lowest flat index  identical to the serial scan.
+      /* "tribbleclustering/pcvat.pyx":58
+ *         # itself is computed in Py_ssize_t for the same reason.
  *         for tid in range(nthreads):
- *             sd[tid] = -INFINITY             # <<<<<<<<<<<<<<
- *             si[tid] = 0
- *         for i in prange(n, schedule='static', num_threads=nthreads):
+ *             sd[tid]  = -INFINITY             # <<<<<<<<<<<<<<
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0
 */
       (__pyx_v_sd[__pyx_v_tid]) = (-INFINITY);
 
-      /* "tribbleclustering/pcvat.pyx":56
+      /* "tribbleclustering/pcvat.pyx":59
  *         for tid in range(nthreads):
- *             sd[tid] = -INFINITY
- *             si[tid] = 0             # <<<<<<<<<<<<<<
+ *             sd[tid]  = -INFINITY
+ *             sbi[tid] = 0             # <<<<<<<<<<<<<<
+ *             sbj[tid] = 0
+ *         for i in prange(n, schedule='static', num_threads=nthreads):
+*/
+      (__pyx_v_sbi[__pyx_v_tid]) = 0;
+
+      /* "tribbleclustering/pcvat.pyx":60
+ *             sd[tid]  = -INFINITY
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0             # <<<<<<<<<<<<<<
  *         for i in prange(n, schedule='static', num_threads=nthreads):
  *             tid = threadid()
 */
-      (__pyx_v_si[__pyx_v_tid]) = 0;
+      (__pyx_v_sbj[__pyx_v_tid]) = 0;
     }
 
-    /* "tribbleclustering/pcvat.pyx":57
- *             sd[tid] = -INFINITY
- *             si[tid] = 0
+    /* "tribbleclustering/pcvat.pyx":61
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0
  *         for i in prange(n, schedule='static', num_threads=nthreads):             # <<<<<<<<<<<<<<
  *             tid = threadid()
  *             for j in range(n):
@@ -15960,12 +15969,12 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
                           {
                               __pyx_v_i = (int)(0 + 1 * __pyx_t_2);
 
-                              /* "tribbleclustering/pcvat.pyx":58
- *             si[tid] = 0
+                              /* "tribbleclustering/pcvat.pyx":62
+ *             sbj[tid] = 0
  *         for i in prange(n, schedule='static', num_threads=nthreads):
  *             tid = threadid()             # <<<<<<<<<<<<<<
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
 */
                               #ifdef _OPENMP
                               __pyx_t_5 = omp_get_thread_num();
@@ -15974,52 +15983,61 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
                               #endif
                               __pyx_v_tid = __pyx_t_5;
 
-                              /* "tribbleclustering/pcvat.pyx":59
+                              /* "tribbleclustering/pcvat.pyx":63
  *         for i in prange(n, schedule='static', num_threads=nthreads):
  *             tid = threadid()
  *             for j in range(n):             # <<<<<<<<<<<<<<
- *                 if adj[i * n + j] > sd[tid]:
- *                     sd[tid] = adj[i * n + j]
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
 */
                               __pyx_t_5 = __pyx_v_n;
                               __pyx_t_6 = __pyx_t_5;
                               for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
                                 __pyx_v_j = __pyx_t_7;
 
-                                /* "tribbleclustering/pcvat.pyx":60
+                                /* "tribbleclustering/pcvat.pyx":64
  *             tid = threadid()
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i
 */
-                                __pyx_t_4 = ((__pyx_v_adj[((__pyx_v_i * __pyx_v_n) + __pyx_v_j)]) > (__pyx_v_sd[__pyx_v_tid]));
+                                __pyx_t_4 = ((__pyx_v_adj[((((Py_ssize_t)__pyx_v_i) * __pyx_v_n) + __pyx_v_j)]) > (__pyx_v_sd[__pyx_v_tid]));
                                 if (__pyx_t_4) {
 
-                                  /* "tribbleclustering/pcvat.pyx":61
+                                  /* "tribbleclustering/pcvat.pyx":65
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:
- *                     sd[tid] = adj[i * n + j]             # <<<<<<<<<<<<<<
- *                     si[tid] = i * n + j
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]             # <<<<<<<<<<<<<<
+ *                     sbi[tid] = i
+ *                     sbj[tid] = j
+*/
+                                  (__pyx_v_sd[__pyx_v_tid]) = (__pyx_v_adj[((((Py_ssize_t)__pyx_v_i) * __pyx_v_n) + __pyx_v_j)]);
+
+                                  /* "tribbleclustering/pcvat.pyx":66
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i             # <<<<<<<<<<<<<<
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):
 */
-                                  (__pyx_v_sd[__pyx_v_tid]) = (__pyx_v_adj[((__pyx_v_i * __pyx_v_n) + __pyx_v_j)]);
+                                  (__pyx_v_sbi[__pyx_v_tid]) = __pyx_v_i;
 
-                                  /* "tribbleclustering/pcvat.pyx":62
- *                 if adj[i * n + j] > sd[tid]:
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j             # <<<<<<<<<<<<<<
+                                  /* "tribbleclustering/pcvat.pyx":67
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i
+ *                     sbj[tid] = j             # <<<<<<<<<<<<<<
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:
 */
-                                  (__pyx_v_si[__pyx_v_tid]) = ((__pyx_v_i * __pyx_v_n) + __pyx_v_j);
+                                  (__pyx_v_sbj[__pyx_v_tid]) = __pyx_v_j;
 
-                                  /* "tribbleclustering/pcvat.pyx":60
+                                  /* "tribbleclustering/pcvat.pyx":64
  *             tid = threadid()
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i
 */
                                 }
                               }
@@ -16036,9 +16054,9 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
           #endif
         }
 
-        /* "tribbleclustering/pcvat.pyx":57
- *             sd[tid] = -INFINITY
- *             si[tid] = 0
+        /* "tribbleclustering/pcvat.pyx":61
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0
  *         for i in prange(n, schedule='static', num_threads=nthreads):             # <<<<<<<<<<<<<<
  *             tid = threadid()
  *             for j in range(n):
@@ -16053,9 +16071,9 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
         }
     }
 
-    /* "tribbleclustering/pcvat.pyx":63
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j
+    /* "tribbleclustering/pcvat.pyx":68
+ *                     sbi[tid] = i
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):             # <<<<<<<<<<<<<<
  *             if sd[tid] > max_val:
  *                 max_val = sd[tid]
@@ -16065,49 +16083,49 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
     for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_2; __pyx_t_1+=1) {
       __pyx_v_tid = __pyx_t_1;
 
-      /* "tribbleclustering/pcvat.pyx":64
- *                     si[tid] = i * n + j
+      /* "tribbleclustering/pcvat.pyx":69
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:             # <<<<<<<<<<<<<<
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n
+ *                 src_i = sbi[tid]
 */
       __pyx_t_4 = ((__pyx_v_sd[__pyx_v_tid]) > __pyx_v_max_val);
       if (__pyx_t_4) {
 
-        /* "tribbleclustering/pcvat.pyx":65
+        /* "tribbleclustering/pcvat.pyx":70
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:
  *                 max_val = sd[tid]             # <<<<<<<<<<<<<<
- *                 src_i = si[tid] // n
- *                 src_j = si[tid] % n
+ *                 src_i = sbi[tid]
+ *                 src_j = sbj[tid]
 */
         __pyx_v_max_val = (__pyx_v_sd[__pyx_v_tid]);
 
-        /* "tribbleclustering/pcvat.pyx":66
+        /* "tribbleclustering/pcvat.pyx":71
  *             if sd[tid] > max_val:
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n             # <<<<<<<<<<<<<<
- *                 src_j = si[tid] % n
+ *                 src_i = sbi[tid]             # <<<<<<<<<<<<<<
+ *                 src_j = sbj[tid]
  *     else:
 */
-        __pyx_v_src_i = ((__pyx_v_si[__pyx_v_tid]) / __pyx_v_n);
+        __pyx_v_src_i = (__pyx_v_sbi[__pyx_v_tid]);
 
-        /* "tribbleclustering/pcvat.pyx":67
+        /* "tribbleclustering/pcvat.pyx":72
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n
- *                 src_j = si[tid] % n             # <<<<<<<<<<<<<<
+ *                 src_i = sbi[tid]
+ *                 src_j = sbj[tid]             # <<<<<<<<<<<<<<
  *     else:
  *         for i in range(n):
 */
-        __pyx_v_src_j = ((__pyx_v_si[__pyx_v_tid]) % __pyx_v_n);
+        __pyx_v_src_j = (__pyx_v_sbj[__pyx_v_tid]);
 
-        /* "tribbleclustering/pcvat.pyx":64
- *                     si[tid] = i * n + j
+        /* "tribbleclustering/pcvat.pyx":69
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:             # <<<<<<<<<<<<<<
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n
+ *                 src_i = sbi[tid]
 */
       }
     }
@@ -16116,17 +16134,17 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
  * 
  *     # Find global maximum to seed the source vertex.
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         # Parallel global-max over row stripes; per-thread (value, flat-index)
- *         # then a serial combine. Static schedule gives thread t the lowest
+ *         # Parallel global-max over row stripes; each thread keeps its best
+ *         # (value, row, col), then a serial combine. Static schedule gives
 */
     goto __pyx_L5;
   }
 
-  /* "tribbleclustering/pcvat.pyx":69
- *                 src_j = si[tid] % n
+  /* "tribbleclustering/pcvat.pyx":74
+ *                 src_j = sbj[tid]
  *     else:
  *         for i in range(n):             # <<<<<<<<<<<<<<
- *             row = adj + i * n
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):
 */
   /*else*/ {
@@ -16135,18 +16153,18 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
     for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_2; __pyx_t_1+=1) {
       __pyx_v_i = __pyx_t_1;
 
-      /* "tribbleclustering/pcvat.pyx":70
+      /* "tribbleclustering/pcvat.pyx":75
  *     else:
  *         for i in range(n):
- *             row = adj + i * n             # <<<<<<<<<<<<<<
+ *             row = adj + <Py_ssize_t>i * n             # <<<<<<<<<<<<<<
  *             for j in range(n):
  *                 if row[j] > max_val:
 */
-      __pyx_v_row = (__pyx_v_adj + (__pyx_v_i * __pyx_v_n));
+      __pyx_v_row = (__pyx_v_adj + (((Py_ssize_t)__pyx_v_i) * __pyx_v_n));
 
-      /* "tribbleclustering/pcvat.pyx":71
+      /* "tribbleclustering/pcvat.pyx":76
  *         for i in range(n):
- *             row = adj + i * n
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):             # <<<<<<<<<<<<<<
  *                 if row[j] > max_val:
  *                     max_val = row[j]
@@ -16156,8 +16174,8 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
       for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
         __pyx_v_j = __pyx_t_7;
 
-        /* "tribbleclustering/pcvat.pyx":72
- *             row = adj + i * n
+        /* "tribbleclustering/pcvat.pyx":77
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):
  *                 if row[j] > max_val:             # <<<<<<<<<<<<<<
  *                     max_val = row[j]
@@ -16166,7 +16184,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
         __pyx_t_4 = ((__pyx_v_row[__pyx_v_j]) > __pyx_v_max_val);
         if (__pyx_t_4) {
 
-          /* "tribbleclustering/pcvat.pyx":73
+          /* "tribbleclustering/pcvat.pyx":78
  *             for j in range(n):
  *                 if row[j] > max_val:
  *                     max_val = row[j]             # <<<<<<<<<<<<<<
@@ -16175,7 +16193,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
           __pyx_v_max_val = (__pyx_v_row[__pyx_v_j]);
 
-          /* "tribbleclustering/pcvat.pyx":74
+          /* "tribbleclustering/pcvat.pyx":79
  *                 if row[j] > max_val:
  *                     max_val = row[j]
  *                     src_i = i             # <<<<<<<<<<<<<<
@@ -16184,7 +16202,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
           __pyx_v_src_i = __pyx_v_i;
 
-          /* "tribbleclustering/pcvat.pyx":75
+          /* "tribbleclustering/pcvat.pyx":80
  *                     max_val = row[j]
  *                     src_i = i
  *                     src_j = j             # <<<<<<<<<<<<<<
@@ -16193,8 +16211,8 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
           __pyx_v_src_j = __pyx_v_j;
 
-          /* "tribbleclustering/pcvat.pyx":72
- *             row = adj + i * n
+          /* "tribbleclustering/pcvat.pyx":77
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):
  *                 if row[j] > max_val:             # <<<<<<<<<<<<<<
  *                     max_val = row[j]
@@ -16206,7 +16224,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
   }
   __pyx_L5:;
 
-  /* "tribbleclustering/pcvat.pyx":78
+  /* "tribbleclustering/pcvat.pyx":83
  * 
  *     # Source occupies slot src_i (act_vert[i] == i initially)
  *     act_key[src_i] = max_val             # <<<<<<<<<<<<<<
@@ -16215,7 +16233,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
   (__pyx_v_act_key[__pyx_v_src_i]) = __pyx_v_max_val;
 
-  /* "tribbleclustering/pcvat.pyx":79
+  /* "tribbleclustering/pcvat.pyx":84
  *     # Source occupies slot src_i (act_vert[i] == i initially)
  *     act_key[src_i] = max_val
  *     act_par[src_i] = src_j             # <<<<<<<<<<<<<<
@@ -16224,7 +16242,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
   (__pyx_v_act_par[__pyx_v_src_i]) = __pyx_v_src_j;
 
-  /* "tribbleclustering/pcvat.pyx":80
+  /* "tribbleclustering/pcvat.pyx":85
  *     act_key[src_i] = max_val
  *     act_par[src_i] = src_j
  *     bk = src_i             # <<<<<<<<<<<<<<
@@ -16233,7 +16251,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
   __pyx_v_bk = __pyx_v_src_i;
 
-  /* "tribbleclustering/pcvat.pyx":81
+  /* "tribbleclustering/pcvat.pyx":86
  *     act_par[src_i] = src_j
  *     bk = src_i
  *     m  = n             # <<<<<<<<<<<<<<
@@ -16242,7 +16260,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
   __pyx_v_m = __pyx_v_n;
 
-  /* "tribbleclustering/pcvat.pyx":83
+  /* "tribbleclustering/pcvat.pyx":88
  *     m  = n
  * 
  *     for rnd in range(n):             # <<<<<<<<<<<<<<
@@ -16254,7 +16272,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
   for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_2; __pyx_t_1+=1) {
     __pyx_v_rnd = __pyx_t_1;
 
-    /* "tribbleclustering/pcvat.pyx":84
+    /* "tribbleclustering/pcvat.pyx":89
  * 
  *     for rnd in range(n):
  *         u = act_vert[bk]             # <<<<<<<<<<<<<<
@@ -16263,7 +16281,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     __pyx_v_u = (__pyx_v_act_vert[__pyx_v_bk]);
 
-    /* "tribbleclustering/pcvat.pyx":85
+    /* "tribbleclustering/pcvat.pyx":90
  *     for rnd in range(n):
  *         u = act_vert[bk]
  *         out_seq[rnd]     = u             # <<<<<<<<<<<<<<
@@ -16272,7 +16290,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     (__pyx_v_out_seq[__pyx_v_rnd]) = __pyx_v_u;
 
-    /* "tribbleclustering/pcvat.pyx":86
+    /* "tribbleclustering/pcvat.pyx":91
  *         u = act_vert[bk]
  *         out_seq[rnd]     = u
  *         out_par_seq[rnd] = act_par[bk]             # <<<<<<<<<<<<<<
@@ -16281,7 +16299,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     (__pyx_v_out_par_seq[__pyx_v_rnd]) = (__pyx_v_act_par[__pyx_v_bk]);
 
-    /* "tribbleclustering/pcvat.pyx":89
+    /* "tribbleclustering/pcvat.pyx":94
  * 
  *         # Remove slot bk by swapping in the last active slot
  *         m -= 1             # <<<<<<<<<<<<<<
@@ -16290,7 +16308,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     __pyx_v_m = (__pyx_v_m - 1);
 
-    /* "tribbleclustering/pcvat.pyx":90
+    /* "tribbleclustering/pcvat.pyx":95
  *         # Remove slot bk by swapping in the last active slot
  *         m -= 1
  *         act_vert[bk] = act_vert[m]             # <<<<<<<<<<<<<<
@@ -16299,7 +16317,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     (__pyx_v_act_vert[__pyx_v_bk]) = (__pyx_v_act_vert[__pyx_v_m]);
 
-    /* "tribbleclustering/pcvat.pyx":91
+    /* "tribbleclustering/pcvat.pyx":96
  *         m -= 1
  *         act_vert[bk] = act_vert[m]
  *         act_key[bk]  = act_key[m]             # <<<<<<<<<<<<<<
@@ -16308,7 +16326,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     (__pyx_v_act_key[__pyx_v_bk]) = (__pyx_v_act_key[__pyx_v_m]);
 
-    /* "tribbleclustering/pcvat.pyx":92
+    /* "tribbleclustering/pcvat.pyx":97
  *         act_vert[bk] = act_vert[m]
  *         act_key[bk]  = act_key[m]
  *         act_par[bk]  = act_par[m]             # <<<<<<<<<<<<<<
@@ -16317,26 +16335,26 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     (__pyx_v_act_par[__pyx_v_bk]) = (__pyx_v_act_par[__pyx_v_m]);
 
-    /* "tribbleclustering/pcvat.pyx":95
+    /* "tribbleclustering/pcvat.pyx":100
  * 
  *         # Fused relax of the remaining active set + next-min selection (serial).
- *         row  = adj + u * n             # <<<<<<<<<<<<<<
+ *         row  = adj + <Py_ssize_t>u * n             # <<<<<<<<<<<<<<
  *         best = INFINITY
  *         bk   = -1
 */
-    __pyx_v_row = (__pyx_v_adj + (__pyx_v_u * __pyx_v_n));
+    __pyx_v_row = (__pyx_v_adj + (((Py_ssize_t)__pyx_v_u) * __pyx_v_n));
 
-    /* "tribbleclustering/pcvat.pyx":96
+    /* "tribbleclustering/pcvat.pyx":101
  *         # Fused relax of the remaining active set + next-min selection (serial).
- *         row  = adj + u * n
+ *         row  = adj + <Py_ssize_t>u * n
  *         best = INFINITY             # <<<<<<<<<<<<<<
  *         bk   = -1
  *         for i in range(m):
 */
     __pyx_v_best = INFINITY;
 
-    /* "tribbleclustering/pcvat.pyx":97
- *         row  = adj + u * n
+    /* "tribbleclustering/pcvat.pyx":102
+ *         row  = adj + <Py_ssize_t>u * n
  *         best = INFINITY
  *         bk   = -1             # <<<<<<<<<<<<<<
  *         for i in range(m):
@@ -16344,7 +16362,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
     __pyx_v_bk = -1;
 
-    /* "tribbleclustering/pcvat.pyx":98
+    /* "tribbleclustering/pcvat.pyx":103
  *         best = INFINITY
  *         bk   = -1
  *         for i in range(m):             # <<<<<<<<<<<<<<
@@ -16356,7 +16374,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
     for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
       __pyx_v_i = __pyx_t_7;
 
-      /* "tribbleclustering/pcvat.pyx":99
+      /* "tribbleclustering/pcvat.pyx":104
  *         bk   = -1
  *         for i in range(m):
  *             w = act_vert[i]             # <<<<<<<<<<<<<<
@@ -16365,7 +16383,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
       __pyx_v_w = (__pyx_v_act_vert[__pyx_v_i]);
 
-      /* "tribbleclustering/pcvat.pyx":100
+      /* "tribbleclustering/pcvat.pyx":105
  *         for i in range(m):
  *             w = act_vert[i]
  *             d = row[w]             # <<<<<<<<<<<<<<
@@ -16374,7 +16392,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
       __pyx_v_d = (__pyx_v_row[__pyx_v_w]);
 
-      /* "tribbleclustering/pcvat.pyx":101
+      /* "tribbleclustering/pcvat.pyx":106
  *             w = act_vert[i]
  *             d = row[w]
  *             if d < act_key[i]:             # <<<<<<<<<<<<<<
@@ -16384,7 +16402,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
       __pyx_t_4 = (__pyx_v_d < (__pyx_v_act_key[__pyx_v_i]));
       if (__pyx_t_4) {
 
-        /* "tribbleclustering/pcvat.pyx":102
+        /* "tribbleclustering/pcvat.pyx":107
  *             d = row[w]
  *             if d < act_key[i]:
  *                 act_key[i] = d             # <<<<<<<<<<<<<<
@@ -16393,7 +16411,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
         (__pyx_v_act_key[__pyx_v_i]) = __pyx_v_d;
 
-        /* "tribbleclustering/pcvat.pyx":103
+        /* "tribbleclustering/pcvat.pyx":108
  *             if d < act_key[i]:
  *                 act_key[i] = d
  *                 act_par[i] = rnd + 1             # <<<<<<<<<<<<<<
@@ -16402,7 +16420,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
         (__pyx_v_act_par[__pyx_v_i]) = (__pyx_v_rnd + 1);
 
-        /* "tribbleclustering/pcvat.pyx":101
+        /* "tribbleclustering/pcvat.pyx":106
  *             w = act_vert[i]
  *             d = row[w]
  *             if d < act_key[i]:             # <<<<<<<<<<<<<<
@@ -16411,7 +16429,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
       }
 
-      /* "tribbleclustering/pcvat.pyx":104
+      /* "tribbleclustering/pcvat.pyx":109
  *                 act_key[i] = d
  *                 act_par[i] = rnd + 1
  *             if act_key[i] < best:             # <<<<<<<<<<<<<<
@@ -16421,7 +16439,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
       __pyx_t_4 = ((__pyx_v_act_key[__pyx_v_i]) < __pyx_v_best);
       if (__pyx_t_4) {
 
-        /* "tribbleclustering/pcvat.pyx":105
+        /* "tribbleclustering/pcvat.pyx":110
  *                 act_par[i] = rnd + 1
  *             if act_key[i] < best:
  *                 best = act_key[i]             # <<<<<<<<<<<<<<
@@ -16430,7 +16448,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
         __pyx_v_best = (__pyx_v_act_key[__pyx_v_i]);
 
-        /* "tribbleclustering/pcvat.pyx":106
+        /* "tribbleclustering/pcvat.pyx":111
  *             if act_key[i] < best:
  *                 best = act_key[i]
  *                 bk   = i             # <<<<<<<<<<<<<<
@@ -16439,7 +16457,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
 */
         __pyx_v_bk = __pyx_v_i;
 
-        /* "tribbleclustering/pcvat.pyx":104
+        /* "tribbleclustering/pcvat.pyx":109
  *                 act_key[i] = d
  *                 act_par[i] = rnd + 1
  *             if act_key[i] < best:             # <<<<<<<<<<<<<<
@@ -16461,7 +16479,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(double const 
   /* function exit code */
 }
 
-/* "tribbleclustering/pcvat.pyx":112
+/* "tribbleclustering/pcvat.pyx":117
  * # Shared helper: allocate working buffers, run kernel, free buffers  float64
  * # ---------------------------------------------------------------------------
  * cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):             # <<<<<<<<<<<<<<
@@ -16475,7 +16493,8 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
   int *__pyx_v_act_par;
   int __pyx_v_nthreads;
   double *__pyx_v_sd;
-  int *__pyx_v_si;
+  int *__pyx_v_sbi;
+  int *__pyx_v_sbj;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -16490,7 +16509,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("_run_mst_64", 0);
 
-  /* "tribbleclustering/pcvat.pyx":113
+  /* "tribbleclustering/pcvat.pyx":118
  * # ---------------------------------------------------------------------------
  * cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
  *     cdef int*    act_vert = <int*>   malloc(n * sizeof(int))             # <<<<<<<<<<<<<<
@@ -16499,7 +16518,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
 */
   __pyx_v_act_vert = ((int *)malloc((__pyx_v_n * (sizeof(int)))));
 
-  /* "tribbleclustering/pcvat.pyx":114
+  /* "tribbleclustering/pcvat.pyx":119
  * cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
  *     cdef int*    act_vert = <int*>   malloc(n * sizeof(int))
  *     cdef double* act_key  = <double*>malloc(n * sizeof(double))             # <<<<<<<<<<<<<<
@@ -16508,7 +16527,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
 */
   __pyx_v_act_key = ((double *)malloc((__pyx_v_n * (sizeof(double)))));
 
-  /* "tribbleclustering/pcvat.pyx":115
+  /* "tribbleclustering/pcvat.pyx":120
  *     cdef int*    act_vert = <int*>   malloc(n * sizeof(int))
  *     cdef double* act_key  = <double*>malloc(n * sizeof(double))
  *     cdef int*    act_par  = <int*>   malloc(n * sizeof(int))             # <<<<<<<<<<<<<<
@@ -16517,7 +16536,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
 */
   __pyx_v_act_par = ((int *)malloc((__pyx_v_n * (sizeof(int)))));
 
-  /* "tribbleclustering/pcvat.pyx":118
+  /* "tribbleclustering/pcvat.pyx":123
  * 
  *     # Thread the one-shot global-max scan only when it pays off.
  *     cdef int nthreads = openmp.omp_get_max_threads()             # <<<<<<<<<<<<<<
@@ -16526,12 +16545,12 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
 */
   __pyx_v_nthreads = omp_get_max_threads();
 
-  /* "tribbleclustering/pcvat.pyx":119
+  /* "tribbleclustering/pcvat.pyx":124
  *     # Thread the one-shot global-max scan only when it pays off.
  *     cdef int nthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or nthreads < 2:             # <<<<<<<<<<<<<<
  *         nthreads = 1
- *     cdef double* sd = NULL
+ *     cdef double* sd  = NULL
 */
   __pyx_t_2 = (__pyx_v_n < __pyx_v_17tribbleclustering_5pcvat__PAR_THRESHOLD);
   if (!__pyx_t_2) {
@@ -16544,44 +16563,53 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "tribbleclustering/pcvat.pyx":120
+    /* "tribbleclustering/pcvat.pyx":125
  *     cdef int nthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or nthreads < 2:
  *         nthreads = 1             # <<<<<<<<<<<<<<
- *     cdef double* sd = NULL
- *     cdef int* si    = NULL
+ *     cdef double* sd  = NULL
+ *     cdef int*    sbi = NULL
 */
     __pyx_v_nthreads = 1;
 
-    /* "tribbleclustering/pcvat.pyx":119
+    /* "tribbleclustering/pcvat.pyx":124
  *     # Thread the one-shot global-max scan only when it pays off.
  *     cdef int nthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or nthreads < 2:             # <<<<<<<<<<<<<<
  *         nthreads = 1
- *     cdef double* sd = NULL
+ *     cdef double* sd  = NULL
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":121
+  /* "tribbleclustering/pcvat.pyx":126
  *     if n < _PAR_THRESHOLD or nthreads < 2:
  *         nthreads = 1
- *     cdef double* sd = NULL             # <<<<<<<<<<<<<<
- *     cdef int* si    = NULL
- * 
+ *     cdef double* sd  = NULL             # <<<<<<<<<<<<<<
+ *     cdef int*    sbi = NULL
+ *     cdef int*    sbj = NULL
 */
   __pyx_v_sd = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":122
+  /* "tribbleclustering/pcvat.pyx":127
  *         nthreads = 1
- *     cdef double* sd = NULL
- *     cdef int* si    = NULL             # <<<<<<<<<<<<<<
+ *     cdef double* sd  = NULL
+ *     cdef int*    sbi = NULL             # <<<<<<<<<<<<<<
+ *     cdef int*    sbj = NULL
+ * 
+*/
+  __pyx_v_sbi = NULL;
+
+  /* "tribbleclustering/pcvat.pyx":128
+ *     cdef double* sd  = NULL
+ *     cdef int*    sbi = NULL
+ *     cdef int*    sbj = NULL             # <<<<<<<<<<<<<<
  * 
  *     if not (act_vert and act_key and act_par):
 */
-  __pyx_v_si = NULL;
+  __pyx_v_sbj = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":124
- *     cdef int* si    = NULL
+  /* "tribbleclustering/pcvat.pyx":130
+ *     cdef int*    sbj = NULL
  * 
  *     if not (act_vert and act_key and act_par):             # <<<<<<<<<<<<<<
  *         free(act_vert); free(act_key); free(act_par)
@@ -16605,7 +16633,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
   __pyx_t_2 = (!__pyx_t_1);
   if (unlikely(__pyx_t_2)) {
 
-    /* "tribbleclustering/pcvat.pyx":125
+    /* "tribbleclustering/pcvat.pyx":131
  * 
  *     if not (act_vert and act_key and act_par):
  *         free(act_vert); free(act_key); free(act_par)             # <<<<<<<<<<<<<<
@@ -16616,7 +16644,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
     free(__pyx_v_act_key);
     free(__pyx_v_act_par);
 
-    /* "tribbleclustering/pcvat.pyx":126
+    /* "tribbleclustering/pcvat.pyx":132
  *     if not (act_vert and act_key and act_par):
  *         free(act_vert); free(act_key); free(act_par)
  *         raise MemoryError("MST workspace allocation failed")             # <<<<<<<<<<<<<<
@@ -16629,15 +16657,15 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
       PyObject *__pyx_callargs[2] = {__pyx_t_4, __pyx_mstate_global->__pyx_kp_u_MST_workspace_allocation_failed};
       __pyx_t_3 = __Pyx_PyObject_FastCall((PyObject*)(((PyTypeObject*)PyExc_MemoryError)), __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-      if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 126, __pyx_L1_error)
+      if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 132, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_3);
     }
     __Pyx_Raise(__pyx_t_3, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __PYX_ERR(0, 126, __pyx_L1_error)
+    __PYX_ERR(0, 132, __pyx_L1_error)
 
-    /* "tribbleclustering/pcvat.pyx":124
- *     cdef int* si    = NULL
+    /* "tribbleclustering/pcvat.pyx":130
+ *     cdef int*    sbj = NULL
  * 
  *     if not (act_vert and act_key and act_par):             # <<<<<<<<<<<<<<
  *         free(act_vert); free(act_key); free(act_par)
@@ -16645,40 +16673,49 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":128
+  /* "tribbleclustering/pcvat.pyx":134
  *         raise MemoryError("MST workspace allocation failed")
  * 
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         sd = <double*>malloc(nthreads * sizeof(double))
- *         si = <int*>   malloc(nthreads * sizeof(int))
+ *         sd  = <double*>malloc(nthreads * sizeof(double))
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))
 */
   __pyx_t_2 = (__pyx_v_nthreads > 1);
   if (__pyx_t_2) {
 
-    /* "tribbleclustering/pcvat.pyx":129
+    /* "tribbleclustering/pcvat.pyx":135
  * 
  *     if nthreads > 1:
- *         sd = <double*>malloc(nthreads * sizeof(double))             # <<<<<<<<<<<<<<
- *         si = <int*>   malloc(nthreads * sizeof(int))
- *         if not (sd and si):
+ *         sd  = <double*>malloc(nthreads * sizeof(double))             # <<<<<<<<<<<<<<
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))
+ *         sbj = <int*>   malloc(nthreads * sizeof(int))
 */
     __pyx_v_sd = ((double *)malloc((__pyx_v_nthreads * (sizeof(double)))));
 
-    /* "tribbleclustering/pcvat.pyx":130
+    /* "tribbleclustering/pcvat.pyx":136
  *     if nthreads > 1:
- *         sd = <double*>malloc(nthreads * sizeof(double))
- *         si = <int*>   malloc(nthreads * sizeof(int))             # <<<<<<<<<<<<<<
- *         if not (sd and si):
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+ *         sd  = <double*>malloc(nthreads * sizeof(double))
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))             # <<<<<<<<<<<<<<
+ *         sbj = <int*>   malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):
 */
-    __pyx_v_si = ((int *)malloc((__pyx_v_nthreads * (sizeof(int)))));
+    __pyx_v_sbi = ((int *)malloc((__pyx_v_nthreads * (sizeof(int)))));
 
-    /* "tribbleclustering/pcvat.pyx":131
- *         sd = <double*>malloc(nthreads * sizeof(double))
- *         si = <int*>   malloc(nthreads * sizeof(int))
- *         if not (sd and si):             # <<<<<<<<<<<<<<
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
- *             raise MemoryError("MST workspace allocation failed")
+    /* "tribbleclustering/pcvat.pyx":137
+ *         sd  = <double*>malloc(nthreads * sizeof(double))
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))
+ *         sbj = <int*>   malloc(nthreads * sizeof(int))             # <<<<<<<<<<<<<<
+ *         if not (sd and sbi and sbj):
+ *             free(act_vert); free(act_key); free(act_par)
+*/
+    __pyx_v_sbj = ((int *)malloc((__pyx_v_nthreads * (sizeof(int)))));
+
+    /* "tribbleclustering/pcvat.pyx":138
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))
+ *         sbj = <int*>   malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):             # <<<<<<<<<<<<<<
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)
 */
     __pyx_t_1 = (__pyx_v_sd != 0);
     if (__pyx_t_1) {
@@ -16686,28 +16723,43 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
       __pyx_t_2 = __pyx_t_1;
       goto __pyx_L12_bool_binop_done;
     }
-    __pyx_t_1 = (__pyx_v_si != 0);
+    __pyx_t_1 = (__pyx_v_sbi != 0);
+    if (__pyx_t_1) {
+    } else {
+      __pyx_t_2 = __pyx_t_1;
+      goto __pyx_L12_bool_binop_done;
+    }
+    __pyx_t_1 = (__pyx_v_sbj != 0);
     __pyx_t_2 = __pyx_t_1;
     __pyx_L12_bool_binop_done:;
     __pyx_t_1 = (!__pyx_t_2);
     if (unlikely(__pyx_t_1)) {
 
-      /* "tribbleclustering/pcvat.pyx":132
- *         si = <int*>   malloc(nthreads * sizeof(int))
- *         if not (sd and si):
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)             # <<<<<<<<<<<<<<
+      /* "tribbleclustering/pcvat.pyx":139
+ *         sbj = <int*>   malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):
+ *             free(act_vert); free(act_key); free(act_par)             # <<<<<<<<<<<<<<
+ *             free(sd); free(sbi); free(sbj)
  *             raise MemoryError("MST workspace allocation failed")
- * 
 */
       free(__pyx_v_act_vert);
       free(__pyx_v_act_key);
       free(__pyx_v_act_par);
-      free(__pyx_v_sd);
-      free(__pyx_v_si);
 
-      /* "tribbleclustering/pcvat.pyx":133
- *         if not (sd and si):
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+      /* "tribbleclustering/pcvat.pyx":140
+ *         if not (sd and sbi and sbj):
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)             # <<<<<<<<<<<<<<
+ *             raise MemoryError("MST workspace allocation failed")
+ * 
+*/
+      free(__pyx_v_sd);
+      free(__pyx_v_sbi);
+      free(__pyx_v_sbj);
+
+      /* "tribbleclustering/pcvat.pyx":141
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)
  *             raise MemoryError("MST workspace allocation failed")             # <<<<<<<<<<<<<<
  * 
  *     with nogil:
@@ -16718,32 +16770,32 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
         PyObject *__pyx_callargs[2] = {__pyx_t_4, __pyx_mstate_global->__pyx_kp_u_MST_workspace_allocation_failed};
         __pyx_t_3 = __Pyx_PyObject_FastCall((PyObject*)(((PyTypeObject*)PyExc_MemoryError)), __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
         __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-        if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 133, __pyx_L1_error)
+        if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 141, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
       }
       __Pyx_Raise(__pyx_t_3, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-      __PYX_ERR(0, 133, __pyx_L1_error)
+      __PYX_ERR(0, 141, __pyx_L1_error)
 
-      /* "tribbleclustering/pcvat.pyx":131
- *         sd = <double*>malloc(nthreads * sizeof(double))
- *         si = <int*>   malloc(nthreads * sizeof(int))
- *         if not (sd and si):             # <<<<<<<<<<<<<<
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
- *             raise MemoryError("MST workspace allocation failed")
+      /* "tribbleclustering/pcvat.pyx":138
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))
+ *         sbj = <int*>   malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):             # <<<<<<<<<<<<<<
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)
 */
     }
 
-    /* "tribbleclustering/pcvat.pyx":128
+    /* "tribbleclustering/pcvat.pyx":134
  *         raise MemoryError("MST workspace allocation failed")
  * 
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         sd = <double*>malloc(nthreads * sizeof(double))
- *         si = <int*>   malloc(nthreads * sizeof(int))
+ *         sd  = <double*>malloc(nthreads * sizeof(double))
+ *         sbi = <int*>   malloc(nthreads * sizeof(int))
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":135
+  /* "tribbleclustering/pcvat.pyx":143
  *             raise MemoryError("MST workspace allocation failed")
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -16756,27 +16808,27 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
       __Pyx_FastGIL_Remember();
       /*try:*/ {
 
-        /* "tribbleclustering/pcvat.pyx":139
+        /* "tribbleclustering/pcvat.pyx":147
  *             adj_ptr, n,
  *             act_vert, act_key, act_par,
  *             &heap_seq[0], &parent_seq[0],             # <<<<<<<<<<<<<<
- *             sd, si, nthreads
+ *             sd, sbi, sbj, nthreads
  *         )
 */
         __pyx_t_6 = 0;
         __pyx_t_7 = 0;
 
-        /* "tribbleclustering/pcvat.pyx":136
+        /* "tribbleclustering/pcvat.pyx":144
  * 
  *     with nogil:
  *         _prim_mst_kernel_64(             # <<<<<<<<<<<<<<
  *             adj_ptr, n,
  *             act_vert, act_key, act_par,
 */
-        __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(__pyx_v_adj_ptr, __pyx_v_n, __pyx_v_act_vert, __pyx_v_act_key, __pyx_v_act_par, (&(*((int *) ( /* dim=0 */ (__pyx_v_heap_seq.data + __pyx_t_6 * __pyx_v_heap_seq.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_parent_seq.data + __pyx_t_7 * __pyx_v_parent_seq.strides[0]) )))), __pyx_v_sd, __pyx_v_si, __pyx_v_nthreads);
+        __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_64(__pyx_v_adj_ptr, __pyx_v_n, __pyx_v_act_vert, __pyx_v_act_key, __pyx_v_act_par, (&(*((int *) ( /* dim=0 */ (__pyx_v_heap_seq.data + __pyx_t_6 * __pyx_v_heap_seq.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_parent_seq.data + __pyx_t_7 * __pyx_v_parent_seq.strides[0]) )))), __pyx_v_sd, __pyx_v_sbi, __pyx_v_sbj, __pyx_v_nthreads);
       }
 
-      /* "tribbleclustering/pcvat.pyx":135
+      /* "tribbleclustering/pcvat.pyx":143
  *             raise MemoryError("MST workspace allocation failed")
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -16787,25 +16839,26 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
         /*normal exit:*/{
           __Pyx_FastGIL_Forget();
           PyEval_RestoreThread(_save);
-          goto __pyx_L16;
+          goto __pyx_L17;
         }
-        __pyx_L16:;
+        __pyx_L17:;
       }
   }
 
-  /* "tribbleclustering/pcvat.pyx":143
+  /* "tribbleclustering/pcvat.pyx":151
  *         )
  * 
- *     free(sd); free(si)             # <<<<<<<<<<<<<<
+ *     free(sd); free(sbi); free(sbj)             # <<<<<<<<<<<<<<
  *     free(act_vert); free(act_key); free(act_par)
  * 
 */
   free(__pyx_v_sd);
-  free(__pyx_v_si);
+  free(__pyx_v_sbi);
+  free(__pyx_v_sbj);
 
-  /* "tribbleclustering/pcvat.pyx":144
+  /* "tribbleclustering/pcvat.pyx":152
  * 
- *     free(sd); free(si)
+ *     free(sd); free(sbi); free(sbj)
  *     free(act_vert); free(act_key); free(act_par)             # <<<<<<<<<<<<<<
  * 
  * 
@@ -16814,7 +16867,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
   free(__pyx_v_act_key);
   free(__pyx_v_act_par);
 
-  /* "tribbleclustering/pcvat.pyx":112
+  /* "tribbleclustering/pcvat.pyx":117
  * # Shared helper: allocate working buffers, run kernel, free buffers  float64
  * # ---------------------------------------------------------------------------
  * cdef _run_mst_64(const double* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):             # <<<<<<<<<<<<<<
@@ -16836,7 +16889,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_64(double const *__
   return __pyx_r;
 }
 
-/* "tribbleclustering/pcvat.pyx":150
+/* "tribbleclustering/pcvat.pyx":158
  * # Public: Prim's MST only  float64
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -16884,32 +16937,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 150, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 158, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 150, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 158, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "vat_prim_mst_c_64", 0) < (0)) __PYX_ERR(0, 150, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "vat_prim_mst_c_64", 0) < (0)) __PYX_ERR(0, 158, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_64", 1, 1, 1, i); __PYX_ERR(0, 150, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_64", 1, 1, 1, i); __PYX_ERR(0, 158, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 150, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 158, __pyx_L3_error)
     }
-    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 152, __pyx_L3_error)
+    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 160, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_64", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 150, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_64", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 158, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -16955,7 +17008,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("vat_prim_mst_c_64", 0);
 
-  /* "tribbleclustering/pcvat.pyx":157
+  /* "tribbleclustering/pcvat.pyx":165
  *     Returns (heap_seq, parent_seq) as int32 numpy arrays.
  *     """
  *     cdef int n = adj.shape[0]             # <<<<<<<<<<<<<<
@@ -16964,7 +17017,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
 */
   __pyx_v_n = (__pyx_v_adj.shape[0]);
 
-  /* "tribbleclustering/pcvat.pyx":158
+  /* "tribbleclustering/pcvat.pyx":166
  *     """
  *     cdef int n = adj.shape[0]
  *     heap_seq_np   = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -16972,16 +17025,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
  *     cdef int[:] heap_seq   = heap_seq_np
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 166, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 166, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 166, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 166, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 166, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -16998,22 +17051,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_3};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 158, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 166, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 158, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 166, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 158, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 166, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_heap_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":159
+  /* "tribbleclustering/pcvat.pyx":167
  *     cdef int n = adj.shape[0]
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -17021,16 +17074,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
  *     cdef int[:] parent_seq = parent_seq_np
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 159, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 167, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 159, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 167, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 159, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 167, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 159, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 167, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 159, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 167, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_7 = 1;
@@ -17047,46 +17100,46 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, __pyx_t_5};
-    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 159, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 167, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 159, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 167, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_6, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_3);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 159, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 167, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_parent_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":160
+  /* "tribbleclustering/pcvat.pyx":168
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)
  *     cdef int[:] heap_seq   = heap_seq_np             # <<<<<<<<<<<<<<
  *     cdef int[:] parent_seq = parent_seq_np
  * 
 */
-  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 160, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 168, __pyx_L1_error)
   __pyx_v_heap_seq = __pyx_t_8;
   __pyx_t_8.memview = NULL;
   __pyx_t_8.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":161
+  /* "tribbleclustering/pcvat.pyx":169
  *     parent_seq_np = np.empty(n, dtype=np.int32)
  *     cdef int[:] heap_seq   = heap_seq_np
  *     cdef int[:] parent_seq = parent_seq_np             # <<<<<<<<<<<<<<
  * 
  *     _run_mst_64(&adj[0, 0], n, heap_seq, parent_seq)
 */
-  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 169, __pyx_L1_error)
   __pyx_v_parent_seq = __pyx_t_8;
   __pyx_t_8.memview = NULL;
   __pyx_t_8.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":163
+  /* "tribbleclustering/pcvat.pyx":171
  *     cdef int[:] parent_seq = parent_seq_np
  * 
  *     _run_mst_64(&adj[0, 0], n, heap_seq, parent_seq)             # <<<<<<<<<<<<<<
@@ -17095,11 +17148,11 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
 */
   __pyx_t_9 = 0;
   __pyx_t_10 = 0;
-  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_64((&(*((double *) ( /* dim=1 */ ((char *) (((double *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_9 * __pyx_v_adj.strides[0]) )) + __pyx_t_10)) )))), __pyx_v_n, __pyx_v_heap_seq, __pyx_v_parent_seq); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 163, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_64((&(*((double *) ( /* dim=1 */ ((char *) (((double *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_9 * __pyx_v_adj.strides[0]) )) + __pyx_t_10)) )))), __pyx_v_n, __pyx_v_heap_seq, __pyx_v_parent_seq); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 171, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":164
+  /* "tribbleclustering/pcvat.pyx":172
  * 
  *     _run_mst_64(&adj[0, 0], n, heap_seq, parent_seq)
  *     return heap_seq_np, parent_seq_np             # <<<<<<<<<<<<<<
@@ -17107,19 +17160,19 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
  * 
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 164, __pyx_L1_error)
+  __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 172, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_INCREF(__pyx_v_heap_seq_np);
   __Pyx_GIVEREF(__pyx_v_heap_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 164, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 172, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_parent_seq_np);
   __Pyx_GIVEREF(__pyx_v_parent_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 164, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 172, __pyx_L1_error);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "tribbleclustering/pcvat.pyx":150
+  /* "tribbleclustering/pcvat.pyx":158
  * # Public: Prim's MST only  float64
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -17148,7 +17201,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_vat_prim_mst_c_64(CYTHON_UN
   return __pyx_r;
 }
 
-/* "tribbleclustering/pcvat.pyx":170
+/* "tribbleclustering/pcvat.pyx":178
  * # Public: full VAT pipeline  float64 (MST + permutation gather, OpenMP parallel)
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -17196,32 +17249,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 170, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 178, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 170, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 178, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "compute_vat_c_64", 0) < (0)) __PYX_ERR(0, 170, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "compute_vat_c_64", 0) < (0)) __PYX_ERR(0, 178, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("compute_vat_c_64", 1, 1, 1, i); __PYX_ERR(0, 170, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("compute_vat_c_64", 1, 1, 1, i); __PYX_ERR(0, 178, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 170, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 178, __pyx_L3_error)
     }
-    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 172, __pyx_L3_error)
+    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 180, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("compute_vat_c_64", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 170, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("compute_vat_c_64", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 178, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -17292,7 +17345,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("compute_vat_c_64", 0);
 
-  /* "tribbleclustering/pcvat.pyx":185
+  /* "tribbleclustering/pcvat.pyx":193
  *     Returns (ordered_matrix, p_seq, q_seq).
  *     """
  *     cdef int n = adj.shape[0]             # <<<<<<<<<<<<<<
@@ -17301,7 +17354,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
   __pyx_v_n = (__pyx_v_adj.shape[0]);
 
-  /* "tribbleclustering/pcvat.pyx":191
+  /* "tribbleclustering/pcvat.pyx":199
  *     cdef double* dst
  * 
  *     out_np        = np.empty((n, n), dtype=np.float64)             # <<<<<<<<<<<<<<
@@ -17309,26 +17362,26 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
  *     parent_seq_np = np.empty(n, dtype=np.int32)
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_GIVEREF(__pyx_t_3);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_3) != (0)) __PYX_ERR(0, 191, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_3) != (0)) __PYX_ERR(0, 199, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_5);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_5) != (0)) __PYX_ERR(0, 191, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_5) != (0)) __PYX_ERR(0, 199, __pyx_L1_error);
   __pyx_t_3 = 0;
   __pyx_t_5 = 0;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 191, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 199, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -17345,22 +17398,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_6};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 191, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 199, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 191, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 199, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 191, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 199, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_out_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":192
+  /* "tribbleclustering/pcvat.pyx":200
  * 
  *     out_np        = np.empty((n, n), dtype=np.float64)
  *     heap_seq_np   = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -17368,16 +17421,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
  *     invp_np       = np.empty(n, dtype=np.int32)
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 192, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 200, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 192, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 200, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 192, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 200, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 192, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 200, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 192, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 200, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __pyx_t_7 = 1;
@@ -17394,22 +17447,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, __pyx_t_5};
-    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 192, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 200, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 192, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 200, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_3, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_6);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 192, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 200, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_heap_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":193
+  /* "tribbleclustering/pcvat.pyx":201
  *     out_np        = np.empty((n, n), dtype=np.float64)
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -17417,16 +17470,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
  * 
 */
   __pyx_t_3 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 201, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 201, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 201, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 201, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 201, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -17443,22 +17496,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_3, __pyx_t_6};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 193, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 201, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_4, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 193, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_4, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 201, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_2, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 193, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 201, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_parent_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":194
+  /* "tribbleclustering/pcvat.pyx":202
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)
  *     invp_np       = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -17466,16 +17519,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
  *     cdef double[:, ::1] out = out_np
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 194, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 202, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 194, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 202, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 194, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 202, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 194, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 202, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 194, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 202, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __pyx_t_7 = 1;
@@ -17492,70 +17545,70 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_5};
-    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 194, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 202, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 194, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 202, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_6);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 194, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 202, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_invp_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":196
+  /* "tribbleclustering/pcvat.pyx":204
  *     invp_np       = np.empty(n, dtype=np.int32)
  * 
  *     cdef double[:, ::1] out = out_np             # <<<<<<<<<<<<<<
  *     cdef int[:]  p           = heap_seq_np
  *     cdef int[:]  q           = parent_seq_np
 */
-  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_d_dc_double(__pyx_v_out_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 196, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_d_dc_double(__pyx_v_out_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 204, __pyx_L1_error)
   __pyx_v_out = __pyx_t_8;
   __pyx_t_8.memview = NULL;
   __pyx_t_8.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":197
+  /* "tribbleclustering/pcvat.pyx":205
  * 
  *     cdef double[:, ::1] out = out_np
  *     cdef int[:]  p           = heap_seq_np             # <<<<<<<<<<<<<<
  *     cdef int[:]  q           = parent_seq_np
  *     cdef int[:]  invp        = invp_np
 */
-  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 197, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 205, __pyx_L1_error)
   __pyx_v_p = __pyx_t_9;
   __pyx_t_9.memview = NULL;
   __pyx_t_9.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":198
+  /* "tribbleclustering/pcvat.pyx":206
  *     cdef double[:, ::1] out = out_np
  *     cdef int[:]  p           = heap_seq_np
  *     cdef int[:]  q           = parent_seq_np             # <<<<<<<<<<<<<<
  *     cdef int[:]  invp        = invp_np
  * 
 */
-  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 198, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 206, __pyx_L1_error)
   __pyx_v_q = __pyx_t_9;
   __pyx_t_9.memview = NULL;
   __pyx_t_9.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":199
+  /* "tribbleclustering/pcvat.pyx":207
  *     cdef int[:]  p           = heap_seq_np
  *     cdef int[:]  q           = parent_seq_np
  *     cdef int[:]  invp        = invp_np             # <<<<<<<<<<<<<<
  * 
  *     # Step 1: MST (nogil)
 */
-  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_invp_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 199, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_invp_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 207, __pyx_L1_error)
   __pyx_v_invp = __pyx_t_9;
   __pyx_t_9.memview = NULL;
   __pyx_t_9.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":202
+  /* "tribbleclustering/pcvat.pyx":210
  * 
  *     # Step 1: MST (nogil)
  *     _run_mst_64(&adj[0, 0], n, p, q)             # <<<<<<<<<<<<<<
@@ -17564,11 +17617,11 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
   __pyx_t_10 = 0;
   __pyx_t_11 = 0;
-  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_64((&(*((double *) ( /* dim=1 */ ((char *) (((double *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_10 * __pyx_v_adj.strides[0]) )) + __pyx_t_11)) )))), __pyx_v_n, __pyx_v_p, __pyx_v_q); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 202, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_64((&(*((double *) ( /* dim=1 */ ((char *) (((double *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_10 * __pyx_v_adj.strides[0]) )) + __pyx_t_11)) )))), __pyx_v_n, __pyx_v_p, __pyx_v_q); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 210, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":205
+  /* "tribbleclustering/pcvat.pyx":213
  * 
  *     # Step 2: Permutation re-order, out[i, j] = adj[p[i], p[j]].
  *     cdef const double* A = &adj[0, 0]             # <<<<<<<<<<<<<<
@@ -17579,7 +17632,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   __pyx_t_10 = 0;
   __pyx_v_A = (&(*((double *) ( /* dim=1 */ ((char *) (((double *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_11 * __pyx_v_adj.strides[0]) )) + __pyx_t_10)) ))));
 
-  /* "tribbleclustering/pcvat.pyx":206
+  /* "tribbleclustering/pcvat.pyx":214
  *     # Step 2: Permutation re-order, out[i, j] = adj[p[i], p[j]].
  *     cdef const double* A = &adj[0, 0]
  *     cdef double* O       = &out[0, 0]             # <<<<<<<<<<<<<<
@@ -17590,7 +17643,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   __pyx_t_11 = 0;
   __pyx_v_O = (&(*((double *) ( /* dim=1 */ ((char *) (((double *) ( /* dim=0 */ (__pyx_v_out.data + __pyx_t_10 * __pyx_v_out.strides[0]) )) + __pyx_t_11)) ))));
 
-  /* "tribbleclustering/pcvat.pyx":207
+  /* "tribbleclustering/pcvat.pyx":215
  *     cdef const double* A = &adj[0, 0]
  *     cdef double* O       = &out[0, 0]
  *     cdef const int* P    = &p[0]             # <<<<<<<<<<<<<<
@@ -17600,7 +17653,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   __pyx_t_11 = 0;
   __pyx_v_P = (&(*((int *) ( /* dim=0 */ (__pyx_v_p.data + __pyx_t_11 * __pyx_v_p.strides[0]) ))));
 
-  /* "tribbleclustering/pcvat.pyx":208
+  /* "tribbleclustering/pcvat.pyx":216
  *     cdef double* O       = &out[0, 0]
  *     cdef const int* P    = &p[0]
  *     cdef const int* IP   = &invp[0]             # <<<<<<<<<<<<<<
@@ -17610,7 +17663,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   __pyx_t_11 = 0;
   __pyx_v_IP = (&(*((int *) ( /* dim=0 */ (__pyx_v_invp.data + __pyx_t_11 * __pyx_v_invp.strides[0]) ))));
 
-  /* "tribbleclustering/pcvat.pyx":210
+  /* "tribbleclustering/pcvat.pyx":218
  *     cdef const int* IP   = &invp[0]
  * 
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -17622,7 +17675,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   for (__pyx_t_14 = 0; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
     __pyx_v_i = __pyx_t_14;
 
-    /* "tribbleclustering/pcvat.pyx":211
+    /* "tribbleclustering/pcvat.pyx":219
  * 
  *     for i in range(n):
  *         invp[P[i]] = i             # <<<<<<<<<<<<<<
@@ -17633,7 +17686,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
     *((int *) ( /* dim=0 */ (__pyx_v_invp.data + __pyx_t_11 * __pyx_v_invp.strides[0]) )) = __pyx_v_i;
   }
 
-  /* "tribbleclustering/pcvat.pyx":213
+  /* "tribbleclustering/pcvat.pyx":221
  *         invp[P[i]] = i
  * 
  *     cdef int gthreads = openmp.omp_get_max_threads()             # <<<<<<<<<<<<<<
@@ -17642,7 +17695,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
   __pyx_v_gthreads = omp_get_max_threads();
 
-  /* "tribbleclustering/pcvat.pyx":214
+  /* "tribbleclustering/pcvat.pyx":222
  * 
  *     cdef int gthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or gthreads < 2:             # <<<<<<<<<<<<<<
@@ -17660,7 +17713,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   __pyx_L6_bool_binop_done:;
   if (__pyx_t_15) {
 
-    /* "tribbleclustering/pcvat.pyx":215
+    /* "tribbleclustering/pcvat.pyx":223
  *     cdef int gthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or gthreads < 2:
  *         gthreads = 1             # <<<<<<<<<<<<<<
@@ -17669,7 +17722,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
     __pyx_v_gthreads = 1;
 
-    /* "tribbleclustering/pcvat.pyx":214
+    /* "tribbleclustering/pcvat.pyx":222
  * 
  *     cdef int gthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or gthreads < 2:             # <<<<<<<<<<<<<<
@@ -17678,7 +17731,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":217
+  /* "tribbleclustering/pcvat.pyx":225
  *         gthreads = 1
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -17691,7 +17744,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
       __Pyx_FastGIL_Remember();
       /*try:*/ {
 
-        /* "tribbleclustering/pcvat.pyx":218
+        /* "tribbleclustering/pcvat.pyx":226
  * 
  *     with nogil:
  *         for i in prange(n, schedule='static', num_threads=gthreads):             # <<<<<<<<<<<<<<
@@ -17720,7 +17773,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
                         {
                             __pyx_v_i = (int)(0 + 1 * __pyx_t_13);
 
-                            /* "tribbleclustering/pcvat.pyx":219
+                            /* "tribbleclustering/pcvat.pyx":227
  *     with nogil:
  *         for i in prange(n, schedule='static', num_threads=gthreads):
  *             pi   = P[i]             # <<<<<<<<<<<<<<
@@ -17729,7 +17782,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
                             __pyx_v_pi = (__pyx_v_P[__pyx_v_i]);
 
-                            /* "tribbleclustering/pcvat.pyx":220
+                            /* "tribbleclustering/pcvat.pyx":228
  *         for i in prange(n, schedule='static', num_threads=gthreads):
  *             pi   = P[i]
  *             base = <Py_ssize_t>pi * n             # <<<<<<<<<<<<<<
@@ -17738,7 +17791,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
                             __pyx_v_base = (((Py_ssize_t)__pyx_v_pi) * __pyx_v_n);
 
-                            /* "tribbleclustering/pcvat.pyx":221
+                            /* "tribbleclustering/pcvat.pyx":229
  *             pi   = P[i]
  *             base = <Py_ssize_t>pi * n
  *             orow = <Py_ssize_t>i * n             # <<<<<<<<<<<<<<
@@ -17747,7 +17800,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
                             __pyx_v_orow = (((Py_ssize_t)__pyx_v_i) * __pyx_v_n);
 
-                            /* "tribbleclustering/pcvat.pyx":222
+                            /* "tribbleclustering/pcvat.pyx":230
  *             base = <Py_ssize_t>pi * n
  *             orow = <Py_ssize_t>i * n
  *             src  = A + base             # <<<<<<<<<<<<<<
@@ -17756,7 +17809,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
                             __pyx_v_src = (__pyx_v_A + __pyx_v_base);
 
-                            /* "tribbleclustering/pcvat.pyx":223
+                            /* "tribbleclustering/pcvat.pyx":231
  *             orow = <Py_ssize_t>i * n
  *             src  = A + base
  *             dst  = O + orow             # <<<<<<<<<<<<<<
@@ -17765,7 +17818,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
 */
                             __pyx_v_dst = (__pyx_v_O + __pyx_v_orow);
 
-                            /* "tribbleclustering/pcvat.pyx":224
+                            /* "tribbleclustering/pcvat.pyx":232
  *             src  = A + base
  *             dst  = O + orow
  *             for c in range(n):             # <<<<<<<<<<<<<<
@@ -17777,7 +17830,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
                             for (__pyx_t_19 = 0; __pyx_t_19 < __pyx_t_18; __pyx_t_19+=1) {
                               __pyx_v_c = __pyx_t_19;
 
-                              /* "tribbleclustering/pcvat.pyx":225
+                              /* "tribbleclustering/pcvat.pyx":233
  *             dst  = O + orow
  *             for c in range(n):
  *                 dst[IP[c]] = src[c]             # <<<<<<<<<<<<<<
@@ -17799,7 +17852,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
         #endif
       }
 
-      /* "tribbleclustering/pcvat.pyx":217
+      /* "tribbleclustering/pcvat.pyx":225
  *         gthreads = 1
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -17816,7 +17869,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
       }
   }
 
-  /* "tribbleclustering/pcvat.pyx":227
+  /* "tribbleclustering/pcvat.pyx":235
  *                 dst[IP[c]] = src[c]
  * 
  *     return out_np, heap_seq_np, parent_seq_np             # <<<<<<<<<<<<<<
@@ -17824,22 +17877,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
  * 
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 227, __pyx_L1_error)
+  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 235, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_INCREF(__pyx_v_out_np);
   __Pyx_GIVEREF(__pyx_v_out_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_out_np) != (0)) __PYX_ERR(0, 227, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_out_np) != (0)) __PYX_ERR(0, 235, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_heap_seq_np);
   __Pyx_GIVEREF(__pyx_v_heap_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 227, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 235, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_parent_seq_np);
   __Pyx_GIVEREF(__pyx_v_parent_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 227, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 235, __pyx_L1_error);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "tribbleclustering/pcvat.pyx":170
+  /* "tribbleclustering/pcvat.pyx":178
  * # Public: full VAT pipeline  float64 (MST + permutation gather, OpenMP parallel)
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -17873,7 +17926,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
   return __pyx_r;
 }
 
-/* "tribbleclustering/pcvat.pyx":237
+/* "tribbleclustering/pcvat.pyx":245
  * # Core MST kernel  float32 variant
  * # ---------------------------------------------------------------------------
  * cdef void _prim_mst_kernel_32(             # <<<<<<<<<<<<<<
@@ -17881,7 +17934,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_2compute_vat_c_64(CYTHON_UN
  *     int* act_vert, float* act_key, int* act_par,
 */
 
-static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *__pyx_v_adj, int __pyx_v_n, int *__pyx_v_act_vert, float *__pyx_v_act_key, int *__pyx_v_act_par, int *__pyx_v_out_seq, int *__pyx_v_out_par_seq, float *__pyx_v_sd, int *__pyx_v_si, int __pyx_v_nthreads) {
+static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *__pyx_v_adj, int __pyx_v_n, int *__pyx_v_act_vert, float *__pyx_v_act_key, int *__pyx_v_act_par, int *__pyx_v_out_seq, int *__pyx_v_out_par_seq, float *__pyx_v_sd, int *__pyx_v_sbi, int *__pyx_v_sbj, int __pyx_v_nthreads) {
   int __pyx_v_i;
   int __pyx_v_j;
   int __pyx_v_w;
@@ -17904,7 +17957,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
   int __pyx_t_6;
   int __pyx_t_7;
 
-  /* "tribbleclustering/pcvat.pyx":244
+  /* "tribbleclustering/pcvat.pyx":252
  * ) noexcept nogil:
  *     cdef int i, j, w, u, bk, rnd, m, tid
  *     cdef int src_i = 0, src_j = 0             # <<<<<<<<<<<<<<
@@ -17914,7 +17967,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
   __pyx_v_src_i = 0;
   __pyx_v_src_j = 0;
 
-  /* "tribbleclustering/pcvat.pyx":245
+  /* "tribbleclustering/pcvat.pyx":253
  *     cdef int i, j, w, u, bk, rnd, m, tid
  *     cdef int src_i = 0, src_j = 0
  *     cdef float max_val = -INFINITY             # <<<<<<<<<<<<<<
@@ -17923,7 +17976,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
   __pyx_v_max_val = (-INFINITY);
 
-  /* "tribbleclustering/pcvat.pyx":249
+  /* "tribbleclustering/pcvat.pyx":257
  *     cdef const float* row
  * 
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -17935,7 +17988,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "tribbleclustering/pcvat.pyx":250
+    /* "tribbleclustering/pcvat.pyx":258
  * 
  *     for i in range(n):
  *         act_vert[i] = i             # <<<<<<<<<<<<<<
@@ -17944,7 +17997,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     (__pyx_v_act_vert[__pyx_v_i]) = __pyx_v_i;
 
-    /* "tribbleclustering/pcvat.pyx":251
+    /* "tribbleclustering/pcvat.pyx":259
  *     for i in range(n):
  *         act_vert[i] = i
  *         act_key[i]  = INFINITY             # <<<<<<<<<<<<<<
@@ -17953,7 +18006,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     (__pyx_v_act_key[__pyx_v_i]) = INFINITY;
 
-    /* "tribbleclustering/pcvat.pyx":252
+    /* "tribbleclustering/pcvat.pyx":260
  *         act_vert[i] = i
  *         act_key[i]  = INFINITY
  *         act_par[i]  = -1             # <<<<<<<<<<<<<<
@@ -17963,50 +18016,59 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
     (__pyx_v_act_par[__pyx_v_i]) = -1;
   }
 
-  /* "tribbleclustering/pcvat.pyx":254
+  /* "tribbleclustering/pcvat.pyx":262
  *         act_par[i]  = -1
  * 
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         for tid in range(nthreads):
- *             sd[tid] = -INFINITY
+ *         # Per-thread best (value, row, col); row/col stored separately to avoid
+ *         # the int32 overflow of a packed i*n+j, and the matrix offset is taken
 */
   __pyx_t_4 = (__pyx_v_nthreads > 1);
   if (__pyx_t_4) {
 
-    /* "tribbleclustering/pcvat.pyx":255
- * 
- *     if nthreads > 1:
+    /* "tribbleclustering/pcvat.pyx":266
+ *         # the int32 overflow of a packed i*n+j, and the matrix offset is taken
+ *         # in Py_ssize_t. See the float64 kernel for the full rationale.
  *         for tid in range(nthreads):             # <<<<<<<<<<<<<<
- *             sd[tid] = -INFINITY
- *             si[tid] = 0
+ *             sd[tid]  = -INFINITY
+ *             sbi[tid] = 0
 */
     __pyx_t_1 = __pyx_v_nthreads;
     __pyx_t_2 = __pyx_t_1;
     for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
       __pyx_v_tid = __pyx_t_3;
 
-      /* "tribbleclustering/pcvat.pyx":256
- *     if nthreads > 1:
+      /* "tribbleclustering/pcvat.pyx":267
+ *         # in Py_ssize_t. See the float64 kernel for the full rationale.
  *         for tid in range(nthreads):
- *             sd[tid] = -INFINITY             # <<<<<<<<<<<<<<
- *             si[tid] = 0
- *         for i in prange(n, schedule='static', num_threads=nthreads):
+ *             sd[tid]  = -INFINITY             # <<<<<<<<<<<<<<
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0
 */
       (__pyx_v_sd[__pyx_v_tid]) = (-INFINITY);
 
-      /* "tribbleclustering/pcvat.pyx":257
+      /* "tribbleclustering/pcvat.pyx":268
  *         for tid in range(nthreads):
- *             sd[tid] = -INFINITY
- *             si[tid] = 0             # <<<<<<<<<<<<<<
+ *             sd[tid]  = -INFINITY
+ *             sbi[tid] = 0             # <<<<<<<<<<<<<<
+ *             sbj[tid] = 0
+ *         for i in prange(n, schedule='static', num_threads=nthreads):
+*/
+      (__pyx_v_sbi[__pyx_v_tid]) = 0;
+
+      /* "tribbleclustering/pcvat.pyx":269
+ *             sd[tid]  = -INFINITY
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0             # <<<<<<<<<<<<<<
  *         for i in prange(n, schedule='static', num_threads=nthreads):
  *             tid = threadid()
 */
-      (__pyx_v_si[__pyx_v_tid]) = 0;
+      (__pyx_v_sbj[__pyx_v_tid]) = 0;
     }
 
-    /* "tribbleclustering/pcvat.pyx":258
- *             sd[tid] = -INFINITY
- *             si[tid] = 0
+    /* "tribbleclustering/pcvat.pyx":270
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0
  *         for i in prange(n, schedule='static', num_threads=nthreads):             # <<<<<<<<<<<<<<
  *             tid = threadid()
  *             for j in range(n):
@@ -18038,12 +18100,12 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
                           {
                               __pyx_v_i = (int)(0 + 1 * __pyx_t_2);
 
-                              /* "tribbleclustering/pcvat.pyx":259
- *             si[tid] = 0
+                              /* "tribbleclustering/pcvat.pyx":271
+ *             sbj[tid] = 0
  *         for i in prange(n, schedule='static', num_threads=nthreads):
  *             tid = threadid()             # <<<<<<<<<<<<<<
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
 */
                               #ifdef _OPENMP
                               __pyx_t_5 = omp_get_thread_num();
@@ -18052,52 +18114,61 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
                               #endif
                               __pyx_v_tid = __pyx_t_5;
 
-                              /* "tribbleclustering/pcvat.pyx":260
+                              /* "tribbleclustering/pcvat.pyx":272
  *         for i in prange(n, schedule='static', num_threads=nthreads):
  *             tid = threadid()
  *             for j in range(n):             # <<<<<<<<<<<<<<
- *                 if adj[i * n + j] > sd[tid]:
- *                     sd[tid] = adj[i * n + j]
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
 */
                               __pyx_t_5 = __pyx_v_n;
                               __pyx_t_6 = __pyx_t_5;
                               for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
                                 __pyx_v_j = __pyx_t_7;
 
-                                /* "tribbleclustering/pcvat.pyx":261
+                                /* "tribbleclustering/pcvat.pyx":273
  *             tid = threadid()
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i
 */
-                                __pyx_t_4 = ((__pyx_v_adj[((__pyx_v_i * __pyx_v_n) + __pyx_v_j)]) > (__pyx_v_sd[__pyx_v_tid]));
+                                __pyx_t_4 = ((__pyx_v_adj[((((Py_ssize_t)__pyx_v_i) * __pyx_v_n) + __pyx_v_j)]) > (__pyx_v_sd[__pyx_v_tid]));
                                 if (__pyx_t_4) {
 
-                                  /* "tribbleclustering/pcvat.pyx":262
+                                  /* "tribbleclustering/pcvat.pyx":274
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:
- *                     sd[tid] = adj[i * n + j]             # <<<<<<<<<<<<<<
- *                     si[tid] = i * n + j
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]             # <<<<<<<<<<<<<<
+ *                     sbi[tid] = i
+ *                     sbj[tid] = j
+*/
+                                  (__pyx_v_sd[__pyx_v_tid]) = (__pyx_v_adj[((((Py_ssize_t)__pyx_v_i) * __pyx_v_n) + __pyx_v_j)]);
+
+                                  /* "tribbleclustering/pcvat.pyx":275
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i             # <<<<<<<<<<<<<<
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):
 */
-                                  (__pyx_v_sd[__pyx_v_tid]) = (__pyx_v_adj[((__pyx_v_i * __pyx_v_n) + __pyx_v_j)]);
+                                  (__pyx_v_sbi[__pyx_v_tid]) = __pyx_v_i;
 
-                                  /* "tribbleclustering/pcvat.pyx":263
- *                 if adj[i * n + j] > sd[tid]:
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j             # <<<<<<<<<<<<<<
+                                  /* "tribbleclustering/pcvat.pyx":276
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i
+ *                     sbj[tid] = j             # <<<<<<<<<<<<<<
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:
 */
-                                  (__pyx_v_si[__pyx_v_tid]) = ((__pyx_v_i * __pyx_v_n) + __pyx_v_j);
+                                  (__pyx_v_sbj[__pyx_v_tid]) = __pyx_v_j;
 
-                                  /* "tribbleclustering/pcvat.pyx":261
+                                  /* "tribbleclustering/pcvat.pyx":273
  *             tid = threadid()
  *             for j in range(n):
- *                 if adj[i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j
+ *                 if adj[<Py_ssize_t>i * n + j] > sd[tid]:             # <<<<<<<<<<<<<<
+ *                     sd[tid]  = adj[<Py_ssize_t>i * n + j]
+ *                     sbi[tid] = i
 */
                                 }
                               }
@@ -18114,9 +18185,9 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
           #endif
         }
 
-        /* "tribbleclustering/pcvat.pyx":258
- *             sd[tid] = -INFINITY
- *             si[tid] = 0
+        /* "tribbleclustering/pcvat.pyx":270
+ *             sbi[tid] = 0
+ *             sbj[tid] = 0
  *         for i in prange(n, schedule='static', num_threads=nthreads):             # <<<<<<<<<<<<<<
  *             tid = threadid()
  *             for j in range(n):
@@ -18131,9 +18202,9 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
         }
     }
 
-    /* "tribbleclustering/pcvat.pyx":264
- *                     sd[tid] = adj[i * n + j]
- *                     si[tid] = i * n + j
+    /* "tribbleclustering/pcvat.pyx":277
+ *                     sbi[tid] = i
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):             # <<<<<<<<<<<<<<
  *             if sd[tid] > max_val:
  *                 max_val = sd[tid]
@@ -18143,68 +18214,68 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
     for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_2; __pyx_t_1+=1) {
       __pyx_v_tid = __pyx_t_1;
 
-      /* "tribbleclustering/pcvat.pyx":265
- *                     si[tid] = i * n + j
+      /* "tribbleclustering/pcvat.pyx":278
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:             # <<<<<<<<<<<<<<
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n
+ *                 src_i = sbi[tid]
 */
       __pyx_t_4 = ((__pyx_v_sd[__pyx_v_tid]) > __pyx_v_max_val);
       if (__pyx_t_4) {
 
-        /* "tribbleclustering/pcvat.pyx":266
+        /* "tribbleclustering/pcvat.pyx":279
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:
  *                 max_val = sd[tid]             # <<<<<<<<<<<<<<
- *                 src_i = si[tid] // n
- *                 src_j = si[tid] % n
+ *                 src_i = sbi[tid]
+ *                 src_j = sbj[tid]
 */
         __pyx_v_max_val = (__pyx_v_sd[__pyx_v_tid]);
 
-        /* "tribbleclustering/pcvat.pyx":267
+        /* "tribbleclustering/pcvat.pyx":280
  *             if sd[tid] > max_val:
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n             # <<<<<<<<<<<<<<
- *                 src_j = si[tid] % n
+ *                 src_i = sbi[tid]             # <<<<<<<<<<<<<<
+ *                 src_j = sbj[tid]
  *     else:
 */
-        __pyx_v_src_i = ((__pyx_v_si[__pyx_v_tid]) / __pyx_v_n);
+        __pyx_v_src_i = (__pyx_v_sbi[__pyx_v_tid]);
 
-        /* "tribbleclustering/pcvat.pyx":268
+        /* "tribbleclustering/pcvat.pyx":281
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n
- *                 src_j = si[tid] % n             # <<<<<<<<<<<<<<
+ *                 src_i = sbi[tid]
+ *                 src_j = sbj[tid]             # <<<<<<<<<<<<<<
  *     else:
  *         for i in range(n):
 */
-        __pyx_v_src_j = ((__pyx_v_si[__pyx_v_tid]) % __pyx_v_n);
+        __pyx_v_src_j = (__pyx_v_sbj[__pyx_v_tid]);
 
-        /* "tribbleclustering/pcvat.pyx":265
- *                     si[tid] = i * n + j
+        /* "tribbleclustering/pcvat.pyx":278
+ *                     sbj[tid] = j
  *         for tid in range(nthreads):
  *             if sd[tid] > max_val:             # <<<<<<<<<<<<<<
  *                 max_val = sd[tid]
- *                 src_i = si[tid] // n
+ *                 src_i = sbi[tid]
 */
       }
     }
 
-    /* "tribbleclustering/pcvat.pyx":254
+    /* "tribbleclustering/pcvat.pyx":262
  *         act_par[i]  = -1
  * 
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         for tid in range(nthreads):
- *             sd[tid] = -INFINITY
+ *         # Per-thread best (value, row, col); row/col stored separately to avoid
+ *         # the int32 overflow of a packed i*n+j, and the matrix offset is taken
 */
     goto __pyx_L5;
   }
 
-  /* "tribbleclustering/pcvat.pyx":270
- *                 src_j = si[tid] % n
+  /* "tribbleclustering/pcvat.pyx":283
+ *                 src_j = sbj[tid]
  *     else:
  *         for i in range(n):             # <<<<<<<<<<<<<<
- *             row = adj + i * n
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):
 */
   /*else*/ {
@@ -18213,18 +18284,18 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
     for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_2; __pyx_t_1+=1) {
       __pyx_v_i = __pyx_t_1;
 
-      /* "tribbleclustering/pcvat.pyx":271
+      /* "tribbleclustering/pcvat.pyx":284
  *     else:
  *         for i in range(n):
- *             row = adj + i * n             # <<<<<<<<<<<<<<
+ *             row = adj + <Py_ssize_t>i * n             # <<<<<<<<<<<<<<
  *             for j in range(n):
  *                 if row[j] > max_val:
 */
-      __pyx_v_row = (__pyx_v_adj + (__pyx_v_i * __pyx_v_n));
+      __pyx_v_row = (__pyx_v_adj + (((Py_ssize_t)__pyx_v_i) * __pyx_v_n));
 
-      /* "tribbleclustering/pcvat.pyx":272
+      /* "tribbleclustering/pcvat.pyx":285
  *         for i in range(n):
- *             row = adj + i * n
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):             # <<<<<<<<<<<<<<
  *                 if row[j] > max_val:
  *                     max_val = row[j]
@@ -18234,8 +18305,8 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
       for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
         __pyx_v_j = __pyx_t_7;
 
-        /* "tribbleclustering/pcvat.pyx":273
- *             row = adj + i * n
+        /* "tribbleclustering/pcvat.pyx":286
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):
  *                 if row[j] > max_val:             # <<<<<<<<<<<<<<
  *                     max_val = row[j]
@@ -18244,7 +18315,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
         __pyx_t_4 = ((__pyx_v_row[__pyx_v_j]) > __pyx_v_max_val);
         if (__pyx_t_4) {
 
-          /* "tribbleclustering/pcvat.pyx":274
+          /* "tribbleclustering/pcvat.pyx":287
  *             for j in range(n):
  *                 if row[j] > max_val:
  *                     max_val = row[j]             # <<<<<<<<<<<<<<
@@ -18253,7 +18324,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
           __pyx_v_max_val = (__pyx_v_row[__pyx_v_j]);
 
-          /* "tribbleclustering/pcvat.pyx":275
+          /* "tribbleclustering/pcvat.pyx":288
  *                 if row[j] > max_val:
  *                     max_val = row[j]
  *                     src_i = i             # <<<<<<<<<<<<<<
@@ -18262,7 +18333,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
           __pyx_v_src_i = __pyx_v_i;
 
-          /* "tribbleclustering/pcvat.pyx":276
+          /* "tribbleclustering/pcvat.pyx":289
  *                     max_val = row[j]
  *                     src_i = i
  *                     src_j = j             # <<<<<<<<<<<<<<
@@ -18271,8 +18342,8 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
           __pyx_v_src_j = __pyx_v_j;
 
-          /* "tribbleclustering/pcvat.pyx":273
- *             row = adj + i * n
+          /* "tribbleclustering/pcvat.pyx":286
+ *             row = adj + <Py_ssize_t>i * n
  *             for j in range(n):
  *                 if row[j] > max_val:             # <<<<<<<<<<<<<<
  *                     max_val = row[j]
@@ -18284,7 +18355,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
   }
   __pyx_L5:;
 
-  /* "tribbleclustering/pcvat.pyx":278
+  /* "tribbleclustering/pcvat.pyx":291
  *                     src_j = j
  * 
  *     act_key[src_i] = max_val             # <<<<<<<<<<<<<<
@@ -18293,7 +18364,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
   (__pyx_v_act_key[__pyx_v_src_i]) = __pyx_v_max_val;
 
-  /* "tribbleclustering/pcvat.pyx":279
+  /* "tribbleclustering/pcvat.pyx":292
  * 
  *     act_key[src_i] = max_val
  *     act_par[src_i] = src_j             # <<<<<<<<<<<<<<
@@ -18302,7 +18373,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
   (__pyx_v_act_par[__pyx_v_src_i]) = __pyx_v_src_j;
 
-  /* "tribbleclustering/pcvat.pyx":280
+  /* "tribbleclustering/pcvat.pyx":293
  *     act_key[src_i] = max_val
  *     act_par[src_i] = src_j
  *     bk = src_i             # <<<<<<<<<<<<<<
@@ -18311,7 +18382,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
   __pyx_v_bk = __pyx_v_src_i;
 
-  /* "tribbleclustering/pcvat.pyx":281
+  /* "tribbleclustering/pcvat.pyx":294
  *     act_par[src_i] = src_j
  *     bk = src_i
  *     m  = n             # <<<<<<<<<<<<<<
@@ -18320,7 +18391,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
   __pyx_v_m = __pyx_v_n;
 
-  /* "tribbleclustering/pcvat.pyx":283
+  /* "tribbleclustering/pcvat.pyx":296
  *     m  = n
  * 
  *     for rnd in range(n):             # <<<<<<<<<<<<<<
@@ -18332,7 +18403,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
   for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_2; __pyx_t_1+=1) {
     __pyx_v_rnd = __pyx_t_1;
 
-    /* "tribbleclustering/pcvat.pyx":284
+    /* "tribbleclustering/pcvat.pyx":297
  * 
  *     for rnd in range(n):
  *         u = act_vert[bk]             # <<<<<<<<<<<<<<
@@ -18341,7 +18412,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     __pyx_v_u = (__pyx_v_act_vert[__pyx_v_bk]);
 
-    /* "tribbleclustering/pcvat.pyx":285
+    /* "tribbleclustering/pcvat.pyx":298
  *     for rnd in range(n):
  *         u = act_vert[bk]
  *         out_seq[rnd]     = u             # <<<<<<<<<<<<<<
@@ -18350,7 +18421,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     (__pyx_v_out_seq[__pyx_v_rnd]) = __pyx_v_u;
 
-    /* "tribbleclustering/pcvat.pyx":286
+    /* "tribbleclustering/pcvat.pyx":299
  *         u = act_vert[bk]
  *         out_seq[rnd]     = u
  *         out_par_seq[rnd] = act_par[bk]             # <<<<<<<<<<<<<<
@@ -18359,7 +18430,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     (__pyx_v_out_par_seq[__pyx_v_rnd]) = (__pyx_v_act_par[__pyx_v_bk]);
 
-    /* "tribbleclustering/pcvat.pyx":288
+    /* "tribbleclustering/pcvat.pyx":301
  *         out_par_seq[rnd] = act_par[bk]
  * 
  *         m -= 1             # <<<<<<<<<<<<<<
@@ -18368,7 +18439,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     __pyx_v_m = (__pyx_v_m - 1);
 
-    /* "tribbleclustering/pcvat.pyx":289
+    /* "tribbleclustering/pcvat.pyx":302
  * 
  *         m -= 1
  *         act_vert[bk] = act_vert[m]             # <<<<<<<<<<<<<<
@@ -18377,7 +18448,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     (__pyx_v_act_vert[__pyx_v_bk]) = (__pyx_v_act_vert[__pyx_v_m]);
 
-    /* "tribbleclustering/pcvat.pyx":290
+    /* "tribbleclustering/pcvat.pyx":303
  *         m -= 1
  *         act_vert[bk] = act_vert[m]
  *         act_key[bk]  = act_key[m]             # <<<<<<<<<<<<<<
@@ -18386,35 +18457,35 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     (__pyx_v_act_key[__pyx_v_bk]) = (__pyx_v_act_key[__pyx_v_m]);
 
-    /* "tribbleclustering/pcvat.pyx":291
+    /* "tribbleclustering/pcvat.pyx":304
  *         act_vert[bk] = act_vert[m]
  *         act_key[bk]  = act_key[m]
  *         act_par[bk]  = act_par[m]             # <<<<<<<<<<<<<<
  * 
- *         row  = adj + u * n
+ *         row  = adj + <Py_ssize_t>u * n
 */
     (__pyx_v_act_par[__pyx_v_bk]) = (__pyx_v_act_par[__pyx_v_m]);
 
-    /* "tribbleclustering/pcvat.pyx":293
+    /* "tribbleclustering/pcvat.pyx":306
  *         act_par[bk]  = act_par[m]
  * 
- *         row  = adj + u * n             # <<<<<<<<<<<<<<
+ *         row  = adj + <Py_ssize_t>u * n             # <<<<<<<<<<<<<<
  *         best = INFINITY
  *         bk   = -1
 */
-    __pyx_v_row = (__pyx_v_adj + (__pyx_v_u * __pyx_v_n));
+    __pyx_v_row = (__pyx_v_adj + (((Py_ssize_t)__pyx_v_u) * __pyx_v_n));
 
-    /* "tribbleclustering/pcvat.pyx":294
+    /* "tribbleclustering/pcvat.pyx":307
  * 
- *         row  = adj + u * n
+ *         row  = adj + <Py_ssize_t>u * n
  *         best = INFINITY             # <<<<<<<<<<<<<<
  *         bk   = -1
  *         for i in range(m):
 */
     __pyx_v_best = INFINITY;
 
-    /* "tribbleclustering/pcvat.pyx":295
- *         row  = adj + u * n
+    /* "tribbleclustering/pcvat.pyx":308
+ *         row  = adj + <Py_ssize_t>u * n
  *         best = INFINITY
  *         bk   = -1             # <<<<<<<<<<<<<<
  *         for i in range(m):
@@ -18422,7 +18493,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
     __pyx_v_bk = -1;
 
-    /* "tribbleclustering/pcvat.pyx":296
+    /* "tribbleclustering/pcvat.pyx":309
  *         best = INFINITY
  *         bk   = -1
  *         for i in range(m):             # <<<<<<<<<<<<<<
@@ -18434,7 +18505,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
     for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
       __pyx_v_i = __pyx_t_7;
 
-      /* "tribbleclustering/pcvat.pyx":297
+      /* "tribbleclustering/pcvat.pyx":310
  *         bk   = -1
  *         for i in range(m):
  *             w = act_vert[i]             # <<<<<<<<<<<<<<
@@ -18443,7 +18514,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
       __pyx_v_w = (__pyx_v_act_vert[__pyx_v_i]);
 
-      /* "tribbleclustering/pcvat.pyx":298
+      /* "tribbleclustering/pcvat.pyx":311
  *         for i in range(m):
  *             w = act_vert[i]
  *             d = row[w]             # <<<<<<<<<<<<<<
@@ -18452,7 +18523,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
       __pyx_v_d = (__pyx_v_row[__pyx_v_w]);
 
-      /* "tribbleclustering/pcvat.pyx":299
+      /* "tribbleclustering/pcvat.pyx":312
  *             w = act_vert[i]
  *             d = row[w]
  *             if d < act_key[i]:             # <<<<<<<<<<<<<<
@@ -18462,7 +18533,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
       __pyx_t_4 = (__pyx_v_d < (__pyx_v_act_key[__pyx_v_i]));
       if (__pyx_t_4) {
 
-        /* "tribbleclustering/pcvat.pyx":300
+        /* "tribbleclustering/pcvat.pyx":313
  *             d = row[w]
  *             if d < act_key[i]:
  *                 act_key[i] = d             # <<<<<<<<<<<<<<
@@ -18471,7 +18542,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
         (__pyx_v_act_key[__pyx_v_i]) = __pyx_v_d;
 
-        /* "tribbleclustering/pcvat.pyx":301
+        /* "tribbleclustering/pcvat.pyx":314
  *             if d < act_key[i]:
  *                 act_key[i] = d
  *                 act_par[i] = rnd + 1             # <<<<<<<<<<<<<<
@@ -18480,7 +18551,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
         (__pyx_v_act_par[__pyx_v_i]) = (__pyx_v_rnd + 1);
 
-        /* "tribbleclustering/pcvat.pyx":299
+        /* "tribbleclustering/pcvat.pyx":312
  *             w = act_vert[i]
  *             d = row[w]
  *             if d < act_key[i]:             # <<<<<<<<<<<<<<
@@ -18489,7 +18560,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
       }
 
-      /* "tribbleclustering/pcvat.pyx":302
+      /* "tribbleclustering/pcvat.pyx":315
  *                 act_key[i] = d
  *                 act_par[i] = rnd + 1
  *             if act_key[i] < best:             # <<<<<<<<<<<<<<
@@ -18499,7 +18570,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
       __pyx_t_4 = ((__pyx_v_act_key[__pyx_v_i]) < __pyx_v_best);
       if (__pyx_t_4) {
 
-        /* "tribbleclustering/pcvat.pyx":303
+        /* "tribbleclustering/pcvat.pyx":316
  *                 act_par[i] = rnd + 1
  *             if act_key[i] < best:
  *                 best = act_key[i]             # <<<<<<<<<<<<<<
@@ -18508,7 +18579,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
         __pyx_v_best = (__pyx_v_act_key[__pyx_v_i]);
 
-        /* "tribbleclustering/pcvat.pyx":304
+        /* "tribbleclustering/pcvat.pyx":317
  *             if act_key[i] < best:
  *                 best = act_key[i]
  *                 bk   = i             # <<<<<<<<<<<<<<
@@ -18517,7 +18588,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
 */
         __pyx_v_bk = __pyx_v_i;
 
-        /* "tribbleclustering/pcvat.pyx":302
+        /* "tribbleclustering/pcvat.pyx":315
  *                 act_key[i] = d
  *                 act_par[i] = rnd + 1
  *             if act_key[i] < best:             # <<<<<<<<<<<<<<
@@ -18528,7 +18599,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
     }
   }
 
-  /* "tribbleclustering/pcvat.pyx":237
+  /* "tribbleclustering/pcvat.pyx":245
  * # Core MST kernel  float32 variant
  * # ---------------------------------------------------------------------------
  * cdef void _prim_mst_kernel_32(             # <<<<<<<<<<<<<<
@@ -18539,7 +18610,7 @@ static void __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(float const *
   /* function exit code */
 }
 
-/* "tribbleclustering/pcvat.pyx":310
+/* "tribbleclustering/pcvat.pyx":323
  * # Shared helper: allocate working buffers, run kernel, free buffers  float32
  * # ---------------------------------------------------------------------------
  * cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):             # <<<<<<<<<<<<<<
@@ -18553,7 +18624,8 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
   int *__pyx_v_act_par;
   int __pyx_v_nthreads;
   float *__pyx_v_sd;
-  int *__pyx_v_si;
+  int *__pyx_v_sbi;
+  int *__pyx_v_sbj;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -18568,7 +18640,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("_run_mst_32", 0);
 
-  /* "tribbleclustering/pcvat.pyx":311
+  /* "tribbleclustering/pcvat.pyx":324
  * # ---------------------------------------------------------------------------
  * cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
  *     cdef int*   act_vert = <int*>  malloc(n * sizeof(int))             # <<<<<<<<<<<<<<
@@ -18577,7 +18649,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
 */
   __pyx_v_act_vert = ((int *)malloc((__pyx_v_n * (sizeof(int)))));
 
-  /* "tribbleclustering/pcvat.pyx":312
+  /* "tribbleclustering/pcvat.pyx":325
  * cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):
  *     cdef int*   act_vert = <int*>  malloc(n * sizeof(int))
  *     cdef float* act_key  = <float*>malloc(n * sizeof(float))             # <<<<<<<<<<<<<<
@@ -18586,7 +18658,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
 */
   __pyx_v_act_key = ((float *)malloc((__pyx_v_n * (sizeof(float)))));
 
-  /* "tribbleclustering/pcvat.pyx":313
+  /* "tribbleclustering/pcvat.pyx":326
  *     cdef int*   act_vert = <int*>  malloc(n * sizeof(int))
  *     cdef float* act_key  = <float*>malloc(n * sizeof(float))
  *     cdef int*   act_par  = <int*>  malloc(n * sizeof(int))             # <<<<<<<<<<<<<<
@@ -18595,7 +18667,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
 */
   __pyx_v_act_par = ((int *)malloc((__pyx_v_n * (sizeof(int)))));
 
-  /* "tribbleclustering/pcvat.pyx":315
+  /* "tribbleclustering/pcvat.pyx":328
  *     cdef int*   act_par  = <int*>  malloc(n * sizeof(int))
  * 
  *     cdef int nthreads = openmp.omp_get_max_threads()             # <<<<<<<<<<<<<<
@@ -18604,12 +18676,12 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
 */
   __pyx_v_nthreads = omp_get_max_threads();
 
-  /* "tribbleclustering/pcvat.pyx":316
+  /* "tribbleclustering/pcvat.pyx":329
  * 
  *     cdef int nthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or nthreads < 2:             # <<<<<<<<<<<<<<
  *         nthreads = 1
- *     cdef float* sd = NULL
+ *     cdef float* sd  = NULL
 */
   __pyx_t_2 = (__pyx_v_n < __pyx_v_17tribbleclustering_5pcvat__PAR_THRESHOLD);
   if (!__pyx_t_2) {
@@ -18622,44 +18694,53 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "tribbleclustering/pcvat.pyx":317
+    /* "tribbleclustering/pcvat.pyx":330
  *     cdef int nthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or nthreads < 2:
  *         nthreads = 1             # <<<<<<<<<<<<<<
- *     cdef float* sd = NULL
- *     cdef int* si   = NULL
+ *     cdef float* sd  = NULL
+ *     cdef int*   sbi = NULL
 */
     __pyx_v_nthreads = 1;
 
-    /* "tribbleclustering/pcvat.pyx":316
+    /* "tribbleclustering/pcvat.pyx":329
  * 
  *     cdef int nthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or nthreads < 2:             # <<<<<<<<<<<<<<
  *         nthreads = 1
- *     cdef float* sd = NULL
+ *     cdef float* sd  = NULL
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":318
+  /* "tribbleclustering/pcvat.pyx":331
  *     if n < _PAR_THRESHOLD or nthreads < 2:
  *         nthreads = 1
- *     cdef float* sd = NULL             # <<<<<<<<<<<<<<
- *     cdef int* si   = NULL
- * 
+ *     cdef float* sd  = NULL             # <<<<<<<<<<<<<<
+ *     cdef int*   sbi = NULL
+ *     cdef int*   sbj = NULL
 */
   __pyx_v_sd = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":319
+  /* "tribbleclustering/pcvat.pyx":332
  *         nthreads = 1
- *     cdef float* sd = NULL
- *     cdef int* si   = NULL             # <<<<<<<<<<<<<<
+ *     cdef float* sd  = NULL
+ *     cdef int*   sbi = NULL             # <<<<<<<<<<<<<<
+ *     cdef int*   sbj = NULL
+ * 
+*/
+  __pyx_v_sbi = NULL;
+
+  /* "tribbleclustering/pcvat.pyx":333
+ *     cdef float* sd  = NULL
+ *     cdef int*   sbi = NULL
+ *     cdef int*   sbj = NULL             # <<<<<<<<<<<<<<
  * 
  *     if not (act_vert and act_key and act_par):
 */
-  __pyx_v_si = NULL;
+  __pyx_v_sbj = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":321
- *     cdef int* si   = NULL
+  /* "tribbleclustering/pcvat.pyx":335
+ *     cdef int*   sbj = NULL
  * 
  *     if not (act_vert and act_key and act_par):             # <<<<<<<<<<<<<<
  *         free(act_vert); free(act_key); free(act_par)
@@ -18683,7 +18764,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
   __pyx_t_2 = (!__pyx_t_1);
   if (unlikely(__pyx_t_2)) {
 
-    /* "tribbleclustering/pcvat.pyx":322
+    /* "tribbleclustering/pcvat.pyx":336
  * 
  *     if not (act_vert and act_key and act_par):
  *         free(act_vert); free(act_key); free(act_par)             # <<<<<<<<<<<<<<
@@ -18694,7 +18775,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
     free(__pyx_v_act_key);
     free(__pyx_v_act_par);
 
-    /* "tribbleclustering/pcvat.pyx":323
+    /* "tribbleclustering/pcvat.pyx":337
  *     if not (act_vert and act_key and act_par):
  *         free(act_vert); free(act_key); free(act_par)
  *         raise MemoryError("MST workspace allocation failed")             # <<<<<<<<<<<<<<
@@ -18707,15 +18788,15 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
       PyObject *__pyx_callargs[2] = {__pyx_t_4, __pyx_mstate_global->__pyx_kp_u_MST_workspace_allocation_failed};
       __pyx_t_3 = __Pyx_PyObject_FastCall((PyObject*)(((PyTypeObject*)PyExc_MemoryError)), __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-      if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 323, __pyx_L1_error)
+      if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 337, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_3);
     }
     __Pyx_Raise(__pyx_t_3, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __PYX_ERR(0, 323, __pyx_L1_error)
+    __PYX_ERR(0, 337, __pyx_L1_error)
 
-    /* "tribbleclustering/pcvat.pyx":321
- *     cdef int* si   = NULL
+    /* "tribbleclustering/pcvat.pyx":335
+ *     cdef int*   sbj = NULL
  * 
  *     if not (act_vert and act_key and act_par):             # <<<<<<<<<<<<<<
  *         free(act_vert); free(act_key); free(act_par)
@@ -18723,40 +18804,49 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":325
+  /* "tribbleclustering/pcvat.pyx":339
  *         raise MemoryError("MST workspace allocation failed")
  * 
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         sd = <float*>malloc(nthreads * sizeof(float))
- *         si = <int*>  malloc(nthreads * sizeof(int))
+ *         sd  = <float*>malloc(nthreads * sizeof(float))
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))
 */
   __pyx_t_2 = (__pyx_v_nthreads > 1);
   if (__pyx_t_2) {
 
-    /* "tribbleclustering/pcvat.pyx":326
+    /* "tribbleclustering/pcvat.pyx":340
  * 
  *     if nthreads > 1:
- *         sd = <float*>malloc(nthreads * sizeof(float))             # <<<<<<<<<<<<<<
- *         si = <int*>  malloc(nthreads * sizeof(int))
- *         if not (sd and si):
+ *         sd  = <float*>malloc(nthreads * sizeof(float))             # <<<<<<<<<<<<<<
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))
+ *         sbj = <int*>  malloc(nthreads * sizeof(int))
 */
     __pyx_v_sd = ((float *)malloc((__pyx_v_nthreads * (sizeof(float)))));
 
-    /* "tribbleclustering/pcvat.pyx":327
+    /* "tribbleclustering/pcvat.pyx":341
  *     if nthreads > 1:
- *         sd = <float*>malloc(nthreads * sizeof(float))
- *         si = <int*>  malloc(nthreads * sizeof(int))             # <<<<<<<<<<<<<<
- *         if not (sd and si):
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+ *         sd  = <float*>malloc(nthreads * sizeof(float))
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))             # <<<<<<<<<<<<<<
+ *         sbj = <int*>  malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):
 */
-    __pyx_v_si = ((int *)malloc((__pyx_v_nthreads * (sizeof(int)))));
+    __pyx_v_sbi = ((int *)malloc((__pyx_v_nthreads * (sizeof(int)))));
 
-    /* "tribbleclustering/pcvat.pyx":328
- *         sd = <float*>malloc(nthreads * sizeof(float))
- *         si = <int*>  malloc(nthreads * sizeof(int))
- *         if not (sd and si):             # <<<<<<<<<<<<<<
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
- *             raise MemoryError("MST workspace allocation failed")
+    /* "tribbleclustering/pcvat.pyx":342
+ *         sd  = <float*>malloc(nthreads * sizeof(float))
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))
+ *         sbj = <int*>  malloc(nthreads * sizeof(int))             # <<<<<<<<<<<<<<
+ *         if not (sd and sbi and sbj):
+ *             free(act_vert); free(act_key); free(act_par)
+*/
+    __pyx_v_sbj = ((int *)malloc((__pyx_v_nthreads * (sizeof(int)))));
+
+    /* "tribbleclustering/pcvat.pyx":343
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))
+ *         sbj = <int*>  malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):             # <<<<<<<<<<<<<<
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)
 */
     __pyx_t_1 = (__pyx_v_sd != 0);
     if (__pyx_t_1) {
@@ -18764,28 +18854,43 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
       __pyx_t_2 = __pyx_t_1;
       goto __pyx_L12_bool_binop_done;
     }
-    __pyx_t_1 = (__pyx_v_si != 0);
+    __pyx_t_1 = (__pyx_v_sbi != 0);
+    if (__pyx_t_1) {
+    } else {
+      __pyx_t_2 = __pyx_t_1;
+      goto __pyx_L12_bool_binop_done;
+    }
+    __pyx_t_1 = (__pyx_v_sbj != 0);
     __pyx_t_2 = __pyx_t_1;
     __pyx_L12_bool_binop_done:;
     __pyx_t_1 = (!__pyx_t_2);
     if (unlikely(__pyx_t_1)) {
 
-      /* "tribbleclustering/pcvat.pyx":329
- *         si = <int*>  malloc(nthreads * sizeof(int))
- *         if not (sd and si):
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)             # <<<<<<<<<<<<<<
+      /* "tribbleclustering/pcvat.pyx":344
+ *         sbj = <int*>  malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):
+ *             free(act_vert); free(act_key); free(act_par)             # <<<<<<<<<<<<<<
+ *             free(sd); free(sbi); free(sbj)
  *             raise MemoryError("MST workspace allocation failed")
- * 
 */
       free(__pyx_v_act_vert);
       free(__pyx_v_act_key);
       free(__pyx_v_act_par);
-      free(__pyx_v_sd);
-      free(__pyx_v_si);
 
-      /* "tribbleclustering/pcvat.pyx":330
- *         if not (sd and si):
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
+      /* "tribbleclustering/pcvat.pyx":345
+ *         if not (sd and sbi and sbj):
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)             # <<<<<<<<<<<<<<
+ *             raise MemoryError("MST workspace allocation failed")
+ * 
+*/
+      free(__pyx_v_sd);
+      free(__pyx_v_sbi);
+      free(__pyx_v_sbj);
+
+      /* "tribbleclustering/pcvat.pyx":346
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)
  *             raise MemoryError("MST workspace allocation failed")             # <<<<<<<<<<<<<<
  * 
  *     with nogil:
@@ -18796,32 +18901,32 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
         PyObject *__pyx_callargs[2] = {__pyx_t_4, __pyx_mstate_global->__pyx_kp_u_MST_workspace_allocation_failed};
         __pyx_t_3 = __Pyx_PyObject_FastCall((PyObject*)(((PyTypeObject*)PyExc_MemoryError)), __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
         __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-        if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 330, __pyx_L1_error)
+        if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 346, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
       }
       __Pyx_Raise(__pyx_t_3, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-      __PYX_ERR(0, 330, __pyx_L1_error)
+      __PYX_ERR(0, 346, __pyx_L1_error)
 
-      /* "tribbleclustering/pcvat.pyx":328
- *         sd = <float*>malloc(nthreads * sizeof(float))
- *         si = <int*>  malloc(nthreads * sizeof(int))
- *         if not (sd and si):             # <<<<<<<<<<<<<<
- *             free(act_vert); free(act_key); free(act_par); free(sd); free(si)
- *             raise MemoryError("MST workspace allocation failed")
+      /* "tribbleclustering/pcvat.pyx":343
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))
+ *         sbj = <int*>  malloc(nthreads * sizeof(int))
+ *         if not (sd and sbi and sbj):             # <<<<<<<<<<<<<<
+ *             free(act_vert); free(act_key); free(act_par)
+ *             free(sd); free(sbi); free(sbj)
 */
     }
 
-    /* "tribbleclustering/pcvat.pyx":325
+    /* "tribbleclustering/pcvat.pyx":339
  *         raise MemoryError("MST workspace allocation failed")
  * 
  *     if nthreads > 1:             # <<<<<<<<<<<<<<
- *         sd = <float*>malloc(nthreads * sizeof(float))
- *         si = <int*>  malloc(nthreads * sizeof(int))
+ *         sd  = <float*>malloc(nthreads * sizeof(float))
+ *         sbi = <int*>  malloc(nthreads * sizeof(int))
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":332
+  /* "tribbleclustering/pcvat.pyx":348
  *             raise MemoryError("MST workspace allocation failed")
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -18834,27 +18939,27 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
       __Pyx_FastGIL_Remember();
       /*try:*/ {
 
-        /* "tribbleclustering/pcvat.pyx":336
+        /* "tribbleclustering/pcvat.pyx":352
  *             adj_ptr, n,
  *             act_vert, act_key, act_par,
  *             &heap_seq[0], &parent_seq[0],             # <<<<<<<<<<<<<<
- *             sd, si, nthreads
+ *             sd, sbi, sbj, nthreads
  *         )
 */
         __pyx_t_6 = 0;
         __pyx_t_7 = 0;
 
-        /* "tribbleclustering/pcvat.pyx":333
+        /* "tribbleclustering/pcvat.pyx":349
  * 
  *     with nogil:
  *         _prim_mst_kernel_32(             # <<<<<<<<<<<<<<
  *             adj_ptr, n,
  *             act_vert, act_key, act_par,
 */
-        __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(__pyx_v_adj_ptr, __pyx_v_n, __pyx_v_act_vert, __pyx_v_act_key, __pyx_v_act_par, (&(*((int *) ( /* dim=0 */ (__pyx_v_heap_seq.data + __pyx_t_6 * __pyx_v_heap_seq.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_parent_seq.data + __pyx_t_7 * __pyx_v_parent_seq.strides[0]) )))), __pyx_v_sd, __pyx_v_si, __pyx_v_nthreads);
+        __pyx_f_17tribbleclustering_5pcvat__prim_mst_kernel_32(__pyx_v_adj_ptr, __pyx_v_n, __pyx_v_act_vert, __pyx_v_act_key, __pyx_v_act_par, (&(*((int *) ( /* dim=0 */ (__pyx_v_heap_seq.data + __pyx_t_6 * __pyx_v_heap_seq.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_parent_seq.data + __pyx_t_7 * __pyx_v_parent_seq.strides[0]) )))), __pyx_v_sd, __pyx_v_sbi, __pyx_v_sbj, __pyx_v_nthreads);
       }
 
-      /* "tribbleclustering/pcvat.pyx":332
+      /* "tribbleclustering/pcvat.pyx":348
  *             raise MemoryError("MST workspace allocation failed")
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -18865,25 +18970,26 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
         /*normal exit:*/{
           __Pyx_FastGIL_Forget();
           PyEval_RestoreThread(_save);
-          goto __pyx_L16;
+          goto __pyx_L17;
         }
-        __pyx_L16:;
+        __pyx_L17:;
       }
   }
 
-  /* "tribbleclustering/pcvat.pyx":340
+  /* "tribbleclustering/pcvat.pyx":356
  *         )
  * 
- *     free(sd); free(si)             # <<<<<<<<<<<<<<
+ *     free(sd); free(sbi); free(sbj)             # <<<<<<<<<<<<<<
  *     free(act_vert); free(act_key); free(act_par)
  * 
 */
   free(__pyx_v_sd);
-  free(__pyx_v_si);
+  free(__pyx_v_sbi);
+  free(__pyx_v_sbj);
 
-  /* "tribbleclustering/pcvat.pyx":341
+  /* "tribbleclustering/pcvat.pyx":357
  * 
- *     free(sd); free(si)
+ *     free(sd); free(sbi); free(sbj)
  *     free(act_vert); free(act_key); free(act_par)             # <<<<<<<<<<<<<<
  * 
  * 
@@ -18892,7 +18998,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
   free(__pyx_v_act_key);
   free(__pyx_v_act_par);
 
-  /* "tribbleclustering/pcvat.pyx":310
+  /* "tribbleclustering/pcvat.pyx":323
  * # Shared helper: allocate working buffers, run kernel, free buffers  float32
  * # ---------------------------------------------------------------------------
  * cdef _run_mst_32(const float* adj_ptr, int n, int[:] heap_seq, int[:] parent_seq):             # <<<<<<<<<<<<<<
@@ -18914,7 +19020,7 @@ static PyObject *__pyx_f_17tribbleclustering_5pcvat__run_mst_32(float const *__p
   return __pyx_r;
 }
 
-/* "tribbleclustering/pcvat.pyx":347
+/* "tribbleclustering/pcvat.pyx":363
  * # Public: Prim's MST only  float32
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -18962,32 +19068,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 347, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 363, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 347, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 363, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "vat_prim_mst_c_32", 0) < (0)) __PYX_ERR(0, 347, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "vat_prim_mst_c_32", 0) < (0)) __PYX_ERR(0, 363, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_32", 1, 1, 1, i); __PYX_ERR(0, 347, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_32", 1, 1, 1, i); __PYX_ERR(0, 363, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 347, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 363, __pyx_L3_error)
     }
-    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_float(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 349, __pyx_L3_error)
+    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_float(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 365, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_32", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 347, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c_32", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 363, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -19033,7 +19139,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("vat_prim_mst_c_32", 0);
 
-  /* "tribbleclustering/pcvat.pyx":354
+  /* "tribbleclustering/pcvat.pyx":370
  *     Returns (heap_seq, parent_seq) as int32 numpy arrays.
  *     """
  *     cdef int n = adj.shape[0]             # <<<<<<<<<<<<<<
@@ -19042,7 +19148,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
 */
   __pyx_v_n = (__pyx_v_adj.shape[0]);
 
-  /* "tribbleclustering/pcvat.pyx":355
+  /* "tribbleclustering/pcvat.pyx":371
  *     """
  *     cdef int n = adj.shape[0]
  *     heap_seq_np   = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -19050,16 +19156,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
  *     cdef int[:] heap_seq   = heap_seq_np
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 355, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 371, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 355, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 371, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 355, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 371, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 355, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 371, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 355, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 371, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -19076,22 +19182,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_3};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 355, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 371, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 355, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 371, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 355, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 371, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_heap_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":356
+  /* "tribbleclustering/pcvat.pyx":372
  *     cdef int n = adj.shape[0]
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -19099,16 +19205,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
  *     cdef int[:] parent_seq = parent_seq_np
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 356, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 372, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 356, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 372, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 356, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 372, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 356, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 372, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 356, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 372, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_7 = 1;
@@ -19125,46 +19231,46 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, __pyx_t_5};
-    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 356, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 372, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 356, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 372, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_6, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_3);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 356, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 372, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_parent_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":357
+  /* "tribbleclustering/pcvat.pyx":373
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)
  *     cdef int[:] heap_seq   = heap_seq_np             # <<<<<<<<<<<<<<
  *     cdef int[:] parent_seq = parent_seq_np
  * 
 */
-  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 357, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 373, __pyx_L1_error)
   __pyx_v_heap_seq = __pyx_t_8;
   __pyx_t_8.memview = NULL;
   __pyx_t_8.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":358
+  /* "tribbleclustering/pcvat.pyx":374
  *     parent_seq_np = np.empty(n, dtype=np.int32)
  *     cdef int[:] heap_seq   = heap_seq_np
  *     cdef int[:] parent_seq = parent_seq_np             # <<<<<<<<<<<<<<
  * 
  *     _run_mst_32(&adj[0, 0], n, heap_seq, parent_seq)
 */
-  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 358, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 374, __pyx_L1_error)
   __pyx_v_parent_seq = __pyx_t_8;
   __pyx_t_8.memview = NULL;
   __pyx_t_8.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":360
+  /* "tribbleclustering/pcvat.pyx":376
  *     cdef int[:] parent_seq = parent_seq_np
  * 
  *     _run_mst_32(&adj[0, 0], n, heap_seq, parent_seq)             # <<<<<<<<<<<<<<
@@ -19173,11 +19279,11 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
 */
   __pyx_t_9 = 0;
   __pyx_t_10 = 0;
-  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_32((&(*((float *) ( /* dim=1 */ ((char *) (((float *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_9 * __pyx_v_adj.strides[0]) )) + __pyx_t_10)) )))), __pyx_v_n, __pyx_v_heap_seq, __pyx_v_parent_seq); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 360, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_32((&(*((float *) ( /* dim=1 */ ((char *) (((float *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_9 * __pyx_v_adj.strides[0]) )) + __pyx_t_10)) )))), __pyx_v_n, __pyx_v_heap_seq, __pyx_v_parent_seq); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 376, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":361
+  /* "tribbleclustering/pcvat.pyx":377
  * 
  *     _run_mst_32(&adj[0, 0], n, heap_seq, parent_seq)
  *     return heap_seq_np, parent_seq_np             # <<<<<<<<<<<<<<
@@ -19185,19 +19291,19 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
  * 
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 361, __pyx_L1_error)
+  __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 377, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_INCREF(__pyx_v_heap_seq_np);
   __Pyx_GIVEREF(__pyx_v_heap_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 361, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 377, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_parent_seq_np);
   __Pyx_GIVEREF(__pyx_v_parent_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 361, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 377, __pyx_L1_error);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "tribbleclustering/pcvat.pyx":347
+  /* "tribbleclustering/pcvat.pyx":363
  * # Public: Prim's MST only  float32
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -19226,7 +19332,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_4vat_prim_mst_c_32(CYTHON_U
   return __pyx_r;
 }
 
-/* "tribbleclustering/pcvat.pyx":367
+/* "tribbleclustering/pcvat.pyx":383
  * # Public: full VAT pipeline  float32 (MST + permutation gather, OpenMP parallel)
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -19274,32 +19380,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 367, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 383, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 367, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 383, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "compute_vat_c_32", 0) < (0)) __PYX_ERR(0, 367, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "compute_vat_c_32", 0) < (0)) __PYX_ERR(0, 383, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("compute_vat_c_32", 1, 1, 1, i); __PYX_ERR(0, 367, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("compute_vat_c_32", 1, 1, 1, i); __PYX_ERR(0, 383, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 367, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 383, __pyx_L3_error)
     }
-    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_float(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 369, __pyx_L3_error)
+    __pyx_v_adj = __Pyx_PyObject_to_MemoryviewSlice_d_dc_float(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_adj.memview)) __PYX_ERR(0, 385, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("compute_vat_c_32", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 367, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("compute_vat_c_32", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 383, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -19370,7 +19476,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("compute_vat_c_32", 0);
 
-  /* "tribbleclustering/pcvat.pyx":382
+  /* "tribbleclustering/pcvat.pyx":398
  *     Returns (ordered_matrix, p_seq, q_seq).
  *     """
  *     cdef int n = adj.shape[0]             # <<<<<<<<<<<<<<
@@ -19379,7 +19485,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
   __pyx_v_n = (__pyx_v_adj.shape[0]);
 
-  /* "tribbleclustering/pcvat.pyx":388
+  /* "tribbleclustering/pcvat.pyx":404
  *     cdef float* dst
  * 
  *     out_np        = np.empty((n, n), dtype=np.float32)             # <<<<<<<<<<<<<<
@@ -19387,26 +19493,26 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
  *     parent_seq_np = np.empty(n, dtype=np.int32)
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_GIVEREF(__pyx_t_3);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_3) != (0)) __PYX_ERR(0, 388, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_3) != (0)) __PYX_ERR(0, 404, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_5);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_5) != (0)) __PYX_ERR(0, 388, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_5) != (0)) __PYX_ERR(0, 404, __pyx_L1_error);
   __pyx_t_3 = 0;
   __pyx_t_5 = 0;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_float32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_float32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 404, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -19423,22 +19529,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_6};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 388, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 404, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 388, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 404, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 388, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 404, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_out_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":389
+  /* "tribbleclustering/pcvat.pyx":405
  * 
  *     out_np        = np.empty((n, n), dtype=np.float32)
  *     heap_seq_np   = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -19446,16 +19552,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
  *     invp_np       = np.empty(n, dtype=np.int32)
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 389, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 405, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 389, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 405, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 389, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 405, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 389, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 405, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 389, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 405, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __pyx_t_7 = 1;
@@ -19472,22 +19578,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, __pyx_t_5};
-    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 389, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 405, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 389, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 405, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_3, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_6);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 389, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 405, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_heap_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":390
+  /* "tribbleclustering/pcvat.pyx":406
  *     out_np        = np.empty((n, n), dtype=np.float32)
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -19495,16 +19601,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
  * 
 */
   __pyx_t_3 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 390, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 406, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 390, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 406, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 390, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 406, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 390, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 406, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 390, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 406, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -19521,22 +19627,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_3, __pyx_t_6};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 390, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 406, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_4, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 390, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_4, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 406, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_2, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 390, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 406, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_parent_seq_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":391
+  /* "tribbleclustering/pcvat.pyx":407
  *     heap_seq_np   = np.empty(n, dtype=np.int32)
  *     parent_seq_np = np.empty(n, dtype=np.int32)
  *     invp_np       = np.empty(n, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -19544,16 +19650,16 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
  *     cdef float[:, ::1] out = out_np
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 391, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 407, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 391, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 407, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 391, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 407, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 391, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 407, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 391, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 407, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __pyx_t_7 = 1;
@@ -19570,70 +19676,70 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_5};
-    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 391, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 407, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 391, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 407, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_6);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 391, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 407, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_invp_np = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":393
+  /* "tribbleclustering/pcvat.pyx":409
  *     invp_np       = np.empty(n, dtype=np.int32)
  * 
  *     cdef float[:, ::1] out = out_np             # <<<<<<<<<<<<<<
  *     cdef int[:]  p          = heap_seq_np
  *     cdef int[:]  q          = parent_seq_np
 */
-  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_d_dc_float(__pyx_v_out_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 393, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_to_MemoryviewSlice_d_dc_float(__pyx_v_out_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_8.memview)) __PYX_ERR(0, 409, __pyx_L1_error)
   __pyx_v_out = __pyx_t_8;
   __pyx_t_8.memview = NULL;
   __pyx_t_8.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":394
+  /* "tribbleclustering/pcvat.pyx":410
  * 
  *     cdef float[:, ::1] out = out_np
  *     cdef int[:]  p          = heap_seq_np             # <<<<<<<<<<<<<<
  *     cdef int[:]  q          = parent_seq_np
  *     cdef int[:]  invp       = invp_np
 */
-  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 394, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_heap_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 410, __pyx_L1_error)
   __pyx_v_p = __pyx_t_9;
   __pyx_t_9.memview = NULL;
   __pyx_t_9.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":395
+  /* "tribbleclustering/pcvat.pyx":411
  *     cdef float[:, ::1] out = out_np
  *     cdef int[:]  p          = heap_seq_np
  *     cdef int[:]  q          = parent_seq_np             # <<<<<<<<<<<<<<
  *     cdef int[:]  invp       = invp_np
  * 
 */
-  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 395, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_parent_seq_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 411, __pyx_L1_error)
   __pyx_v_q = __pyx_t_9;
   __pyx_t_9.memview = NULL;
   __pyx_t_9.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":396
+  /* "tribbleclustering/pcvat.pyx":412
  *     cdef int[:]  p          = heap_seq_np
  *     cdef int[:]  q          = parent_seq_np
  *     cdef int[:]  invp       = invp_np             # <<<<<<<<<<<<<<
  * 
  *     # Step 1: MST (nogil)
 */
-  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_invp_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 396, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_to_MemoryviewSlice_ds_int(__pyx_v_invp_np, PyBUF_WRITABLE); if (unlikely(!__pyx_t_9.memview)) __PYX_ERR(0, 412, __pyx_L1_error)
   __pyx_v_invp = __pyx_t_9;
   __pyx_t_9.memview = NULL;
   __pyx_t_9.data = NULL;
 
-  /* "tribbleclustering/pcvat.pyx":399
+  /* "tribbleclustering/pcvat.pyx":415
  * 
  *     # Step 1: MST (nogil)
  *     _run_mst_32(&adj[0, 0], n, p, q)             # <<<<<<<<<<<<<<
@@ -19642,11 +19748,11 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
   __pyx_t_10 = 0;
   __pyx_t_11 = 0;
-  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_32((&(*((float *) ( /* dim=1 */ ((char *) (((float *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_10 * __pyx_v_adj.strides[0]) )) + __pyx_t_11)) )))), __pyx_v_n, __pyx_v_p, __pyx_v_q); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 399, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_17tribbleclustering_5pcvat__run_mst_32((&(*((float *) ( /* dim=1 */ ((char *) (((float *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_10 * __pyx_v_adj.strides[0]) )) + __pyx_t_11)) )))), __pyx_v_n, __pyx_v_p, __pyx_v_q); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 415, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":402
+  /* "tribbleclustering/pcvat.pyx":418
  * 
  *     # Step 2: Permutation re-order, out[i, j] = adj[p[i], p[j]].
  *     cdef const float* A = &adj[0, 0]             # <<<<<<<<<<<<<<
@@ -19657,7 +19763,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   __pyx_t_10 = 0;
   __pyx_v_A = (&(*((float *) ( /* dim=1 */ ((char *) (((float *) ( /* dim=0 */ (__pyx_v_adj.data + __pyx_t_11 * __pyx_v_adj.strides[0]) )) + __pyx_t_10)) ))));
 
-  /* "tribbleclustering/pcvat.pyx":403
+  /* "tribbleclustering/pcvat.pyx":419
  *     # Step 2: Permutation re-order, out[i, j] = adj[p[i], p[j]].
  *     cdef const float* A = &adj[0, 0]
  *     cdef float* O       = &out[0, 0]             # <<<<<<<<<<<<<<
@@ -19668,7 +19774,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   __pyx_t_11 = 0;
   __pyx_v_O = (&(*((float *) ( /* dim=1 */ ((char *) (((float *) ( /* dim=0 */ (__pyx_v_out.data + __pyx_t_10 * __pyx_v_out.strides[0]) )) + __pyx_t_11)) ))));
 
-  /* "tribbleclustering/pcvat.pyx":404
+  /* "tribbleclustering/pcvat.pyx":420
  *     cdef const float* A = &adj[0, 0]
  *     cdef float* O       = &out[0, 0]
  *     cdef const int* P   = &p[0]             # <<<<<<<<<<<<<<
@@ -19678,7 +19784,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   __pyx_t_11 = 0;
   __pyx_v_P = (&(*((int *) ( /* dim=0 */ (__pyx_v_p.data + __pyx_t_11 * __pyx_v_p.strides[0]) ))));
 
-  /* "tribbleclustering/pcvat.pyx":405
+  /* "tribbleclustering/pcvat.pyx":421
  *     cdef float* O       = &out[0, 0]
  *     cdef const int* P   = &p[0]
  *     cdef const int* IP  = &invp[0]             # <<<<<<<<<<<<<<
@@ -19688,7 +19794,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   __pyx_t_11 = 0;
   __pyx_v_IP = (&(*((int *) ( /* dim=0 */ (__pyx_v_invp.data + __pyx_t_11 * __pyx_v_invp.strides[0]) ))));
 
-  /* "tribbleclustering/pcvat.pyx":407
+  /* "tribbleclustering/pcvat.pyx":423
  *     cdef const int* IP  = &invp[0]
  * 
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -19700,7 +19806,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   for (__pyx_t_14 = 0; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
     __pyx_v_i = __pyx_t_14;
 
-    /* "tribbleclustering/pcvat.pyx":408
+    /* "tribbleclustering/pcvat.pyx":424
  * 
  *     for i in range(n):
  *         invp[P[i]] = i             # <<<<<<<<<<<<<<
@@ -19711,7 +19817,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
     *((int *) ( /* dim=0 */ (__pyx_v_invp.data + __pyx_t_11 * __pyx_v_invp.strides[0]) )) = __pyx_v_i;
   }
 
-  /* "tribbleclustering/pcvat.pyx":410
+  /* "tribbleclustering/pcvat.pyx":426
  *         invp[P[i]] = i
  * 
  *     cdef int gthreads = openmp.omp_get_max_threads()             # <<<<<<<<<<<<<<
@@ -19720,7 +19826,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
   __pyx_v_gthreads = omp_get_max_threads();
 
-  /* "tribbleclustering/pcvat.pyx":411
+  /* "tribbleclustering/pcvat.pyx":427
  * 
  *     cdef int gthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or gthreads < 2:             # <<<<<<<<<<<<<<
@@ -19738,7 +19844,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   __pyx_L6_bool_binop_done:;
   if (__pyx_t_15) {
 
-    /* "tribbleclustering/pcvat.pyx":412
+    /* "tribbleclustering/pcvat.pyx":428
  *     cdef int gthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or gthreads < 2:
  *         gthreads = 1             # <<<<<<<<<<<<<<
@@ -19747,7 +19853,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
     __pyx_v_gthreads = 1;
 
-    /* "tribbleclustering/pcvat.pyx":411
+    /* "tribbleclustering/pcvat.pyx":427
  * 
  *     cdef int gthreads = openmp.omp_get_max_threads()
  *     if n < _PAR_THRESHOLD or gthreads < 2:             # <<<<<<<<<<<<<<
@@ -19756,7 +19862,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
   }
 
-  /* "tribbleclustering/pcvat.pyx":414
+  /* "tribbleclustering/pcvat.pyx":430
  *         gthreads = 1
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -19769,7 +19875,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
       __Pyx_FastGIL_Remember();
       /*try:*/ {
 
-        /* "tribbleclustering/pcvat.pyx":415
+        /* "tribbleclustering/pcvat.pyx":431
  * 
  *     with nogil:
  *         for i in prange(n, schedule='static', num_threads=gthreads):             # <<<<<<<<<<<<<<
@@ -19798,7 +19904,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
                         {
                             __pyx_v_i = (int)(0 + 1 * __pyx_t_13);
 
-                            /* "tribbleclustering/pcvat.pyx":416
+                            /* "tribbleclustering/pcvat.pyx":432
  *     with nogil:
  *         for i in prange(n, schedule='static', num_threads=gthreads):
  *             pi   = P[i]             # <<<<<<<<<<<<<<
@@ -19807,7 +19913,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
                             __pyx_v_pi = (__pyx_v_P[__pyx_v_i]);
 
-                            /* "tribbleclustering/pcvat.pyx":417
+                            /* "tribbleclustering/pcvat.pyx":433
  *         for i in prange(n, schedule='static', num_threads=gthreads):
  *             pi   = P[i]
  *             base = <Py_ssize_t>pi * n             # <<<<<<<<<<<<<<
@@ -19816,7 +19922,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
                             __pyx_v_base = (((Py_ssize_t)__pyx_v_pi) * __pyx_v_n);
 
-                            /* "tribbleclustering/pcvat.pyx":418
+                            /* "tribbleclustering/pcvat.pyx":434
  *             pi   = P[i]
  *             base = <Py_ssize_t>pi * n
  *             orow = <Py_ssize_t>i * n             # <<<<<<<<<<<<<<
@@ -19825,7 +19931,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
                             __pyx_v_orow = (((Py_ssize_t)__pyx_v_i) * __pyx_v_n);
 
-                            /* "tribbleclustering/pcvat.pyx":419
+                            /* "tribbleclustering/pcvat.pyx":435
  *             base = <Py_ssize_t>pi * n
  *             orow = <Py_ssize_t>i * n
  *             src  = A + base             # <<<<<<<<<<<<<<
@@ -19834,7 +19940,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
                             __pyx_v_src = (__pyx_v_A + __pyx_v_base);
 
-                            /* "tribbleclustering/pcvat.pyx":420
+                            /* "tribbleclustering/pcvat.pyx":436
  *             orow = <Py_ssize_t>i * n
  *             src  = A + base
  *             dst  = O + orow             # <<<<<<<<<<<<<<
@@ -19843,7 +19949,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
 */
                             __pyx_v_dst = (__pyx_v_O + __pyx_v_orow);
 
-                            /* "tribbleclustering/pcvat.pyx":421
+                            /* "tribbleclustering/pcvat.pyx":437
  *             src  = A + base
  *             dst  = O + orow
  *             for c in range(n):             # <<<<<<<<<<<<<<
@@ -19855,7 +19961,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
                             for (__pyx_t_19 = 0; __pyx_t_19 < __pyx_t_18; __pyx_t_19+=1) {
                               __pyx_v_c = __pyx_t_19;
 
-                              /* "tribbleclustering/pcvat.pyx":422
+                              /* "tribbleclustering/pcvat.pyx":438
  *             dst  = O + orow
  *             for c in range(n):
  *                 dst[IP[c]] = src[c]             # <<<<<<<<<<<<<<
@@ -19877,7 +19983,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
         #endif
       }
 
-      /* "tribbleclustering/pcvat.pyx":414
+      /* "tribbleclustering/pcvat.pyx":430
  *         gthreads = 1
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -19894,7 +20000,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
       }
   }
 
-  /* "tribbleclustering/pcvat.pyx":424
+  /* "tribbleclustering/pcvat.pyx":440
  *                 dst[IP[c]] = src[c]
  * 
  *     return out_np, heap_seq_np, parent_seq_np             # <<<<<<<<<<<<<<
@@ -19902,22 +20008,22 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
  * 
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 424, __pyx_L1_error)
+  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 440, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_INCREF(__pyx_v_out_np);
   __Pyx_GIVEREF(__pyx_v_out_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_out_np) != (0)) __PYX_ERR(0, 424, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_out_np) != (0)) __PYX_ERR(0, 440, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_heap_seq_np);
   __Pyx_GIVEREF(__pyx_v_heap_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 424, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_heap_seq_np) != (0)) __PYX_ERR(0, 440, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_parent_seq_np);
   __Pyx_GIVEREF(__pyx_v_parent_seq_np);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 424, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_parent_seq_np) != (0)) __PYX_ERR(0, 440, __pyx_L1_error);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "tribbleclustering/pcvat.pyx":367
+  /* "tribbleclustering/pcvat.pyx":383
  * # Public: full VAT pipeline  float32 (MST + permutation gather, OpenMP parallel)
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
@@ -19951,7 +20057,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_6compute_vat_c_32(CYTHON_UN
   return __pyx_r;
 }
 
-/* "tribbleclustering/pcvat.pyx":430
+/* "tribbleclustering/pcvat.pyx":446
  * # Public dispatch: automatic dtype selection
  * # ---------------------------------------------------------------------------
  * def vat_prim_mst_c(adj):             # <<<<<<<<<<<<<<
@@ -19999,32 +20105,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 430, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 446, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 430, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 446, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "vat_prim_mst_c", 0) < (0)) __PYX_ERR(0, 430, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "vat_prim_mst_c", 0) < (0)) __PYX_ERR(0, 446, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c", 1, 1, 1, i); __PYX_ERR(0, 430, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c", 1, 1, 1, i); __PYX_ERR(0, 446, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 430, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 446, __pyx_L3_error)
     }
     __pyx_v_adj = values[0];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 430, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("vat_prim_mst_c", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 446, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -20062,415 +20168,12 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_8vat_prim_mst_c(CYTHON_UNUS
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("vat_prim_mst_c", 0);
 
-  /* "tribbleclustering/pcvat.pyx":436
- *     Returns (heap_seq, parent_seq) as int32 numpy arrays.
- *     """
- *     if adj.dtype == np.float32:             # <<<<<<<<<<<<<<
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return vat_prim_mst_c_32(adj_c)
-*/
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 436, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 436, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_float32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 436, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = PyObject_RichCompare(__pyx_t_1, __pyx_t_3, Py_EQ); __Pyx_XGOTREF(__pyx_t_2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 436, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely((__pyx_t_4 < 0))) __PYX_ERR(0, 436, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (__pyx_t_4) {
-
-    /* "tribbleclustering/pcvat.pyx":437
- *     """
- *     if adj.dtype == np.float32:
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)             # <<<<<<<<<<<<<<
- *         return vat_prim_mst_c_32(adj_c)
- *     elif adj.dtype == np.float64:
-*/
-    __pyx_t_3 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 437, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_require); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 437, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_5);
-    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __pyx_t_1 = PyList_New(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 437, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
-    __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
-    if (__Pyx_PyList_SET_ITEM(__pyx_t_1, 0, __pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS) != (0)) __PYX_ERR(0, 437, __pyx_L1_error);
-    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 437, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_float32); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 437, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    __pyx_t_8 = 1;
-    #if CYTHON_UNPACK_METHODS
-    if (unlikely(PyMethod_Check(__pyx_t_5))) {
-      __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_5);
-      assert(__pyx_t_3);
-      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_5);
-      __Pyx_INCREF(__pyx_t_3);
-      __Pyx_INCREF(__pyx__function);
-      __Pyx_DECREF_SET(__pyx_t_5, __pyx__function);
-      __pyx_t_8 = 0;
-    }
-    #endif
-    {
-      PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 2 : 0)] = {__pyx_t_3, __pyx_v_adj};
-      __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 437, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_6);
-      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_requirements, __pyx_t_1, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 437, __pyx_L1_error)
-      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_7, __pyx_t_6, __pyx_callargs+2, 1) < (0)) __PYX_ERR(0, 437, __pyx_L1_error)
-      __pyx_t_2 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_6);
-      __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 437, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_2);
-    }
-    __pyx_v_adj_c = __pyx_t_2;
-    __pyx_t_2 = 0;
-
-    /* "tribbleclustering/pcvat.pyx":438
- *     if adj.dtype == np.float32:
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return vat_prim_mst_c_32(adj_c)             # <<<<<<<<<<<<<<
- *     elif adj.dtype == np.float64:
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
-*/
-    __Pyx_XDECREF(__pyx_r);
-    __pyx_t_5 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 438, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_8 = 1;
-    #if CYTHON_UNPACK_METHODS
-    if (unlikely(PyMethod_Check(__pyx_t_6))) {
-      __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_6);
-      assert(__pyx_t_5);
-      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_6);
-      __Pyx_INCREF(__pyx_t_5);
-      __Pyx_INCREF(__pyx__function);
-      __Pyx_DECREF_SET(__pyx_t_6, __pyx__function);
-      __pyx_t_8 = 0;
-    }
-    #endif
-    {
-      PyObject *__pyx_callargs[2] = {__pyx_t_5, __pyx_v_adj_c};
-      __pyx_t_2 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_6, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 438, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_2);
-    }
-    __pyx_r = __pyx_t_2;
-    __pyx_t_2 = 0;
-    goto __pyx_L0;
-
-    /* "tribbleclustering/pcvat.pyx":436
- *     Returns (heap_seq, parent_seq) as int32 numpy arrays.
- *     """
- *     if adj.dtype == np.float32:             # <<<<<<<<<<<<<<
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return vat_prim_mst_c_32(adj_c)
-*/
-  }
-
-  /* "tribbleclustering/pcvat.pyx":439
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return vat_prim_mst_c_32(adj_c)
- *     elif adj.dtype == np.float64:             # <<<<<<<<<<<<<<
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
- *         return vat_prim_mst_c_64(adj_c)
-*/
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 439, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 439, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 439, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_6 = PyObject_RichCompare(__pyx_t_2, __pyx_t_5, Py_EQ); __Pyx_XGOTREF(__pyx_t_6); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 439, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_6); if (unlikely((__pyx_t_4 < 0))) __PYX_ERR(0, 439, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  if (likely(__pyx_t_4)) {
-
-    /* "tribbleclustering/pcvat.pyx":440
- *         return vat_prim_mst_c_32(adj_c)
- *     elif adj.dtype == np.float64:
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)             # <<<<<<<<<<<<<<
- *         return vat_prim_mst_c_64(adj_c)
- *     else:
-*/
-    __pyx_t_5 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 440, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_require); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 440, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_2 = PyList_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 440, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_2);
-    __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
-    __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
-    if (__Pyx_PyList_SET_ITEM(__pyx_t_2, 0, __pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS) != (0)) __PYX_ERR(0, 440, __pyx_L1_error);
-    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 440, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 440, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_3);
-    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __pyx_t_8 = 1;
-    #if CYTHON_UNPACK_METHODS
-    if (unlikely(PyMethod_Check(__pyx_t_7))) {
-      __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_7);
-      assert(__pyx_t_5);
-      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_7);
-      __Pyx_INCREF(__pyx_t_5);
-      __Pyx_INCREF(__pyx__function);
-      __Pyx_DECREF_SET(__pyx_t_7, __pyx__function);
-      __pyx_t_8 = 0;
-    }
-    #endif
-    {
-      PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 2 : 0)] = {__pyx_t_5, __pyx_v_adj};
-      __pyx_t_1 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 440, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_1);
-      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_requirements, __pyx_t_2, __pyx_t_1, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 440, __pyx_L1_error)
-      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_1, __pyx_callargs+2, 1) < (0)) __PYX_ERR(0, 440, __pyx_L1_error)
-      __pyx_t_6 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_7, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_1);
-      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-      __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-      __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-      if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 440, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_6);
-    }
-    __pyx_v_adj_c = __pyx_t_6;
-    __pyx_t_6 = 0;
-
-    /* "tribbleclustering/pcvat.pyx":441
- *     elif adj.dtype == np.float64:
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
- *         return vat_prim_mst_c_64(adj_c)             # <<<<<<<<<<<<<<
- *     else:
- *         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
-*/
-    __Pyx_XDECREF(__pyx_r);
-    __pyx_t_7 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_64); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 441, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_8 = 1;
-    #if CYTHON_UNPACK_METHODS
-    if (unlikely(PyMethod_Check(__pyx_t_1))) {
-      __pyx_t_7 = PyMethod_GET_SELF(__pyx_t_1);
-      assert(__pyx_t_7);
-      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_1);
-      __Pyx_INCREF(__pyx_t_7);
-      __Pyx_INCREF(__pyx__function);
-      __Pyx_DECREF_SET(__pyx_t_1, __pyx__function);
-      __pyx_t_8 = 0;
-    }
-    #endif
-    {
-      PyObject *__pyx_callargs[2] = {__pyx_t_7, __pyx_v_adj_c};
-      __pyx_t_6 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_1, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-      __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-      if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 441, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_6);
-    }
-    __pyx_r = __pyx_t_6;
-    __pyx_t_6 = 0;
-    goto __pyx_L0;
-
-    /* "tribbleclustering/pcvat.pyx":439
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return vat_prim_mst_c_32(adj_c)
- *     elif adj.dtype == np.float64:             # <<<<<<<<<<<<<<
- *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
- *         return vat_prim_mst_c_64(adj_c)
-*/
-  }
-
-  /* "tribbleclustering/pcvat.pyx":443
- *         return vat_prim_mst_c_64(adj_c)
- *     else:
- *         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")             # <<<<<<<<<<<<<<
- * 
- * 
-*/
-  /*else*/ {
-    __pyx_t_1 = NULL;
-    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 443, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __pyx_t_3 = __Pyx_PyObject_FormatSimple(__pyx_t_7, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 443, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_3);
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    __pyx_t_7 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Expected_float32_or_float64_got, __pyx_t_3); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 443, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_7);
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __pyx_t_8 = 1;
-    {
-      PyObject *__pyx_callargs[2] = {__pyx_t_1, __pyx_t_7};
-      __pyx_t_6 = __Pyx_PyObject_FastCall((PyObject*)(((PyTypeObject*)PyExc_TypeError)), __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-      __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-      if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 443, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_6);
-    }
-    __Pyx_Raise(__pyx_t_6, 0, 0, 0);
-    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    __PYX_ERR(0, 443, __pyx_L1_error)
-  }
-
-  /* "tribbleclustering/pcvat.pyx":430
- * # Public dispatch: automatic dtype selection
- * # ---------------------------------------------------------------------------
- * def vat_prim_mst_c(adj):             # <<<<<<<<<<<<<<
- *     """
- *     Compact dense Prim's MST.
-*/
-
-  /* function exit code */
-  __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_2);
-  __Pyx_XDECREF(__pyx_t_3);
-  __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_XDECREF(__pyx_t_6);
-  __Pyx_XDECREF(__pyx_t_7);
-  __Pyx_AddTraceback("tribbleclustering.pcvat.vat_prim_mst_c", __pyx_clineno, __pyx_lineno, __pyx_filename);
-  __pyx_r = NULL;
-  __pyx_L0:;
-  __Pyx_XDECREF(__pyx_v_adj_c);
-  __Pyx_XGIVEREF(__pyx_r);
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
-/* "tribbleclustering/pcvat.pyx":446
- * 
- * 
- * def compute_vat_c(adj):             # <<<<<<<<<<<<<<
- *     """
- *     C/OpenMP implementation of compute_ordered_dis_njit_merge.
-*/
-
-/* Python wrapper */
-static PyObject *__pyx_pw_17tribbleclustering_5pcvat_11compute_vat_c(PyObject *__pyx_self, 
-#if CYTHON_METH_FASTCALL
-PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
-#else
-PyObject *__pyx_args, PyObject *__pyx_kwds
-#endif
-); /*proto*/
-PyDoc_STRVAR(__pyx_doc_17tribbleclustering_5pcvat_10compute_vat_c, "\n    C/OpenMP implementation of compute_ordered_dis_njit_merge.\n    Automatically dispatches to float32 or float64 based on input dtype.\n    Returns (ordered_matrix, p_seq, q_seq).\n    ");
-static PyMethodDef __pyx_mdef_17tribbleclustering_5pcvat_11compute_vat_c = {"compute_vat_c", (PyCFunction)(void(*)(void))(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17tribbleclustering_5pcvat_11compute_vat_c, __Pyx_METH_FASTCALL|METH_KEYWORDS, __pyx_doc_17tribbleclustering_5pcvat_10compute_vat_c};
-static PyObject *__pyx_pw_17tribbleclustering_5pcvat_11compute_vat_c(PyObject *__pyx_self, 
-#if CYTHON_METH_FASTCALL
-PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
-#else
-PyObject *__pyx_args, PyObject *__pyx_kwds
-#endif
-) {
-  PyObject *__pyx_v_adj = 0;
-  #if !CYTHON_METH_FASTCALL
-  CYTHON_UNUSED Py_ssize_t __pyx_nargs;
-  #endif
-  CYTHON_UNUSED PyObject *const *__pyx_kwvalues;
-  PyObject* values[1] = {0};
-  int __pyx_lineno = 0;
-  const char *__pyx_filename = NULL;
-  int __pyx_clineno = 0;
-  PyObject *__pyx_r = 0;
-  __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("compute_vat_c (wrapper)", 0);
-  #if !CYTHON_METH_FASTCALL
-  #if CYTHON_ASSUME_SAFE_SIZE
-  __pyx_nargs = PyTuple_GET_SIZE(__pyx_args);
-  #else
-  __pyx_nargs = PyTuple_Size(__pyx_args); if (unlikely(__pyx_nargs < 0)) return NULL;
-  #endif
-  #endif
-  __pyx_kwvalues = __Pyx_KwValues_FASTCALL(__pyx_args, __pyx_nargs);
-  {
-    PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
-    const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 446, __pyx_L3_error)
-    if (__pyx_kwds_len > 0) {
-      switch (__pyx_nargs) {
-        case  1:
-        values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 446, __pyx_L3_error)
-        CYTHON_FALLTHROUGH;
-        case  0: break;
-        default: goto __pyx_L5_argtuple_error;
-      }
-      const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "compute_vat_c", 0) < (0)) __PYX_ERR(0, 446, __pyx_L3_error)
-      for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("compute_vat_c", 1, 1, 1, i); __PYX_ERR(0, 446, __pyx_L3_error) }
-      }
-    } else if (unlikely(__pyx_nargs != 1)) {
-      goto __pyx_L5_argtuple_error;
-    } else {
-      values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 446, __pyx_L3_error)
-    }
-    __pyx_v_adj = values[0];
-  }
-  goto __pyx_L6_skip;
-  __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("compute_vat_c", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 446, __pyx_L3_error)
-  __pyx_L6_skip:;
-  goto __pyx_L4_argument_unpacking_done;
-  __pyx_L3_error:;
-  for (Py_ssize_t __pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
-    Py_XDECREF(values[__pyx_temp]);
-  }
-  __Pyx_AddTraceback("tribbleclustering.pcvat.compute_vat_c", __pyx_clineno, __pyx_lineno, __pyx_filename);
-  __Pyx_RefNannyFinishContext();
-  return NULL;
-  __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(__pyx_self, __pyx_v_adj);
-
-  /* function exit code */
-  for (Py_ssize_t __pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
-    Py_XDECREF(values[__pyx_temp]);
-  }
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
-static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_adj) {
-  PyObject *__pyx_v_adj_c = NULL;
-  PyObject *__pyx_r = NULL;
-  __Pyx_RefNannyDeclarations
-  PyObject *__pyx_t_1 = NULL;
-  PyObject *__pyx_t_2 = NULL;
-  PyObject *__pyx_t_3 = NULL;
-  int __pyx_t_4;
-  PyObject *__pyx_t_5 = NULL;
-  PyObject *__pyx_t_6 = NULL;
-  PyObject *__pyx_t_7 = NULL;
-  size_t __pyx_t_8;
-  int __pyx_lineno = 0;
-  const char *__pyx_filename = NULL;
-  int __pyx_clineno = 0;
-  __Pyx_RefNannySetupContext("compute_vat_c", 0);
-
   /* "tribbleclustering/pcvat.pyx":452
- *     Returns (ordered_matrix, p_seq, q_seq).
+ *     Returns (heap_seq, parent_seq) as int32 numpy arrays.
  *     """
  *     if adj.dtype == np.float32:             # <<<<<<<<<<<<<<
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return compute_vat_c_32(adj_c)
+ *         return vat_prim_mst_c_32(adj_c)
 */
   __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 452, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -20490,7 +20193,7 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
  *     """
  *     if adj.dtype == np.float32:
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)             # <<<<<<<<<<<<<<
- *         return compute_vat_c_32(adj_c)
+ *         return vat_prim_mst_c_32(adj_c)
  *     elif adj.dtype == np.float64:
 */
     __pyx_t_3 = NULL;
@@ -20542,13 +20245,13 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
     /* "tribbleclustering/pcvat.pyx":454
  *     if adj.dtype == np.float32:
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return compute_vat_c_32(adj_c)             # <<<<<<<<<<<<<<
+ *         return vat_prim_mst_c_32(adj_c)             # <<<<<<<<<<<<<<
  *     elif adj.dtype == np.float64:
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
 */
     __Pyx_XDECREF(__pyx_r);
     __pyx_t_5 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_compute_vat_c_32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 454, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 454, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     __pyx_t_8 = 1;
     #if CYTHON_UNPACK_METHODS
@@ -20575,20 +20278,20 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
     goto __pyx_L0;
 
     /* "tribbleclustering/pcvat.pyx":452
- *     Returns (ordered_matrix, p_seq, q_seq).
+ *     Returns (heap_seq, parent_seq) as int32 numpy arrays.
  *     """
  *     if adj.dtype == np.float32:             # <<<<<<<<<<<<<<
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return compute_vat_c_32(adj_c)
+ *         return vat_prim_mst_c_32(adj_c)
 */
   }
 
   /* "tribbleclustering/pcvat.pyx":455
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return compute_vat_c_32(adj_c)
+ *         return vat_prim_mst_c_32(adj_c)
  *     elif adj.dtype == np.float64:             # <<<<<<<<<<<<<<
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
- *         return compute_vat_c_64(adj_c)
+ *         return vat_prim_mst_c_64(adj_c)
 */
   __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 455, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
@@ -20605,10 +20308,10 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
   if (likely(__pyx_t_4)) {
 
     /* "tribbleclustering/pcvat.pyx":456
- *         return compute_vat_c_32(adj_c)
+ *         return vat_prim_mst_c_32(adj_c)
  *     elif adj.dtype == np.float64:
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)             # <<<<<<<<<<<<<<
- *         return compute_vat_c_64(adj_c)
+ *         return vat_prim_mst_c_64(adj_c)
  *     else:
 */
     __pyx_t_5 = NULL;
@@ -20660,13 +20363,13 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
     /* "tribbleclustering/pcvat.pyx":457
  *     elif adj.dtype == np.float64:
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
- *         return compute_vat_c_64(adj_c)             # <<<<<<<<<<<<<<
+ *         return vat_prim_mst_c_64(adj_c)             # <<<<<<<<<<<<<<
  *     else:
  *         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
 */
     __Pyx_XDECREF(__pyx_r);
     __pyx_t_7 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_compute_vat_c_64); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 457, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_64); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 457, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
     __pyx_t_8 = 1;
     #if CYTHON_UNPACK_METHODS
@@ -20694,17 +20397,19 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
 
     /* "tribbleclustering/pcvat.pyx":455
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
- *         return compute_vat_c_32(adj_c)
+ *         return vat_prim_mst_c_32(adj_c)
  *     elif adj.dtype == np.float64:             # <<<<<<<<<<<<<<
  *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
- *         return compute_vat_c_64(adj_c)
+ *         return vat_prim_mst_c_64(adj_c)
 */
   }
 
   /* "tribbleclustering/pcvat.pyx":459
- *         return compute_vat_c_64(adj_c)
+ *         return vat_prim_mst_c_64(adj_c)
  *     else:
  *         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")             # <<<<<<<<<<<<<<
+ * 
+ * 
 */
   /*else*/ {
     __pyx_t_1 = NULL;
@@ -20731,6 +20436,407 @@ static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUS
   }
 
   /* "tribbleclustering/pcvat.pyx":446
+ * # Public dispatch: automatic dtype selection
+ * # ---------------------------------------------------------------------------
+ * def vat_prim_mst_c(adj):             # <<<<<<<<<<<<<<
+ *     """
+ *     Compact dense Prim's MST.
+*/
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_XDECREF(__pyx_t_6);
+  __Pyx_XDECREF(__pyx_t_7);
+  __Pyx_AddTraceback("tribbleclustering.pcvat.vat_prim_mst_c", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_adj_c);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tribbleclustering/pcvat.pyx":462
+ * 
+ * 
+ * def compute_vat_c(adj):             # <<<<<<<<<<<<<<
+ *     """
+ *     C/OpenMP implementation of compute_ordered_dis_njit_merge.
+*/
+
+/* Python wrapper */
+static PyObject *__pyx_pw_17tribbleclustering_5pcvat_11compute_vat_c(PyObject *__pyx_self, 
+#if CYTHON_METH_FASTCALL
+PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
+#else
+PyObject *__pyx_args, PyObject *__pyx_kwds
+#endif
+); /*proto*/
+PyDoc_STRVAR(__pyx_doc_17tribbleclustering_5pcvat_10compute_vat_c, "\n    C/OpenMP implementation of compute_ordered_dis_njit_merge.\n    Automatically dispatches to float32 or float64 based on input dtype.\n    Returns (ordered_matrix, p_seq, q_seq).\n    ");
+static PyMethodDef __pyx_mdef_17tribbleclustering_5pcvat_11compute_vat_c = {"compute_vat_c", (PyCFunction)(void(*)(void))(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17tribbleclustering_5pcvat_11compute_vat_c, __Pyx_METH_FASTCALL|METH_KEYWORDS, __pyx_doc_17tribbleclustering_5pcvat_10compute_vat_c};
+static PyObject *__pyx_pw_17tribbleclustering_5pcvat_11compute_vat_c(PyObject *__pyx_self, 
+#if CYTHON_METH_FASTCALL
+PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
+#else
+PyObject *__pyx_args, PyObject *__pyx_kwds
+#endif
+) {
+  PyObject *__pyx_v_adj = 0;
+  #if !CYTHON_METH_FASTCALL
+  CYTHON_UNUSED Py_ssize_t __pyx_nargs;
+  #endif
+  CYTHON_UNUSED PyObject *const *__pyx_kwvalues;
+  PyObject* values[1] = {0};
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("compute_vat_c (wrapper)", 0);
+  #if !CYTHON_METH_FASTCALL
+  #if CYTHON_ASSUME_SAFE_SIZE
+  __pyx_nargs = PyTuple_GET_SIZE(__pyx_args);
+  #else
+  __pyx_nargs = PyTuple_Size(__pyx_args); if (unlikely(__pyx_nargs < 0)) return NULL;
+  #endif
+  #endif
+  __pyx_kwvalues = __Pyx_KwValues_FASTCALL(__pyx_args, __pyx_nargs);
+  {
+    PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_adj,0};
+    const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 462, __pyx_L3_error)
+    if (__pyx_kwds_len > 0) {
+      switch (__pyx_nargs) {
+        case  1:
+        values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 462, __pyx_L3_error)
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      const Py_ssize_t kwd_pos_args = __pyx_nargs;
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "compute_vat_c", 0) < (0)) __PYX_ERR(0, 462, __pyx_L3_error)
+      for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("compute_vat_c", 1, 1, 1, i); __PYX_ERR(0, 462, __pyx_L3_error) }
+      }
+    } else if (unlikely(__pyx_nargs != 1)) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 462, __pyx_L3_error)
+    }
+    __pyx_v_adj = values[0];
+  }
+  goto __pyx_L6_skip;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("compute_vat_c", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 462, __pyx_L3_error)
+  __pyx_L6_skip:;
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  for (Py_ssize_t __pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
+    Py_XDECREF(values[__pyx_temp]);
+  }
+  __Pyx_AddTraceback("tribbleclustering.pcvat.compute_vat_c", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(__pyx_self, __pyx_v_adj);
+
+  /* function exit code */
+  for (Py_ssize_t __pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
+    Py_XDECREF(values[__pyx_temp]);
+  }
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_17tribbleclustering_5pcvat_10compute_vat_c(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_adj) {
+  PyObject *__pyx_v_adj_c = NULL;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  int __pyx_t_4;
+  PyObject *__pyx_t_5 = NULL;
+  PyObject *__pyx_t_6 = NULL;
+  PyObject *__pyx_t_7 = NULL;
+  size_t __pyx_t_8;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("compute_vat_c", 0);
+
+  /* "tribbleclustering/pcvat.pyx":468
+ *     Returns (ordered_matrix, p_seq, q_seq).
+ *     """
+ *     if adj.dtype == np.float32:             # <<<<<<<<<<<<<<
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+ *         return compute_vat_c_32(adj_c)
+*/
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 468, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 468, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_float32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 468, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = PyObject_RichCompare(__pyx_t_1, __pyx_t_3, Py_EQ); __Pyx_XGOTREF(__pyx_t_2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 468, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely((__pyx_t_4 < 0))) __PYX_ERR(0, 468, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (__pyx_t_4) {
+
+    /* "tribbleclustering/pcvat.pyx":469
+ *     """
+ *     if adj.dtype == np.float32:
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)             # <<<<<<<<<<<<<<
+ *         return compute_vat_c_32(adj_c)
+ *     elif adj.dtype == np.float64:
+*/
+    __pyx_t_3 = NULL;
+    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 469, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_require); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 469, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __pyx_t_1 = PyList_New(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 469, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
+    __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
+    if (__Pyx_PyList_SET_ITEM(__pyx_t_1, 0, __pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS) != (0)) __PYX_ERR(0, 469, __pyx_L1_error);
+    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 469, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_float32); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 469, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_8 = 1;
+    #if CYTHON_UNPACK_METHODS
+    if (unlikely(PyMethod_Check(__pyx_t_5))) {
+      __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_5);
+      assert(__pyx_t_3);
+      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_5);
+      __Pyx_INCREF(__pyx_t_3);
+      __Pyx_INCREF(__pyx__function);
+      __Pyx_DECREF_SET(__pyx_t_5, __pyx__function);
+      __pyx_t_8 = 0;
+    }
+    #endif
+    {
+      PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 2 : 0)] = {__pyx_t_3, __pyx_v_adj};
+      __pyx_t_6 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 469, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_requirements, __pyx_t_1, __pyx_t_6, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 469, __pyx_L1_error)
+      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_7, __pyx_t_6, __pyx_callargs+2, 1) < (0)) __PYX_ERR(0, 469, __pyx_L1_error)
+      __pyx_t_2 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_6);
+      __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 469, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_2);
+    }
+    __pyx_v_adj_c = __pyx_t_2;
+    __pyx_t_2 = 0;
+
+    /* "tribbleclustering/pcvat.pyx":470
+ *     if adj.dtype == np.float32:
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+ *         return compute_vat_c_32(adj_c)             # <<<<<<<<<<<<<<
+ *     elif adj.dtype == np.float64:
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+*/
+    __Pyx_XDECREF(__pyx_r);
+    __pyx_t_5 = NULL;
+    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_compute_vat_c_32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 470, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_8 = 1;
+    #if CYTHON_UNPACK_METHODS
+    if (unlikely(PyMethod_Check(__pyx_t_6))) {
+      __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_6);
+      assert(__pyx_t_5);
+      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_6);
+      __Pyx_INCREF(__pyx_t_5);
+      __Pyx_INCREF(__pyx__function);
+      __Pyx_DECREF_SET(__pyx_t_6, __pyx__function);
+      __pyx_t_8 = 0;
+    }
+    #endif
+    {
+      PyObject *__pyx_callargs[2] = {__pyx_t_5, __pyx_v_adj_c};
+      __pyx_t_2 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_6, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 470, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_2);
+    }
+    __pyx_r = __pyx_t_2;
+    __pyx_t_2 = 0;
+    goto __pyx_L0;
+
+    /* "tribbleclustering/pcvat.pyx":468
+ *     Returns (ordered_matrix, p_seq, q_seq).
+ *     """
+ *     if adj.dtype == np.float32:             # <<<<<<<<<<<<<<
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+ *         return compute_vat_c_32(adj_c)
+*/
+  }
+
+  /* "tribbleclustering/pcvat.pyx":471
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+ *         return compute_vat_c_32(adj_c)
+ *     elif adj.dtype == np.float64:             # <<<<<<<<<<<<<<
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+ *         return compute_vat_c_64(adj_c)
+*/
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 471, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 471, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 471, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  __pyx_t_6 = PyObject_RichCompare(__pyx_t_2, __pyx_t_5, Py_EQ); __Pyx_XGOTREF(__pyx_t_6); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 471, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_6); if (unlikely((__pyx_t_4 < 0))) __PYX_ERR(0, 471, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  if (likely(__pyx_t_4)) {
+
+    /* "tribbleclustering/pcvat.pyx":472
+ *         return compute_vat_c_32(adj_c)
+ *     elif adj.dtype == np.float64:
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)             # <<<<<<<<<<<<<<
+ *         return compute_vat_c_64(adj_c)
+ *     else:
+*/
+    __pyx_t_5 = NULL;
+    __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 472, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_require); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 472, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __pyx_t_2 = PyList_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 472, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
+    __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS);
+    if (__Pyx_PyList_SET_ITEM(__pyx_t_2, 0, __pyx_mstate_global->__pyx_n_u_C_CONTIGUOUS) != (0)) __PYX_ERR(0, 472, __pyx_L1_error);
+    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 472, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 472, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_3);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __pyx_t_8 = 1;
+    #if CYTHON_UNPACK_METHODS
+    if (unlikely(PyMethod_Check(__pyx_t_7))) {
+      __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_7);
+      assert(__pyx_t_5);
+      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_7);
+      __Pyx_INCREF(__pyx_t_5);
+      __Pyx_INCREF(__pyx__function);
+      __Pyx_DECREF_SET(__pyx_t_7, __pyx__function);
+      __pyx_t_8 = 0;
+    }
+    #endif
+    {
+      PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 2 : 0)] = {__pyx_t_5, __pyx_v_adj};
+      __pyx_t_1 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 472, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_1);
+      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_requirements, __pyx_t_2, __pyx_t_1, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 472, __pyx_L1_error)
+      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_3, __pyx_t_1, __pyx_callargs+2, 1) < (0)) __PYX_ERR(0, 472, __pyx_L1_error)
+      __pyx_t_6 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_7, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_1);
+      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+      __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+      __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 472, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+    }
+    __pyx_v_adj_c = __pyx_t_6;
+    __pyx_t_6 = 0;
+
+    /* "tribbleclustering/pcvat.pyx":473
+ *     elif adj.dtype == np.float64:
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+ *         return compute_vat_c_64(adj_c)             # <<<<<<<<<<<<<<
+ *     else:
+ *         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
+*/
+    __Pyx_XDECREF(__pyx_r);
+    __pyx_t_7 = NULL;
+    __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_compute_vat_c_64); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 473, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_8 = 1;
+    #if CYTHON_UNPACK_METHODS
+    if (unlikely(PyMethod_Check(__pyx_t_1))) {
+      __pyx_t_7 = PyMethod_GET_SELF(__pyx_t_1);
+      assert(__pyx_t_7);
+      PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_1);
+      __Pyx_INCREF(__pyx_t_7);
+      __Pyx_INCREF(__pyx__function);
+      __Pyx_DECREF_SET(__pyx_t_1, __pyx__function);
+      __pyx_t_8 = 0;
+    }
+    #endif
+    {
+      PyObject *__pyx_callargs[2] = {__pyx_t_7, __pyx_v_adj_c};
+      __pyx_t_6 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_1, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+      __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
+      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+      if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 473, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+    }
+    __pyx_r = __pyx_t_6;
+    __pyx_t_6 = 0;
+    goto __pyx_L0;
+
+    /* "tribbleclustering/pcvat.pyx":471
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+ *         return compute_vat_c_32(adj_c)
+ *     elif adj.dtype == np.float64:             # <<<<<<<<<<<<<<
+ *         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+ *         return compute_vat_c_64(adj_c)
+*/
+  }
+
+  /* "tribbleclustering/pcvat.pyx":475
+ *         return compute_vat_c_64(adj_c)
+ *     else:
+ *         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")             # <<<<<<<<<<<<<<
+*/
+  /*else*/ {
+    __pyx_t_1 = NULL;
+    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_adj, __pyx_mstate_global->__pyx_n_u_dtype); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 475, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
+    __pyx_t_3 = __Pyx_PyObject_FormatSimple(__pyx_t_7, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 475, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_3);
+    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __pyx_t_7 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Expected_float32_or_float64_got, __pyx_t_3); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 475, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    __pyx_t_8 = 1;
+    {
+      PyObject *__pyx_callargs[2] = {__pyx_t_1, __pyx_t_7};
+      __pyx_t_6 = __Pyx_PyObject_FastCall((PyObject*)(((PyTypeObject*)PyExc_TypeError)), __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+      __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 475, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+    }
+    __Pyx_Raise(__pyx_t_6, 0, 0, 0);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __PYX_ERR(0, 475, __pyx_L1_error)
+  }
+
+  /* "tribbleclustering/pcvat.pyx":462
  * 
  * 
  * def compute_vat_c(adj):             # <<<<<<<<<<<<<<
@@ -22609,94 +22715,94 @@ __Pyx_RefNannySetupContext("PyInit_pcvat", 0);
 */
   __pyx_v_17tribbleclustering_5pcvat__PAR_THRESHOLD = 0x200;
 
-  /* "tribbleclustering/pcvat.pyx":150
+  /* "tribbleclustering/pcvat.pyx":158
  * # Public: Prim's MST only  float64
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
  * def vat_prim_mst_c_64(double[:, ::1] adj):
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_1vat_prim_mst_c_64, 0, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_64, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 150, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_1vat_prim_mst_c_64, 0, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_64, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 158, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_64, __pyx_t_4) < (0)) __PYX_ERR(0, 150, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_64, __pyx_t_4) < (0)) __PYX_ERR(0, 158, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":170
+  /* "tribbleclustering/pcvat.pyx":178
  * # Public: full VAT pipeline  float64 (MST + permutation gather, OpenMP parallel)
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
  * def compute_vat_c_64(double[:, ::1] adj):
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_3compute_vat_c_64, 0, __pyx_mstate_global->__pyx_n_u_compute_vat_c_64, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 170, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_3compute_vat_c_64, 0, __pyx_mstate_global->__pyx_n_u_compute_vat_c_64, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 178, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_compute_vat_c_64, __pyx_t_4) < (0)) __PYX_ERR(0, 170, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_compute_vat_c_64, __pyx_t_4) < (0)) __PYX_ERR(0, 178, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":347
+  /* "tribbleclustering/pcvat.pyx":363
  * # Public: Prim's MST only  float32
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
  * def vat_prim_mst_c_32(float[:, ::1] adj):
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_5vat_prim_mst_c_32, 0, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_32, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 347, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_5vat_prim_mst_c_32, 0, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_32, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 363, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_32, __pyx_t_4) < (0)) __PYX_ERR(0, 347, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c_32, __pyx_t_4) < (0)) __PYX_ERR(0, 363, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":367
+  /* "tribbleclustering/pcvat.pyx":383
  * # Public: full VAT pipeline  float32 (MST + permutation gather, OpenMP parallel)
  * # ---------------------------------------------------------------------------
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
  * def compute_vat_c_32(float[:, ::1] adj):
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_7compute_vat_c_32, 0, __pyx_mstate_global->__pyx_n_u_compute_vat_c_32, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 367, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_7compute_vat_c_32, 0, __pyx_mstate_global->__pyx_n_u_compute_vat_c_32, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 383, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_compute_vat_c_32, __pyx_t_4) < (0)) __PYX_ERR(0, 367, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_compute_vat_c_32, __pyx_t_4) < (0)) __PYX_ERR(0, 383, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":430
+  /* "tribbleclustering/pcvat.pyx":446
  * # Public dispatch: automatic dtype selection
  * # ---------------------------------------------------------------------------
  * def vat_prim_mst_c(adj):             # <<<<<<<<<<<<<<
  *     """
  *     Compact dense Prim's MST.
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_9vat_prim_mst_c, 0, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 430, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_9vat_prim_mst_c, 0, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 446, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c, __pyx_t_4) < (0)) __PYX_ERR(0, 430, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_vat_prim_mst_c, __pyx_t_4) < (0)) __PYX_ERR(0, 446, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "tribbleclustering/pcvat.pyx":446
+  /* "tribbleclustering/pcvat.pyx":462
  * 
  * 
  * def compute_vat_c(adj):             # <<<<<<<<<<<<<<
  *     """
  *     C/OpenMP implementation of compute_ordered_dis_njit_merge.
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_11compute_vat_c, 0, __pyx_mstate_global->__pyx_n_u_compute_vat_c, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[5])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 446, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_17tribbleclustering_5pcvat_11compute_vat_c, 0, __pyx_mstate_global->__pyx_n_u_compute_vat_c, NULL, __pyx_mstate_global->__pyx_n_u_tribbleclustering_pcvat, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[5])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 462, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_compute_vat_c, __pyx_t_4) < (0)) __PYX_ERR(0, 446, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_compute_vat_c, __pyx_t_4) < (0)) __PYX_ERR(0, 462, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
   /* "tribbleclustering/pcvat.pyx":1
@@ -22969,32 +23075,32 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 150};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 158};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_adj, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_heap_seq_np, __pyx_mstate->__pyx_n_u_parent_seq_np, __pyx_mstate->__pyx_n_u_heap_seq, __pyx_mstate->__pyx_n_u_parent_seq};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src_tribbleclustering_pcvat_pyx, __pyx_mstate->__pyx_n_u_vat_prim_mst_c_64, __pyx_mstate->__pyx_kp_b_iso88591_F_1_BfAS_b_BfAS_b_Q_Q_q_AS_Cz, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 22, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 170};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 22, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 178};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_adj, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_c, __pyx_mstate->__pyx_n_u_pi, __pyx_mstate->__pyx_n_u_base, __pyx_mstate->__pyx_n_u_orow, __pyx_mstate->__pyx_n_u_src, __pyx_mstate->__pyx_n_u_dst, __pyx_mstate->__pyx_n_u_out_np, __pyx_mstate->__pyx_n_u_heap_seq_np, __pyx_mstate->__pyx_n_u_parent_seq_np, __pyx_mstate->__pyx_n_u_invp_np, __pyx_mstate->__pyx_n_u_out, __pyx_mstate->__pyx_n_u_p, __pyx_mstate->__pyx_n_u_q, __pyx_mstate->__pyx_n_u_invp, __pyx_mstate->__pyx_n_u_A, __pyx_mstate->__pyx_n_u_O, __pyx_mstate->__pyx_n_u_P, __pyx_mstate->__pyx_n_u_IP, __pyx_mstate->__pyx_n_u_gthreads};
     __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src_tribbleclustering_pcvat_pyx, __pyx_mstate->__pyx_n_u_compute_vat_c_64, __pyx_mstate->__pyx_kp_b_iso88591_F_1_BfBc_V2Q_BfAS_b_BfAS_b_BfAS, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 347};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 363};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_adj, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_heap_seq_np, __pyx_mstate->__pyx_n_u_parent_seq_np, __pyx_mstate->__pyx_n_u_heap_seq, __pyx_mstate->__pyx_n_u_parent_seq};
     __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src_tribbleclustering_pcvat_pyx, __pyx_mstate->__pyx_n_u_vat_prim_mst_c_32, __pyx_mstate->__pyx_kp_b_iso88591_F_1_BfAS_b_BfAS_b_Q_Q_q_AS_Cz, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 22, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 367};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 22, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 383};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_adj, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_c, __pyx_mstate->__pyx_n_u_pi, __pyx_mstate->__pyx_n_u_base, __pyx_mstate->__pyx_n_u_orow, __pyx_mstate->__pyx_n_u_src, __pyx_mstate->__pyx_n_u_dst, __pyx_mstate->__pyx_n_u_out_np, __pyx_mstate->__pyx_n_u_heap_seq_np, __pyx_mstate->__pyx_n_u_parent_seq_np, __pyx_mstate->__pyx_n_u_invp_np, __pyx_mstate->__pyx_n_u_out, __pyx_mstate->__pyx_n_u_p, __pyx_mstate->__pyx_n_u_q, __pyx_mstate->__pyx_n_u_invp, __pyx_mstate->__pyx_n_u_A, __pyx_mstate->__pyx_n_u_O, __pyx_mstate->__pyx_n_u_P, __pyx_mstate->__pyx_n_u_IP, __pyx_mstate->__pyx_n_u_gthreads};
     __pyx_mstate_global->__pyx_codeobj_tab[3] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src_tribbleclustering_pcvat_pyx, __pyx_mstate->__pyx_n_u_compute_vat_c_32, __pyx_mstate->__pyx_kp_b_iso88591_F_1_BfBc_V2Q_BfAS_b_BfAS_b_BfAS_2, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[3])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 430};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 446};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_adj, __pyx_mstate->__pyx_n_u_adj_c};
     __pyx_mstate_global->__pyx_codeobj_tab[4] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src_tribbleclustering_pcvat_pyx, __pyx_mstate->__pyx_n_u_vat_prim_mst_c, __pyx_mstate->__pyx_kp_b_iso88591_s_Ba_5_Q_vRq_G3b_5_Q_vRq_iq_1Cq, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[4])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 446};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 462};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_adj, __pyx_mstate->__pyx_n_u_adj_c};
     __pyx_mstate_global->__pyx_codeobj_tab[5] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src_tribbleclustering_pcvat_pyx, __pyx_mstate->__pyx_n_u_compute_vat_c, __pyx_mstate->__pyx_kp_b_iso88591_s_Ba_5_Q_vRq_q_G3b_5_Q_vRq_q_iq, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[5])) goto bad;
   }
