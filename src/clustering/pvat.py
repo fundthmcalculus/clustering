@@ -120,17 +120,17 @@ def shuffle_ordered_column(
         _set_bit(visited, c0, r0)
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _set_bit(bitmask: np.ndarray, row: int, col: int) -> None:
     bitmask[row, col // 8] |= 1 << (col % 8)
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _get_bit(bitmask: np.ndarray, row: int, col: int) -> int:
     return (bitmask[row, col // 8] >> (col % 8)) & 1
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def vat_prim_mst(
     adj: np.ndarray, progress_bar: ProgressBar | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -202,7 +202,7 @@ def vat_prim_mst(
     return heap_seq, parent_seq
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
     n = len(samples)
 

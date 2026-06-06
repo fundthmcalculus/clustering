@@ -9,6 +9,10 @@ from .pvat import (
     IvatMeansResult,
 )
 
+from .util import (
+    pairwise_distances
+)
+
 from .fcm import (
     fuzzy_c_means
 )
