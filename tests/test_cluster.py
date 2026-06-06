@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import time
 from typing import Any, Union
 
@@ -8,9 +7,8 @@ from matplotlib.animation import FuncAnimation
 from numpy import ndarray
 from scipy.spatial import Voronoi, voronoi_plot_2d, QhullError
 
-from clustering.util import pairwise_distances, circle_random_clusters, _random_cities
-from clustering import (
-    vat_prim_mst_seq,
+from tribbleclustering.util import pairwise_distances, circle_random_clusters, _random_cities
+from tribbleclustering import (
     compute_ivat,
     fcm,
     get_ivat_levels,

@@ -5,13 +5,13 @@ A simple Python package for clustering tasks.
 ## Installation
 
 ```bash
-pip install clustering-pkg
+pip install tribbleclustering
 ```
 
 ## Usage
 For fuzzy-c-means:
 ```python
-from clustering import fuzzy_c_means
+from tribbleclustering import fuzzy_c_means
 import numpy as np
 
 data = np.array([[1, 2], [2, 3], [10, 11], [11, 12]])
@@ -23,8 +23,8 @@ print(f"Membership matrix:\n{membership}")
 For IVAT:
 
 ```python
-from clustering import compute_ivat
-from clustering.util import circle_random_clusters, pairwise_distances
+from tribbleclustering import compute_ivat
+from tribbleclustering.util import circle_random_clusters, pairwise_distances
 
 cluster_cities = circle_random_clusters(10, 2, 10)
 city_distances = pairwise_distances(cluster_cities)

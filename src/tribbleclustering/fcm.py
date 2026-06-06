@@ -40,7 +40,7 @@ def fuzzy_c_means(
     initial_guess: Optional[np.ndarray] = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Compute the fuzzy c-means clustering algorithm.
+    Compute the fuzzy c-means tribbleclustering algorithm.
 
     :param x: Input data points, shape (n_samples, n_features)
     :param n: Number of clusters

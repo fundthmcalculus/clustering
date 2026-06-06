@@ -36,5 +36,5 @@ dev = [
 "Bug Tracker" = "https://github.com/fundthmcalculus/clustering/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/clustering"]
+packages = ["src/tribbleclustering"]
 
