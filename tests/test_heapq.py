@@ -10,6 +10,23 @@ from tribbleclustering.pqvat import vat_prim_mst_numba
 from tribbleclustering.pcvat import vat_prim_mst_c, compute_vat_c
 
 
+def _bench(fn, arg, n_iter=15, warmup=2):
+    """Time `fn(arg)` repeatedly, returning per-call times in milliseconds.
+
+    Runs a few warmup calls (JIT compile / cache / thread-pool spin-up) that
+    are excluded from the sample, then collects `n_iter` individual timings so
+    the caller can compute a mean and a 2-sigma spread.
+    """
+    for _ in range(warmup):
+        fn(arg)
+    samples = np.empty(n_iter, dtype=np.float64)
+    for k in range(n_iter):
+        t0 = time.perf_counter()
+        fn(arg)
+        samples[k] = (time.perf_counter() - t0) * 1000.0
+    return samples
+
+
 @pytest.fixture
 def small_distance_matrix():
     """Create a small symmetric distance matrix for testing."""
@@ -184,115 +201,115 @@ class TestPerformance:
         assert numba_time > 0
 
     def test_vat_scaling_behavior(self):
-        """Test that performance scales reasonably with input size."""
+        """Compare full VAT pipeline: compute_vat (heapq) vs compute_vat_c.
+
+        Reports mean +/- 2 sigma (95% spread) in text and as a shaded band on
+        the plot, so timing noise (which dominates the small sizes) is visible.
+        """
         np.random.seed(42)
 
-        times_c = []
-        times_orig = []
-        sizes = [25, 100, 500, 1000, 2000, 5000, 10000,15000]
+        mean_c, two_sig_c = [], []
+        mean_orig, two_sig_orig = [], []
+        # sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000]
+        sizes = [25, 100, 500, 1000, 2000]
 
-        print('\nPerformance Scaling Comparison:')
-        print(f"{'Size':>6} | {'heapq ms':>10} | {'C ms':>10} | {'C/heapq':>9}")
-        print('-' * 72)
+        print('\ncompute_vat vs compute_vat_c  (mean +/- 2 sigma, ms):')
+        print(f"{'Size':>6} | {'heapq (ms)':>20} | {'C (ms)':>20} | {'C/heapq':>9}")
+        print('-' * 70)
 
         for size in sizes:
             data = np.random.randn(size, 5)
             distances = squareform(pdist(data, metric='euclidean')).astype(np.float64)
 
-            # Warm up all versions
-            compute_vat(distances)
-            compute_vat_c(distances)
+            s_orig = _bench(compute_vat, distances)
+            s_c = _bench(compute_vat_c, distances)
 
-            N = 5
-            start = time.time()
-            for _ in range(N):
-                compute_vat(distances)
-            elapsed_orig = time.time() - start
-            times_orig.append(elapsed_orig / N)
+            m_o, sd_o = float(s_orig.mean()), float(s_orig.std(ddof=1))
+            m_c, sd_c = float(s_c.mean()), float(s_c.std(ddof=1))
+            mean_orig.append(m_o); two_sig_orig.append(2 * sd_o)
+            mean_c.append(m_c); two_sig_c.append(2 * sd_c)
 
-            start = time.time()
-            for _ in range(N):
-                compute_vat_c(distances)
-            elapsed_c = time.time() - start
-            times_c.append(elapsed_c / N)
+            print(f"{size:>6} | {m_o:>9.3f} +/- {2*sd_o:>6.3f} | "
+                  f"{m_c:>9.3f} +/- {2*sd_c:>6.3f} | "
+                  f"{m_c/m_o:>8.2f}x{'✓' if m_c < m_o else 'X'}")
 
-            orig_ms = elapsed_orig / N * 1000
-            c_ms = elapsed_c / N * 1000
+        mean_orig = np.array(mean_orig); two_sig_orig = np.array(two_sig_orig)
+        mean_c = np.array(mean_c); two_sig_c = np.array(two_sig_c)
 
-            print(f"{size:>6} | {orig_ms:>10.3f} | {c_ms:>10.3f}"
-                  f" | {c_ms / orig_ms:>8.2f}x{'✓' if c_ms < orig_ms else '✗'}")
-
-        # Plot comparison
+        # Plot with 2-sigma shaded bands
         plt.figure()
-        plt.plot(sizes, [t * 1000 for t in times_orig], 's-', label='compute_vat (heapq)', linewidth=2, markersize=8)
-        plt.plot(sizes, [t * 1000 for t in times_c], '^-', label='compute_vat_c (C extension)', linewidth=2,
-                 markersize=8)
+        l1, = plt.plot(sizes, mean_orig, 's-', label='compute_vat (heapq)', linewidth=2, markersize=8)
+        plt.fill_between(sizes, np.maximum(mean_orig - two_sig_orig, 0.0), mean_orig + two_sig_orig,
+                         color=l1.get_color(), alpha=0.2, label=r'heapq $\pm 2\sigma$')
+        l2, = plt.plot(sizes, mean_c, '^-', label='compute_vat_c (C extension)', linewidth=2, markersize=8)
+        plt.fill_between(sizes, np.maximum(mean_c - two_sig_c, 0.0), mean_c + two_sig_c,
+                         color=l2.get_color(), alpha=0.2, label=r'C $\pm 2\sigma$')
         plt.xlabel('Matrix Size (n)', fontsize=12)
         plt.ylabel('Time (ms)', fontsize=12)
-        plt.title('Performance Comparison: Original vs C Extension', fontsize=14)
-        plt.legend(fontsize=11)
+        plt.title('compute_vat vs compute_vat_c (mean $\\pm 2\\sigma$)', fontsize=14)
+        plt.legend(fontsize=10)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig('vat_scaling_performance.png', dpi=150)
         print("\nPlot saved to 'vat_scaling_performance.png'")
 
         # Times should generally increase with size (not a strict requirement, but expected)
-        assert times_c[-1] >= times_c[-2]
+        assert mean_c[-1] >= mean_c[-2]
 
     def test_scaling_behavior(self):
-        """Test that performance scales reasonably with input size."""
-        import matplotlib.pyplot as plt
+        """Compare MST only: vat_prim_mst (heapq) vs vat_prim_mst_c.
 
+        Reports mean +/- 2 sigma in text and as a shaded band on the plot.
+        """
         np.random.seed(42)
 
-        times_orig = []
-        times_c = []
-        sizes = [25, 100, 500, 1000,2000,5000, 10000, 15000]
+        mean_orig, two_sig_orig = [], []
+        mean_c, two_sig_c = [], []
+        # sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000]
+        sizes = [25, 100, 500, 1000, 2000]
 
-        print('\nPerformance Scaling Comparison:')
-        print(f"{'Size':>6} | {'heapq ms':>10} | {'C ms':>10} | {'C/heapq':>9}")
-        print('-' * 72)
+        print('\nvat_prim_mst vs vat_prim_mst_c  (mean +/- 2 sigma, ms):')
+        print(f"{'Size':>6} | {'heapq (ms)':>20} | {'C (ms)':>20} | {'C/heapq':>9}")
+        print('-' * 70)
 
         for size in sizes:
             data = np.random.randn(size, 5)
             distances = squareform(pdist(data, metric='euclidean')).astype(np.float64)
 
-            # Warm up all versions
-            vat_prim_mst(distances)
-            vat_prim_mst_c(distances)
+            s_orig = _bench(vat_prim_mst, distances)
+            s_c = _bench(vat_prim_mst_c, distances)
 
-            N = 5
-            start = time.time()
-            for _ in range(N): vat_prim_mst(distances)
-            elapsed_orig = time.time() - start
-            times_orig.append(elapsed_orig / N)
+            m_o, sd_o = float(s_orig.mean()), float(s_orig.std(ddof=1))
+            m_c, sd_c = float(s_c.mean()), float(s_c.std(ddof=1))
+            mean_orig.append(m_o); two_sig_orig.append(2 * sd_o)
+            mean_c.append(m_c); two_sig_c.append(2 * sd_c)
 
-            start = time.time()
-            for _ in range(N): vat_prim_mst_c(distances)
-            elapsed_c = time.time() - start
-            times_c.append(elapsed_c / N)
+            print(f"{size:>6} | {m_o:>9.3f} +/- {2*sd_o:>6.3f} | "
+                  f"{m_c:>9.3f} +/- {2*sd_c:>6.3f} | "
+                  f"{m_c/m_o:>8.2f}x{'✓' if m_c < m_o else 'X'}")
 
-            orig_ms  = elapsed_orig  / N * 1000
-            c_ms     = elapsed_c     / N * 1000
+        mean_orig = np.array(mean_orig); two_sig_orig = np.array(two_sig_orig)
+        mean_c = np.array(mean_c); two_sig_c = np.array(two_sig_c)
 
-            print(f"{size:>6} | {orig_ms:>10.3f} | {c_ms:>10.3f}"
-                  f" | {c_ms/orig_ms:>8.2f}x{'✓' if c_ms < orig_ms else '✗'}")
-
-        # Plot comparison
+        # Plot with 2-sigma shaded bands
         plt.figure()
-        plt.plot(sizes, [t*1000 for t in times_orig], 's-', label='vat_prim_mst (heapq)', linewidth=2, markersize=8)
-        plt.plot(sizes, [t*1000 for t in times_c], '^-', label='vat_prim_mst_c (C extension)', linewidth=2, markersize=8)
+        l1, = plt.plot(sizes, mean_orig, 's-', label='vat_prim_mst (heapq)', linewidth=2, markersize=8)
+        plt.fill_between(sizes, np.maximum(mean_orig - two_sig_orig, 0.0), mean_orig + two_sig_orig,
+                         color=l1.get_color(), alpha=0.2, label=r'heapq $\pm 2\sigma$')
+        l2, = plt.plot(sizes, mean_c, '^-', label='vat_prim_mst_c (C extension)', linewidth=2, markersize=8)
+        plt.fill_between(sizes, np.maximum(mean_c - two_sig_c, 0.0), mean_c + two_sig_c,
+                         color=l2.get_color(), alpha=0.2, label=r'C $\pm 2\sigma$')
         plt.xlabel('Matrix Size (n)', fontsize=12)
         plt.ylabel('Time (ms)', fontsize=12)
-        plt.title('Performance Comparison: Numba vs Original vs C Extension', fontsize=14)
-        plt.legend(fontsize=11)
+        plt.title('vat_prim_mst vs vat_prim_mst_c (mean $\\pm 2\\sigma$)', fontsize=14)
+        plt.legend(fontsize=10)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig('scaling_performance.png', dpi=150)
         print("\nPlot saved to 'scaling_performance.png'")
 
         # Times should generally increase with size (not a strict requirement, but expected)
-        assert times_c[-1] >= times_c[-2]
+        assert mean_c[-1] >= mean_c[-2]
 
 
 class TestEdgeCases:
