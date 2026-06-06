@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:OMP_NUM_THREADS=32; .\\\\.venv\\\\Scripts\\\\python.exe tests\\\\_bench_omp.py; \"`n========\"; $env:OMP_NUM_THREADS=1; .\\\\.venv\\\\Scripts\\\\python.exe tests\\\\_bench_omp.py)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -c \"import importlib.util as u; [print\\(m, bool\\(u.find_spec\\(m\\)\\)\\) for m in ['setuptools','Cython','numpy','scipy']]\")",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -m pip install --quiet \"cython\" \"setuptools\" 2>&1)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -c \"import importlib.util as u; [print\\(m, bool\\(u.find_spec\\(m\\)\\)\\) for m in ['setuptools','Cython']]\")",
+      "PowerShell(cmd /c \"C:\\\\personal\\\\clustering\\\\build_test\\\\build.bat\" 2>&1 | Select-Object -Last 15)",
+      "PowerShell(New-Item *)"
+    ]
+  }
+}

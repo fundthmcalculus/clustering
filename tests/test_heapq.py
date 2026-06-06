@@ -210,8 +210,8 @@ class TestPerformance:
 
         mean_c, two_sig_c = [], []
         mean_orig, two_sig_orig = [], []
-        sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000]
-        # sizes = [25, 100, 500, 1000, 2000]
+        # sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000, 25000, 50000]
+        sizes = [25, 100, 500, 1000, 2000]
 
         print('\ncompute_vat vs compute_vat_c  (mean +/- 2 sigma, ms):')
         print(f"{'Size':>6} | {'heapq (ms)':>20} | {'C (ms)':>20} | {'C/heapq':>9}")
