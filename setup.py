@@ -46,6 +46,11 @@ extensions = [
         "tribbleclustering.pcvat",
         ["src/tribbleclustering/pcvat.pyx"],
         include_dirs=[numpy.get_include()],
+    ),
+    Extension(
+        "tribbleclustering.cfcm",
+        ["src/tribbleclustering/cfcm.pyx"],
+        include_dirs=[numpy.get_include()],
     )
 ]
 
