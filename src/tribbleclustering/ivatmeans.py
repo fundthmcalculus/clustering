@@ -19,7 +19,12 @@ class IVATMeans:
         self.labels_: Optional[ndarray] = None
         self._ivat_result = None
 
-    def fit(self, X: ndarray, y: Optional[ndarray] = None, sample_weight: Optional[ndarray] = None) -> "IVATMeans":
+    def fit(
+        self,
+        X: ndarray,
+        y: Optional[ndarray] = None,
+        sample_weight: Optional[ndarray] = None,
+    ) -> "IVATMeans":
         """
         Fit the IVAT clustering model.
 
@@ -47,7 +52,9 @@ class IVATMeans:
         distances = pairwise_distances(X)
         ivat_matrix, vat_matrix, _, vat_order = compute_ivat(distances, inplace=False)
 
-        self._ivat_result = get_ivat_levels(X, ivat_matrix, vat_order, n_levels=self.n_levels)
+        self._ivat_result = get_ivat_levels(
+            X, ivat_matrix, vat_order, n_levels=self.n_levels
+        )
 
         if self.n_levels == 1:
             result: IvatMeansResult = IvatMeansResult(self._ivat_result)
@@ -81,10 +88,17 @@ class IVATMeans:
         if X.ndim != 2:
             raise ValueError(f"X must be 2-dimensional, got shape {X.shape}")
 
-        distances = np.linalg.norm(X[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :], axis=2)
+        distances = np.linalg.norm(
+            X[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :], axis=2
+        )
         return np.argmin(distances, axis=1)
 
-    def fit_predict(self, X: ndarray, y: Optional[ndarray] = None, sample_weight: Optional[ndarray] = None) -> ndarray:
+    def fit_predict(
+        self,
+        X: ndarray,
+        y: Optional[ndarray] = None,
+        sample_weight: Optional[ndarray] = None,
+    ) -> ndarray:
         """
         Fit the model and predict cluster labels.
 

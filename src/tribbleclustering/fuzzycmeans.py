@@ -26,7 +26,12 @@ class FuzzyCMeans:
         self.labels_: Optional[ndarray] = None
         self.membership_matrix_: Optional[ndarray] = None
 
-    def fit(self, X: ndarray, y: Optional[ndarray] = None, sample_weight: Optional[ndarray] = None) -> "FuzzyCMeans":
+    def fit(
+        self,
+        X: ndarray,
+        y: Optional[ndarray] = None,
+        sample_weight: Optional[ndarray] = None,
+    ) -> "FuzzyCMeans":
         """
         Fit the Fuzzy C-Means clustering model.
 
@@ -80,10 +85,17 @@ class FuzzyCMeans:
         if X.ndim != 2:
             raise ValueError(f"X must be 2-dimensional, got shape {X.shape}")
 
-        distances = np.linalg.norm(X[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :], axis=2)
+        distances = np.linalg.norm(
+            X[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :], axis=2
+        )
         return np.argmin(distances, axis=1)
 
-    def fit_predict(self, X: ndarray, y: Optional[ndarray] = None, sample_weight: Optional[ndarray] = None) -> ndarray:
+    def fit_predict(
+        self,
+        X: ndarray,
+        y: Optional[ndarray] = None,
+        sample_weight: Optional[ndarray] = None,
+    ) -> ndarray:
         """
         Fit the model and predict cluster labels.
 
