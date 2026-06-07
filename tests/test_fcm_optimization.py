@@ -11,6 +11,7 @@ from tribbleclustering.fcm import fuzzy_c_means as fuzzy_c_means_python
 
 try:
     from tribbleclustering.cfcm import fuzzy_c_means as fuzzy_c_means_cython
+
     CYTHON_AVAILABLE = True
 except ImportError:
     CYTHON_AVAILABLE = False
@@ -24,17 +25,16 @@ def synthetic_data():
     n_features = 2
     n_clusters = 3
 
-    cluster_centers = np.array([
-        [0.0, 0.0],
-        [3.0, 3.0],
-        [0.0, 3.0]
-    ])
+    cluster_centers = np.array([[0.0, 0.0], [3.0, 3.0], [0.0, 3.0]])
 
-    x = np.vstack([
-        cluster_centers[0] + np.random.randn(n_samples // 3, n_features) * 0.5,
-        cluster_centers[1] + np.random.randn(n_samples // 3, n_features) * 0.5,
-        cluster_centers[2] + np.random.randn(n_samples - 2 * (n_samples // 3), n_features) * 0.5,
-    ]).astype(np.float64)
+    x = np.vstack(
+        [
+            cluster_centers[0] + np.random.randn(n_samples // 3, n_features) * 0.5,
+            cluster_centers[1] + np.random.randn(n_samples // 3, n_features) * 0.5,
+            cluster_centers[2]
+            + np.random.randn(n_samples - 2 * (n_samples // 3), n_features) * 0.5,
+        ]
+    ).astype(np.float64)
 
     return x, n_clusters
 
@@ -72,8 +72,12 @@ class TestFCMCorrectness:
         np.random.seed(42)
         initial_guess = x[:n_clusters].copy()
 
-        c_py, w_py = fuzzy_c_means_python(x, n_clusters, m=2.0, initial_guess=initial_guess)
-        c_cy, w_cy = fuzzy_c_means_cython(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        c_py, w_py = fuzzy_c_means_python(
+            x, n_clusters, m=2.0, initial_guess=initial_guess
+        )
+        c_cy, w_cy = fuzzy_c_means_cython(
+            x, n_clusters, m=2.0, initial_guess=initial_guess
+        )
 
         # With same initial guess, results should match closely
         # Note: very small differences may occur due to floating-point rounding
@@ -107,8 +111,12 @@ class TestFCMCorrectness:
         x, n_clusters = synthetic_data
         initial_guess = x[:n_clusters].copy()
 
-        c_py, w_py = fuzzy_c_means_python(x, n_clusters, m=2.0, initial_guess=initial_guess)
-        c_cy, w_cy = fuzzy_c_means_cython(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        c_py, w_py = fuzzy_c_means_python(
+            x, n_clusters, m=2.0, initial_guess=initial_guess
+        )
+        c_cy, w_cy = fuzzy_c_means_cython(
+            x, n_clusters, m=2.0, initial_guess=initial_guess
+        )
 
         # Tolerances account for floating-point rounding differences in computation
         assert_allclose(c_py, c_cy, rtol=1e-4, atol=1e-6)
@@ -120,8 +128,12 @@ class TestFCMCorrectness:
         initial_guess = x[:n_clusters].copy()
         indices = np.arange(n_clusters * 2)
 
-        with pytest.raises(ValueError, match="initial_guess and indices cannot both be provided"):
-            fuzzy_c_means_python(x, n_clusters, initial_guess=initial_guess, indices=indices)
+        with pytest.raises(
+            ValueError, match="initial_guess and indices cannot both be provided"
+        ):
+            fuzzy_c_means_python(
+                x, n_clusters, initial_guess=initial_guess, indices=indices
+            )
 
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_cython_error_both_indices_and_guess(self, synthetic_data):
@@ -130,8 +142,12 @@ class TestFCMCorrectness:
         initial_guess = x[:n_clusters].astype(np.float64).copy()
         indices = np.arange(n_clusters * 2, dtype=np.int64)
 
-        with pytest.raises(ValueError, match="initial_guess and indices cannot both be provided"):
-            fuzzy_c_means_cython(x, n_clusters, initial_guess=initial_guess, indices=indices)
+        with pytest.raises(
+            ValueError, match="initial_guess and indices cannot both be provided"
+        ):
+            fuzzy_c_means_cython(
+                x, n_clusters, initial_guess=initial_guess, indices=indices
+            )
 
     def test_python_different_m_values(self, synthetic_data):
         """Test Python implementation with different fuzziness parameters."""
@@ -180,8 +196,12 @@ class TestFCMPerformance:
         x = np.random.randn(1000, 10).astype(np.float64)
         n_clusters = 5
 
-        time_py = self._time_implementation(fuzzy_c_means_python, x, n_clusters, iterations=1)
-        time_cy = self._time_implementation(fuzzy_c_means_cython, x, n_clusters, iterations=1)
+        time_py = self._time_implementation(
+            fuzzy_c_means_python, x, n_clusters, iterations=1
+        )
+        time_cy = self._time_implementation(
+            fuzzy_c_means_cython, x, n_clusters, iterations=1
+        )
 
         print(f"\nMedium dataset (1000 samples, 10 features, 5 clusters):")
         print(f"  Python: {time_py:.4f}s")
@@ -197,8 +217,12 @@ class TestFCMPerformance:
         x = np.random.randn(5000, 10).astype(np.float64)
         n_clusters = 8
 
-        time_py = self._time_implementation(fuzzy_c_means_python, x, n_clusters, iterations=1)
-        time_cy = self._time_implementation(fuzzy_c_means_cython, x, n_clusters, iterations=1)
+        time_py = self._time_implementation(
+            fuzzy_c_means_python, x, n_clusters, iterations=1
+        )
+        time_cy = self._time_implementation(
+            fuzzy_c_means_cython, x, n_clusters, iterations=1
+        )
 
         print(f"\nLarge dataset (5000 samples, 10 features, 8 clusters):")
         print(f"  Python: {time_py:.4f}s")

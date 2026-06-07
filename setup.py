@@ -51,7 +51,7 @@ extensions = [
         "tribbleclustering.cfcm",
         ["src/tribbleclustering/cfcm.pyx"],
         include_dirs=[numpy.get_include()],
-    )
+    ),
 ]
 
 
