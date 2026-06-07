@@ -312,7 +312,11 @@ def _arg_max(a: ndarray, n: int = 1) -> ndarray:
 
 
 def get_ivat_levels(
-    all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1
+    all_cities: ndarray,
+    ivat_mst: ndarray,
+    vat_order: ndarray,
+    n_levels: int = 1,
+    n_clusters: int = -1,
 ) -> Union[IvatMeansResult, list[IvatMeansResult]]:
     """
     Extract multiple levels of clusterings from the iVAT matrix.
@@ -321,11 +325,21 @@ def get_ivat_levels(
         all_cities: Original data points (N, D)
         ivat_mst: iVAT distance matrix
         vat_order: Permutation indices from VAT/iVAT
-        n_levels: Number of hierarchical levels to extract
+        n_levels: Number of hierarchical levels to extract (exclusive with n_clusters)
+        n_clusters: Exact number of clusters to consider. If -1, use all possible clusters.
 
     Returns:
         A single IvatMeansResult if n_levels=1, or a list of them if n_levels > 1.
     """
+    if n_levels < 1:
+        raise ValueError("n_levels must be at least 1")
+    if n_clusters != -1 and n_levels != 1:
+        raise ValueError("n_levels and n_clusters cannot be used together")
+    if n_clusters != -1 and n_clusters < 1:
+        raise ValueError(
+            "n_clusters must be at least 1 or -1 for all possible clusters"
+        )
+
     # Look down the off-by-1 diagonal and count the number of substantial changes.
     diagonal_values = np.diag(ivat_mst, k=1)
     # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
@@ -335,28 +349,36 @@ def get_ivat_levels(
     )
     # Sort the diagonal values
     sorted_diagonal = np.sort(diagonal_values)
-    # Find the maximum difference and the index thereof
-    diagonal_diffs = np.diff(sorted_diagonal)
-    max_diff_indices = _arg_max(diagonal_diffs, n_levels)
-    peaks_threshold = sorted_diagonal[max_diff_indices + 1]
+    if n_clusters == -1:
+        # Find the maximum difference and the index thereof
+        diagonal_diffs = np.diff(sorted_diagonal)
+        max_diff_indices = _arg_max(diagonal_diffs, n_levels)
+        peaks_threshold = sorted_diagonal[max_diff_indices + 1]
 
-    # Sort peaks_threshold in decreasing order and reorder max_diff_indices accordingly
-    sort_order = np.argsort(peaks_threshold)[::-1]
-    peaks_threshold = peaks_threshold[sort_order]
-    max_diff_indices = max_diff_indices[sort_order]
+        # Sort peaks_threshold in decreasing order and reorder max_diff_indices accordingly
+        sort_order = np.argsort(peaks_threshold)[::-1]
+        peaks_threshold = peaks_threshold[sort_order]
+        max_diff_indices = max_diff_indices[sort_order]
+    elif n_clusters == 1:
+        # Pick higher than the highest value
+        peaks_threshold = [sorted_diagonal[-1] * 1.1]
+        max_diff_indices = [-1]
+    else:
+        # Since #clusters = #peaks+1, adjust indexing.
+        peaks_threshold = sorted_diagonal[-(n_clusters - 1) :]
+        max_diff_indices = [-1] * (n_clusters - 1)
 
     results = []
     for index, peak_th in enumerate(peaks_threshold):
         # Prevent weird floating-point comparisons.
-        abrupt_change_idx = np.where(diagonal_values >= 0.99 * peak_th)[0]
+        abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
 
         # Use each section as a cluster endpoint, inclusive.
         cluster_group = np.concatenate(
             [np.array([0]), abrupt_change_idx, np.array([len(all_cities)])]
         )
         cluster_city_indexs = []
-        for idx in range(0, len(cluster_group) - 1):
-            cg_start = cluster_group[idx]
+        for idx, cg_start in enumerate(cluster_group[:-1]):
             cg_end = cluster_group[idx + 1]
             if cg_start < cg_end:
                 # Use the VAT order to pick out the cities in each cluster

@@ -22,8 +22,8 @@ class IVATMeans:
     IVAT-based clustering algorithm with scikit-learn compatible interface.
     """
 
-    def __init__(self, n_levels: int = 1, random_state: Optional[int] = None):
-        self.n_levels = n_levels
+    def __init__(self, n_clusters: int = 2, random_state: Optional[int] = None):
+        self.n_clusters = n_clusters
         self.random_state = random_state
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
@@ -63,17 +63,12 @@ class IVATMeans:
         ivat_matrix, vat_matrix, _, vat_order = _compute_ivat(distances, inplace=False)
 
         self._ivat_result = get_ivat_levels(
-            X, ivat_matrix, vat_order, n_levels=self.n_levels
+            X, ivat_matrix, vat_order, n_levels=1, n_clusters=self.n_clusters
         )
 
-        if self.n_levels == 1:
-            result: IvatMeansResult = self._ivat_result
-            self.cluster_centers_ = result.initial_centroids
-            self.labels_ = self._assign_clusters(X)
-        else:
-            result = self._ivat_result[0]
-            self.cluster_centers_ = result.initial_centroids
-            self.labels_ = self._assign_clusters(X)
+        result: IvatMeansResult = self._ivat_result
+        self.cluster_centers_ = result.initial_centroids
+        self.labels_ = self._assign_clusters(X)
 
         return self
 
