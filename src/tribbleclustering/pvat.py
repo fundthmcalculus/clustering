@@ -312,7 +312,11 @@ def _arg_max(a: ndarray, n: int = 1) -> ndarray:
 
 
 def get_ivat_levels(
-    all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1, n_clusters: int = -1
+    all_cities: ndarray,
+    ivat_mst: ndarray,
+    vat_order: ndarray,
+    n_levels: int = 1,
+    n_clusters: int = -1,
 ) -> Union[IvatMeansResult, list[IvatMeansResult]]:
     """
     Extract multiple levels of clusterings from the iVAT matrix.
@@ -332,7 +336,9 @@ def get_ivat_levels(
     if n_clusters != -1 and n_levels != 1:
         raise ValueError("n_levels and n_clusters cannot be used together")
     if n_clusters != -1 and n_clusters < 1:
-        raise ValueError("n_clusters must be at least 1 or -1 for all possible clusters")
+        raise ValueError(
+            "n_clusters must be at least 1 or -1 for all possible clusters"
+        )
 
     # Look down the off-by-1 diagonal and count the number of substantial changes.
     diagonal_values = np.diag(ivat_mst, k=1)
@@ -359,9 +365,8 @@ def get_ivat_levels(
         max_diff_indices = [-1]
     else:
         # Since #clusters = #peaks+1, adjust indexing.
-        peaks_threshold = sorted_diagonal[-(n_clusters-1):]
-        max_diff_indices = [-1]*(n_clusters-1)
-
+        peaks_threshold = sorted_diagonal[-(n_clusters - 1) :]
+        max_diff_indices = [-1] * (n_clusters - 1)
 
     results = []
     for index, peak_th in enumerate(peaks_threshold):
