@@ -5,7 +5,7 @@
     "distutils": {
         "depends": [],
         "include_dirs": [
-            "C:\\personal\\clustering\\.venv\\Lib\\site-packages\\numpy\\_core\\include"
+            "C:\\Users\\sphillips\\AppData\\Local\\Temp\\build-env-y_ebsk7v\\Lib\\site-packages\\numpy\\_core\\include"
         ],
         "name": "tribbleclustering.pcvat",
         "sources": [
