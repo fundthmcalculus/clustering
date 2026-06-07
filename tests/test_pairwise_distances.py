@@ -6,6 +6,7 @@ C extension (`pairwise_distances_c_32` / `_c_64`) against:
 
 Run with:  pytest tests/test_pairwise_distances.py -v -s
 """
+
 import time
 
 import numpy as np
@@ -70,14 +71,18 @@ def large_data():
 class TestCorrectness:
     """Validate the C extension against scipy ground truth and numba."""
 
-    @pytest.mark.parametrize("fixture", ["tiny_data", "small_data", "medium_data", "large_data"])
+    @pytest.mark.parametrize(
+        "fixture", ["tiny_data", "small_data", "medium_data", "large_data"]
+    )
     def test_c64_matches_scipy(self, fixture, request):
         data = request.getfixturevalue(fixture).astype(np.float64)
         ref = _scipy_ref(data)
         out = pairwise_distances_c_64(data)
         np.testing.assert_allclose(out, ref, rtol=1e-12, atol=1e-12)
 
-    @pytest.mark.parametrize("fixture", ["tiny_data", "small_data", "medium_data", "large_data"])
+    @pytest.mark.parametrize(
+        "fixture", ["tiny_data", "small_data", "medium_data", "large_data"]
+    )
     def test_c32_matches_scipy(self, fixture, request):
         data = request.getfixturevalue(fixture).astype(np.float32)
         ref = _scipy_ref(data.astype(np.float64))
@@ -97,8 +102,12 @@ class TestCorrectness:
         np.testing.assert_array_equal(np.diag(out), np.zeros(out.shape[0]))
 
     def test_dtype_preserved(self, small_data):
-        assert pairwise_distances_c_64(small_data.astype(np.float64)).dtype == np.float64
-        assert pairwise_distances_c_32(small_data.astype(np.float32)).dtype == np.float32
+        assert (
+            pairwise_distances_c_64(small_data.astype(np.float64)).dtype == np.float64
+        )
+        assert (
+            pairwise_distances_c_32(small_data.astype(np.float32)).dtype == np.float32
+        )
 
     def test_dispatch_selects_by_dtype(self, small_data):
         out32 = pairwise_distances_c(small_data.astype(np.float32))
@@ -158,9 +167,13 @@ class TestPerformance:
         mean_c, two_sig_c = [], []
         mean_scipy, two_sig_scipy = [], []
 
-        print("\npairwise_distances: numba vs C/OpenMP vs scipy  (mean +/- 2 sigma, ms):")
-        print(f"{'Size':>6} | {'numba (ms)':>18} | {'C (ms)':>18} | "
-              f"{'scipy (ms)':>18} | {'C/numba':>8}")
+        print(
+            "\npairwise_distances: numba vs C/OpenMP vs scipy  (mean +/- 2 sigma, ms):"
+        )
+        print(
+            f"{'Size':>6} | {'numba (ms)':>18} | {'C (ms)':>18} | "
+            f"{'scipy (ms)':>18} | {'C/numba':>8}"
+        )
         print("-" * 86)
 
         for size in sizes:
@@ -173,26 +186,36 @@ class TestPerformance:
 
             # Correctness check alongside the benchmark.
             np.testing.assert_allclose(
-                pairwise_distances_c_64(data64), _scipy_ref(data64),
-                rtol=1e-10, atol=1e-10,
+                pairwise_distances_c_64(data64),
+                _scipy_ref(data64),
+                rtol=1e-10,
+                atol=1e-10,
             )
 
             m_n, sd_n = float(s_numba.mean()), float(s_numba.std(ddof=1))
             m_c, sd_c = float(s_c.mean()), float(s_c.std(ddof=1))
             m_s, sd_s = float(s_scipy.mean()), float(s_scipy.std(ddof=1))
 
-            mean_numba.append(m_n); two_sig_numba.append(2 * sd_n)
-            mean_c.append(m_c); two_sig_c.append(2 * sd_c)
-            mean_scipy.append(m_s); two_sig_scipy.append(2 * sd_s)
+            mean_numba.append(m_n)
+            two_sig_numba.append(2 * sd_n)
+            mean_c.append(m_c)
+            two_sig_c.append(2 * sd_c)
+            mean_scipy.append(m_s)
+            two_sig_scipy.append(2 * sd_s)
 
-            print(f"{size:>6} | {m_n:>9.3f} +/- {2*sd_n:>5.3f} | "
-                  f"{m_c:>9.3f} +/- {2*sd_c:>5.3f} | "
-                  f"{m_s:>9.3f} +/- {2*sd_s:>5.3f} | "
-                  f"{m_c/m_n:>7.2f}x{' (faster)' if m_c < m_n else ' (slower)'}")
+            print(
+                f"{size:>6} | {m_n:>9.3f} +/- {2*sd_n:>5.3f} | "
+                f"{m_c:>9.3f} +/- {2*sd_c:>5.3f} | "
+                f"{m_s:>9.3f} +/- {2*sd_s:>5.3f} | "
+                f"{m_c/m_n:>7.2f}x{' (faster)' if m_c < m_n else ' (slower)'}"
+            )
 
-        mean_numba = np.array(mean_numba); two_sig_numba = np.array(two_sig_numba)
-        mean_c = np.array(mean_c); two_sig_c = np.array(two_sig_c)
-        mean_scipy = np.array(mean_scipy); two_sig_scipy = np.array(two_sig_scipy)
+        mean_numba = np.array(mean_numba)
+        two_sig_numba = np.array(two_sig_numba)
+        mean_c = np.array(mean_c)
+        two_sig_c = np.array(two_sig_c)
+        mean_scipy = np.array(mean_scipy)
+        two_sig_scipy = np.array(two_sig_scipy)
 
         plt.figure()
         for mean, two_sig, marker, label in (
@@ -200,13 +223,22 @@ class TestPerformance:
             (mean_c, two_sig_c, "^-", "pairwise_distances_c (C/OpenMP)"),
             (mean_scipy, two_sig_scipy, "o-", "scipy pdist"),
         ):
-            line, = plt.plot(sizes, mean, marker, label=label, linewidth=2, markersize=7)
-            plt.fill_between(sizes, np.maximum(mean - two_sig, 0.0), mean + two_sig,
-                             color=line.get_color(), alpha=0.2)
+            (line,) = plt.plot(
+                sizes, mean, marker, label=label, linewidth=2, markersize=7
+            )
+            plt.fill_between(
+                sizes,
+                np.maximum(mean - two_sig, 0.0),
+                mean + two_sig,
+                color=line.get_color(),
+                alpha=0.2,
+            )
         plt.xlabel("Matrix Size (n)", fontsize=12)
         plt.ylabel("Time (ms)", fontsize=12)
-        plt.title("pairwise_distances: numba vs C/OpenMP vs scipy (mean $\\pm 2\\sigma$)",
-                  fontsize=13)
+        plt.title(
+            "pairwise_distances: numba vs C/OpenMP vs scipy (mean $\\pm 2\\sigma$)",
+            fontsize=13,
+        )
         plt.legend(fontsize=10)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()

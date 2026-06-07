@@ -32,7 +32,7 @@ def small_distance_matrix():
     """Create a small symmetric distance matrix for testing."""
     np.random.seed(42)
     data = np.random.randn(5, 2)
-    distances = squareform(pdist(data, metric='euclidean'))
+    distances = squareform(pdist(data, metric="euclidean"))
     return distances
 
 
@@ -41,7 +41,7 @@ def medium_distance_matrix():
     """Create a medium-sized symmetric distance matrix."""
     np.random.seed(42)
     data = np.random.randn(50, 5)
-    distances = squareform(pdist(data, metric='euclidean'))
+    distances = squareform(pdist(data, metric="euclidean"))
     return distances
 
 
@@ -50,7 +50,7 @@ def large_distance_matrix():
     """Create a large symmetric distance matrix."""
     np.random.seed(42)
     data = np.random.randn(200, 10)
-    distances = squareform(pdist(data, metric='euclidean'))
+    distances = squareform(pdist(data, metric="euclidean"))
     return distances
 
 
@@ -120,7 +120,7 @@ class TestCorrectness:
         """Test that algorithm handles symmetric matrices correctly."""
         np.random.seed(123)
         data = np.random.randn(10, 3)
-        distances = squareform(pdist(data, metric='euclidean'))
+        distances = squareform(pdist(data, metric="euclidean"))
 
         # Both should work on symmetric matrix
         heap_seq_orig, parent_seq_orig = vat_prim_mst(distances)
@@ -141,7 +141,9 @@ class TestCorrectness:
     def test_c_version_small_matrix_agreement(self, small_distance_matrix):
         """Test that C version matches original on small matrix."""
         heap_seq_orig, parent_seq_orig = vat_prim_mst(small_distance_matrix)
-        heap_seq_c, parent_seq_c = vat_prim_mst_c(small_distance_matrix.astype(np.float64))
+        heap_seq_c, parent_seq_c = vat_prim_mst_c(
+            small_distance_matrix.astype(np.float64)
+        )
 
         np.testing.assert_array_equal(heap_seq_orig, heap_seq_c)
         np.testing.assert_array_equal(parent_seq_orig, parent_seq_c)
@@ -149,7 +151,9 @@ class TestCorrectness:
     def test_c_version_medium_matrix_agreement(self, medium_distance_matrix):
         """Test that C version matches original on medium matrix."""
         heap_seq_orig, parent_seq_orig = vat_prim_mst(medium_distance_matrix)
-        heap_seq_c, parent_seq_c = vat_prim_mst_c(medium_distance_matrix.astype(np.float64))
+        heap_seq_c, parent_seq_c = vat_prim_mst_c(
+            medium_distance_matrix.astype(np.float64)
+        )
 
         np.testing.assert_array_equal(heap_seq_orig, heap_seq_c)
         np.testing.assert_array_equal(parent_seq_orig, parent_seq_c)
@@ -213,44 +217,76 @@ class TestPerformance:
         # sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000, 25000, 50000]
         sizes = [25, 100, 500, 1000, 2000]
 
-        print('\ncompute_vat vs compute_vat_c  (mean +/- 2 sigma, ms):')
+        print("\ncompute_vat vs compute_vat_c  (mean +/- 2 sigma, ms):")
         print(f"{'Size':>6} | {'heapq (ms)':>20} | {'C (ms)':>20} | {'C/heapq':>9}")
-        print('-' * 70)
+        print("-" * 70)
 
         for size in sizes:
             data = np.random.randn(size, 5)
-            distances = squareform(pdist(data, metric='euclidean')).astype(np.float32)
+            distances = squareform(pdist(data, metric="euclidean")).astype(np.float32)
 
             s_orig = _bench(compute_vat, distances)
             s_c = _bench(compute_vat_c, distances)
 
             m_o, sd_o = float(s_orig.mean()), float(s_orig.std(ddof=1))
             m_c, sd_c = float(s_c.mean()), float(s_c.std(ddof=1))
-            mean_orig.append(m_o); two_sig_orig.append(2 * sd_o)
-            mean_c.append(m_c); two_sig_c.append(2 * sd_c)
+            mean_orig.append(m_o)
+            two_sig_orig.append(2 * sd_o)
+            mean_c.append(m_c)
+            two_sig_c.append(2 * sd_c)
 
-            print(f"{size:>6} | {m_o:>9.3f} +/- {2*sd_o:>6.3f} | "
-                  f"{m_c:>9.3f} +/- {2*sd_c:>6.3f} | "
-                  f"{m_c/m_o:>8.2f}x{'✓' if m_c < m_o else 'X'}")
+            print(
+                f"{size:>6} | {m_o:>9.3f} +/- {2*sd_o:>6.3f} | "
+                f"{m_c:>9.3f} +/- {2*sd_c:>6.3f} | "
+                f"{m_c/m_o:>8.2f}x{'✓' if m_c < m_o else 'X'}"
+            )
 
-        mean_orig = np.array(mean_orig); two_sig_orig = np.array(two_sig_orig)
-        mean_c = np.array(mean_c); two_sig_c = np.array(two_sig_c)
+        mean_orig = np.array(mean_orig)
+        two_sig_orig = np.array(two_sig_orig)
+        mean_c = np.array(mean_c)
+        two_sig_c = np.array(two_sig_c)
 
         # Plot with 2-sigma shaded bands
         plt.figure()
-        l1, = plt.plot(sizes, mean_orig, 's-', label='compute_vat (heapq)', linewidth=2, markersize=8)
-        plt.fill_between(sizes, np.maximum(mean_orig - two_sig_orig, 0.0), mean_orig + two_sig_orig,
-                         color=l1.get_color(), alpha=0.2, label=r'heapq $\pm 2\sigma$')
-        l2, = plt.plot(sizes, mean_c, '^-', label='compute_vat_c (C extension)', linewidth=2, markersize=8)
-        plt.fill_between(sizes, np.maximum(mean_c - two_sig_c, 0.0), mean_c + two_sig_c,
-                         color=l2.get_color(), alpha=0.2, label=r'C $\pm 2\sigma$')
-        plt.xlabel('Matrix Size (n)', fontsize=12)
-        plt.ylabel('Time (ms)', fontsize=12)
-        plt.title('compute_vat vs compute_vat_c (mean $\\pm 2\\sigma$)', fontsize=14)
+        (l1,) = plt.plot(
+            sizes,
+            mean_orig,
+            "s-",
+            label="compute_vat (heapq)",
+            linewidth=2,
+            markersize=8,
+        )
+        plt.fill_between(
+            sizes,
+            np.maximum(mean_orig - two_sig_orig, 0.0),
+            mean_orig + two_sig_orig,
+            color=l1.get_color(),
+            alpha=0.2,
+            label=r"heapq $\pm 2\sigma$",
+        )
+        (l2,) = plt.plot(
+            sizes,
+            mean_c,
+            "^-",
+            label="compute_vat_c (C extension)",
+            linewidth=2,
+            markersize=8,
+        )
+        plt.fill_between(
+            sizes,
+            np.maximum(mean_c - two_sig_c, 0.0),
+            mean_c + two_sig_c,
+            color=l2.get_color(),
+            alpha=0.2,
+            label=r"C $\pm 2\sigma$",
+        )
+        plt.xlabel("Matrix Size (n)", fontsize=12)
+        plt.ylabel("Time (ms)", fontsize=12)
+        plt.title("compute_vat vs compute_vat_c (mean $\\pm 2\\sigma$)", fontsize=14)
         plt.legend(fontsize=10)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig('vat_scaling_performance.png', dpi=150)
+        plt.savefig("vat_scaling_performance.png", dpi=150)
         print("\nPlot saved to 'vat_scaling_performance.png'")
 
         # Times should generally increase with size (not a strict requirement, but expected)
@@ -268,44 +304,76 @@ class TestPerformance:
         # sizes = [25, 100, 500, 1000, 2000, 5000, 10000, 15000]
         sizes = [25, 100, 500, 1000, 2000]
 
-        print('\nvat_prim_mst vs vat_prim_mst_c  (mean +/- 2 sigma, ms):')
+        print("\nvat_prim_mst vs vat_prim_mst_c  (mean +/- 2 sigma, ms):")
         print(f"{'Size':>6} | {'heapq (ms)':>20} | {'C (ms)':>20} | {'C/heapq':>9}")
-        print('-' * 70)
+        print("-" * 70)
 
         for size in sizes:
             data = np.random.randn(size, 5)
-            distances = squareform(pdist(data, metric='euclidean')).astype(np.float64)
+            distances = squareform(pdist(data, metric="euclidean")).astype(np.float64)
 
             s_orig = _bench(vat_prim_mst, distances)
             s_c = _bench(vat_prim_mst_c, distances)
 
             m_o, sd_o = float(s_orig.mean()), float(s_orig.std(ddof=1))
             m_c, sd_c = float(s_c.mean()), float(s_c.std(ddof=1))
-            mean_orig.append(m_o); two_sig_orig.append(2 * sd_o)
-            mean_c.append(m_c); two_sig_c.append(2 * sd_c)
+            mean_orig.append(m_o)
+            two_sig_orig.append(2 * sd_o)
+            mean_c.append(m_c)
+            two_sig_c.append(2 * sd_c)
 
-            print(f"{size:>6} | {m_o:>9.3f} +/- {2*sd_o:>6.3f} | "
-                  f"{m_c:>9.3f} +/- {2*sd_c:>6.3f} | "
-                  f"{m_c/m_o:>8.2f}x{'✓' if m_c < m_o else 'X'}")
+            print(
+                f"{size:>6} | {m_o:>9.3f} +/- {2*sd_o:>6.3f} | "
+                f"{m_c:>9.3f} +/- {2*sd_c:>6.3f} | "
+                f"{m_c/m_o:>8.2f}x{'✓' if m_c < m_o else 'X'}"
+            )
 
-        mean_orig = np.array(mean_orig); two_sig_orig = np.array(two_sig_orig)
-        mean_c = np.array(mean_c); two_sig_c = np.array(two_sig_c)
+        mean_orig = np.array(mean_orig)
+        two_sig_orig = np.array(two_sig_orig)
+        mean_c = np.array(mean_c)
+        two_sig_c = np.array(two_sig_c)
 
         # Plot with 2-sigma shaded bands
         plt.figure()
-        l1, = plt.plot(sizes, mean_orig, 's-', label='vat_prim_mst (heapq)', linewidth=2, markersize=8)
-        plt.fill_between(sizes, np.maximum(mean_orig - two_sig_orig, 0.0), mean_orig + two_sig_orig,
-                         color=l1.get_color(), alpha=0.2, label=r'heapq $\pm 2\sigma$')
-        l2, = plt.plot(sizes, mean_c, '^-', label='vat_prim_mst_c (C extension)', linewidth=2, markersize=8)
-        plt.fill_between(sizes, np.maximum(mean_c - two_sig_c, 0.0), mean_c + two_sig_c,
-                         color=l2.get_color(), alpha=0.2, label=r'C $\pm 2\sigma$')
-        plt.xlabel('Matrix Size (n)', fontsize=12)
-        plt.ylabel('Time (ms)', fontsize=12)
-        plt.title('vat_prim_mst vs vat_prim_mst_c (mean $\\pm 2\\sigma$)', fontsize=14)
+        (l1,) = plt.plot(
+            sizes,
+            mean_orig,
+            "s-",
+            label="vat_prim_mst (heapq)",
+            linewidth=2,
+            markersize=8,
+        )
+        plt.fill_between(
+            sizes,
+            np.maximum(mean_orig - two_sig_orig, 0.0),
+            mean_orig + two_sig_orig,
+            color=l1.get_color(),
+            alpha=0.2,
+            label=r"heapq $\pm 2\sigma$",
+        )
+        (l2,) = plt.plot(
+            sizes,
+            mean_c,
+            "^-",
+            label="vat_prim_mst_c (C extension)",
+            linewidth=2,
+            markersize=8,
+        )
+        plt.fill_between(
+            sizes,
+            np.maximum(mean_c - two_sig_c, 0.0),
+            mean_c + two_sig_c,
+            color=l2.get_color(),
+            alpha=0.2,
+            label=r"C $\pm 2\sigma$",
+        )
+        plt.xlabel("Matrix Size (n)", fontsize=12)
+        plt.ylabel("Time (ms)", fontsize=12)
+        plt.title("vat_prim_mst vs vat_prim_mst_c (mean $\\pm 2\\sigma$)", fontsize=14)
         plt.legend(fontsize=10)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig('scaling_performance.png', dpi=150)
+        plt.savefig("scaling_performance.png", dpi=150)
         print("\nPlot saved to 'scaling_performance.png'")
 
         # Times should generally increase with size (not a strict requirement, but expected)
@@ -352,11 +420,9 @@ class TestEdgeCases:
 
     def test_multiple_equal_max_values(self):
         """Test when distance matrix has multiple equal maximum values."""
-        dist = np.array([
-            [0.0, 5.0, 3.0],
-            [5.0, 0.0, 5.0],
-            [3.0, 5.0, 0.0]
-        ], dtype=np.float64)
+        dist = np.array(
+            [[0.0, 5.0, 3.0], [5.0, 0.0, 5.0], [3.0, 5.0, 0.0]], dtype=np.float64
+        )
 
         heap_seq, parent_seq = vat_prim_mst_numba(dist)
 

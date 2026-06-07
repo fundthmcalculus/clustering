@@ -7,7 +7,11 @@ from matplotlib.animation import FuncAnimation
 from numpy import ndarray
 from scipy.spatial import Voronoi, voronoi_plot_2d, QhullError
 
-from tribbleclustering.util import pairwise_distances, circle_random_clusters, _random_cities
+from tribbleclustering.util import (
+    pairwise_distances,
+    circle_random_clusters,
+    _random_cities,
+)
 from tribbleclustering import (
     compute_ivat,
     fcm,
@@ -19,14 +23,14 @@ from tribbleclustering import (
 
 
 def _hierarchical_circle_clusters(
-        clusters_per_level: list[int],
-        diameters_per_level: list[float],
+    clusters_per_level: list[int],
+    diameters_per_level: list[float],
 ) -> np.ndarray:
     """
     Create hierarchical clusters arranged in circles around circles recursively.
 
     Args:
-        clusters_per_level: Number of clusters at each hierarchical level (e.g., [3, 4, 5] means 3 top-level clusters, 
+        clusters_per_level: Number of clusters at each hierarchical level (e.g., [3, 4, 5] means 3 top-level clusters,
                            each containing 4 mid-level clusters, each containing 5 leaf clusters)
         diameters_per_level: Diameter for clusters at each level
 
@@ -37,7 +41,9 @@ def _hierarchical_circle_clusters(
         ValueError: If configuration would create more than 16000 points
     """
     if len(clusters_per_level) != len(diameters_per_level):
-        raise ValueError("clusters_per_level and diameters_per_level must have the same length")
+        raise ValueError(
+            "clusters_per_level and diameters_per_level must have the same length"
+        )
 
     # Calculate total number of points
     total_points = np.prod(clusters_per_level)
@@ -49,20 +55,18 @@ def _hierarchical_circle_clusters(
         )
 
     def _create_level(
-            center_x: float,
-            center_y: float,
-            level_idx: int,
+        center_x: float,
+        center_y: float,
+        level_idx: int,
     ) -> np.ndarray:
         """Recursively create clusters at the current level"""
         n_clusters = clusters_per_level[level_idx]
         diameter = diameters_per_level[level_idx]
         # Last level gets a bit of noise
-        if level_idx == len(clusters_per_level)-1:
+        if level_idx == len(clusters_per_level) - 1:
             # Base case: create leaf points
             return _random_cities(
-                center_x, center_y,
-                n_cities=n_clusters,
-                cluster_diameter=diameter
+                center_x, center_y, n_cities=n_clusters, cluster_diameter=diameter
             )
 
         all_points = np.zeros(shape=(0, 2), dtype=np.float32)
@@ -73,7 +77,7 @@ def _hierarchical_circle_clusters(
             sub_cy = center_y + diameter * np.sin(theta)
 
             # Recursively create points for this sub-cluster
-            sub_points = _create_level(sub_cx, sub_cy,level_idx + 1)
+            sub_points = _create_level(sub_cx, sub_cy, level_idx + 1)
 
             all_points = np.concatenate((all_points, sub_points), axis=0)
 
@@ -153,8 +157,7 @@ def test_heirarchy_ivat_means():
     """Test hierarchical circle clusters with iVAT and FCM"""
     # Example: 3 top-level clusters, each with 4 mid-level, each with 5 leaf clusters (3*4*5*10 = 600 points)
     all_cities = _hierarchical_circle_clusters(
-        clusters_per_level=[3, 4, 5],
-        diameters_per_level=[15.0, 5.0, 1.0]
+        clusters_per_level=[3, 4, 5], diameters_per_level=[15.0, 5.0, 1.0]
     )
 
     # Scramble the order of the cities
@@ -171,18 +174,20 @@ def test_heirarchy_ivat_means():
     res = get_ivat_levels(all_cities, ivat_mst, vat_order, n_levels=3)
     # Run FCM with iVAT-derived initial guess
     n_clusters = len(res[0].initial_centroids)
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res[0].initial_centroids)
+    meth_c, w_c = fcm.fuzzy_c_means(
+        all_cities, n_clusters, 2, initial_guess=res[0].initial_centroids
+    )
 
     print(f"Detected {n_clusters} clusters using iVAT")
 
     # Test hierarchy
     root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=3)
     assert len(root.children) == len(res[0].cluster_city_ids)
-    
+
     # Check tree structure (recursive count of leaves or similar)
     def count_nodes(node):
         return 1 + sum(count_nodes(child) for child in node.children)
-    
+
     print(f"Hierarchy tree has {count_nodes(root)} nodes")
 
     # Visualize results
@@ -241,7 +246,7 @@ def test_multi_dim_pairwise_dist_perf():
         sizes_arr = np.array(sizes)
         times_arr = np.array(times)
 
-        ax.plot(sizes, times, marker='o', label=f'L2-only={norm} (data)', linewidth=2)
+        ax.plot(sizes, times, marker="o", label=f"L2-only={norm} (data)", linewidth=2)
 
         # Fit quadratic polynomial (degree 2)
         quadratic_coeffs = np.polyfit(sizes_arr, times_arr, 2)
@@ -251,14 +256,18 @@ def test_multi_dim_pairwise_dist_perf():
         x_smooth = np.linspace(min(sizes), max(sizes), 200)
 
         # Plot polynomial fits
-        ax.plot(x_smooth, quadratic_poly(x_smooth),
-                linestyle='--',
-                label=f'L2-only={norm} (quadratic fit): {quadratic_coeffs[0]:.2e}x² + {quadratic_coeffs[1]:.2e}x + {quadratic_coeffs[2]:.2e}',
-                linewidth=1.5, alpha=0.7)
+        ax.plot(
+            x_smooth,
+            quadratic_poly(x_smooth),
+            linestyle="--",
+            label=f"L2-only={norm} (quadratic fit): {quadratic_coeffs[0]:.2e}x² + {quadratic_coeffs[1]:.2e}x + {quadratic_coeffs[2]:.2e}",
+            linewidth=1.5,
+            alpha=0.7,
+        )
 
-    ax.set_xlabel('Data Size', fontsize=12)
-    ax.set_ylabel('Time (seconds)', fontsize=12)
-    ax.set_title('Pairwise Distance Computation Performance', fontsize=14)
+    ax.set_xlabel("Data Size", fontsize=12)
+    ax.set_ylabel("Time (seconds)", fontsize=12)
+    ax.set_title("Pairwise Distance Computation Performance", fontsize=14)
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -278,11 +287,24 @@ def test_multi_dim_pairwise_dist_perf():
         ratios.append(time_f / time_t)
         ratio_sizes.append(size_f)
 
-    ax_ratio.plot(ratio_sizes, ratios, marker='o', linewidth=2, label='Ratio (L2-only=False / L2-only=True)')
-    ax_ratio.axhline(y=np.mean(ratios), color='r', linestyle='--', label=f'Mean Ratio: {np.mean(ratios):.2f}')
-    ax_ratio.set_xlabel('Data Size', fontsize=12)
-    ax_ratio.set_ylabel('Time Ratio (False/True)', fontsize=12)
-    ax_ratio.set_title('Performance Ratio: Full Distance Matrix vs L2-Norm Only', fontsize=14)
+    ax_ratio.plot(
+        ratio_sizes,
+        ratios,
+        marker="o",
+        linewidth=2,
+        label="Ratio (L2-only=False / L2-only=True)",
+    )
+    ax_ratio.axhline(
+        y=np.mean(ratios),
+        color="r",
+        linestyle="--",
+        label=f"Mean Ratio: {np.mean(ratios):.2f}",
+    )
+    ax_ratio.set_xlabel("Data Size", fontsize=12)
+    ax_ratio.set_ylabel("Time Ratio (False/True)", fontsize=12)
+    ax_ratio.set_title(
+        "Performance Ratio: Full Distance Matrix vs L2-Norm Only", fontsize=14
+    )
     ax_ratio.legend()
     ax_ratio.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -295,7 +317,10 @@ def test_fuzzy_c_means():
     n_clusters: int = 16
     n_cities: int = n_total // n_clusters
     all_cities = circle_random_clusters(
-        n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
+        n_clusters=n_clusters,
+        n_cities=n_cities,
+        cluster_spacing=5,
+        cluster_diameter=0.5,
     )
     # Scramble the order of the cities
     scramble_order = np.random.permutation(len(all_cities))
@@ -319,11 +344,13 @@ def test_fuzzy_c_means():
 
     # Time the single FCM call
     start_single = time.time()
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities, n_clusters, 2, initial_guess=res.initial_centroids)
+    meth_c, w_c = fcm.fuzzy_c_means(
+        all_cities, n_clusters, 2, initial_guess=res.initial_centroids
+    )
     mid_single = time.time()
     _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
     end_single = time.time()
-    _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2, method='gd')
+    _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2, method="gd")
     end_gd = time.time()
     smart_fcm_time = mid_single - start_single
     single_fcm_time = end_single - mid_single
@@ -368,8 +395,9 @@ def test_fuzzy_c_means():
     plt.show()
 
 
-def plot_membership(all_cities: ndarray, cluster_city_ids: list[Any],
-                    meth_c: ndarray, w_c: ndarray):
+def plot_membership(
+    all_cities: ndarray, cluster_city_ids: list[Any], meth_c: ndarray, w_c: ndarray
+):
     # Create a color map for clusters
     colors = plt.cm.rainbow(np.linspace(0, 1, meth_c.shape[0]))
 
@@ -495,21 +523,21 @@ def test_ivat_hierarchy_logic():
     cluster1 = np.random.randn(10, 2) + [10, 10]
     cluster1[:5] += [1, 1]
     cluster1[5:] += [-1, -1]
-    
+
     cluster2 = np.random.randn(10, 2) + [-10, -10]
     cluster2[:5] += [1, 1]
     cluster2[5:] += [-1, -1]
-    
+
     all_cities = np.vstack([cluster1, cluster2])
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
-    
+
     # We want 2 levels: level 1 should have 2 clusters, level 2 should have 4 clusters
     root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=2)
-    
+
     # We should have a root with some children
     assert len(root.children) >= 2
-    
+
     # Check that children of root are parents of the next level
     total_grandchildren = 0
     for child in root.children:
@@ -517,7 +545,7 @@ def test_ivat_hierarchy_logic():
         # Check that children indices are subset of parent indices
         for grandchild in child.children:
             assert np.all(np.isin(grandchild.indices, child.indices))
-            
+
     assert total_grandchildren > len(root.children)
 
 
@@ -545,19 +573,23 @@ def plot_tree(root: ClusterNode):
             for child in node.children:
                 child_width = get_width(child)
                 norm_child_width = (child_width / total_child_width) * width
-                assign_pos(child, depth + 1, current_left, current_left + norm_child_width)
+                assign_pos(
+                    child, depth + 1, current_left, current_left + norm_child_width
+                )
                 current_left += norm_child_width
 
     assign_pos(root, 0, 0, 1)
 
     def draw(node):
         x, y = positions[id(node)]
-        ax.scatter(x, y, s=500, c='skyblue', edgecolors='black', zorder=2)
-        ax.text(x, y, str(len(node.indices)), ha='center', va='center', fontsize=8, zorder=3)
+        ax.scatter(x, y, s=500, c="skyblue", edgecolors="black", zorder=2)
+        ax.text(
+            x, y, str(len(node.indices)), ha="center", va="center", fontsize=8, zorder=3
+        )
 
         for child in node.children:
             cx, cy = positions[id(child)]
-            ax.plot([x, cx], [y, cy], c='gray', zorder=1, alpha=0.5)
+            ax.plot([x, cx], [y, cy], c="gray", zorder=1, alpha=0.5)
             draw(child)
 
     draw(root)
@@ -588,12 +620,19 @@ def animate_hierarchical_clustering(all_cities, root: ClusterNode):
 
         for i, node in enumerate(nodes):
             points = all_cities[node.indices]
-            ax.scatter(points[:, 0], points[:, 1], color=colors[i], label=f'Cluster {i}', s=15, alpha=0.6)
+            ax.scatter(
+                points[:, 0],
+                points[:, 1],
+                color=colors[i],
+                label=f"Cluster {i}",
+                s=15,
+                alpha=0.6,
+            )
 
         ax.set_title(f"Hierarchy Level {frame} ({len(nodes)} clusters)")
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         if len(nodes) < 10:
-            ax.legend(loc='upper right', markerscale=2)
+            ax.legend(loc="upper right", markerscale=2)
 
     anim = FuncAnimation(fig, update, frames=len(levels), interval=1500, repeat=True)
     return anim
@@ -603,8 +642,7 @@ def test_visualize_hierarchy():
     """Test and visualize the hierarchical breakdown with a tree plot and animation."""
     # 3 top-level clusters, each with 3 sub-clusters, each with 5 points (3*3*5 = 45 points)
     all_cities = _hierarchical_circle_clusters(
-        clusters_per_level=[3, 3, 5],
-        diameters_per_level=[20.0, 5.0, 1.0]
+        clusters_per_level=[3, 3, 5], diameters_per_level=[20.0, 5.0, 1.0]
     )
 
     # Scramble the order
@@ -623,8 +661,8 @@ def test_visualize_hierarchy():
     anim = animate_hierarchical_clustering(all_cities, root)
 
     # In a real test environment, we might save these
-    anim.save('hierarchy_animation.gif', writer='imagemagick')
-    fig_tree.savefig('hierarchy_tree.png')
+    anim.save("hierarchy_animation.gif", writer="imagemagick")
+    fig_tree.savefig("hierarchy_tree.png")
 
     plt.show()
     assert len(root.children) > 0

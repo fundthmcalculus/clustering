@@ -10,10 +10,10 @@ import numpy
 # all (baseline SSE2 only). Select flags by compiler at build time instead.
 COMPILE_ARGS = {
     "msvc": [
-        "/O2",          # max speed (MSVC has no /O3)
-        "/arch:AVX2",   # emit AVX2 + FMA SIMD — the Windows equivalent of -march=native
-        "/fp:fast",     # relaxed FP, lets the vectorizer fuse/reorder (~ -ffast-math)
-        "/openmp",      # OpenMP (links VCOMP140)
+        "/O2",  # max speed (MSVC has no /O3)
+        "/arch:AVX2",  # emit AVX2 + FMA SIMD — the Windows equivalent of -march=native
+        "/fp:fast",  # relaxed FP, lets the vectorizer fuse/reorder (~ -ffast-math)
+        "/openmp",  # OpenMP (links VCOMP140)
     ],
     "unix": [
         "-O3",
@@ -23,7 +23,7 @@ COMPILE_ARGS = {
     ],
 }
 LINK_ARGS = {
-    "msvc": [],             # /openmp pulls in the runtime automatically
+    "msvc": [],  # /openmp pulls in the runtime automatically
     "unix": ["-fopenmp"],
 }
 
@@ -52,6 +52,7 @@ extensions = [
 
 def _cythonize(exts):
     from Cython.Build import cythonize
+
     return cythonize(exts, language_level="3")
 
 

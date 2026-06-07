@@ -81,12 +81,15 @@ def vat_prim_mst_numba(
                 right = 2 * idx + 2
 
                 if left < heap_len:
-                    if (heap_keys[left] < key_at_idx or
-                        (heap_keys[left] == key_at_idx and heap_u[left] < u_at_idx)):
+                    if heap_keys[left] < key_at_idx or (
+                        heap_keys[left] == key_at_idx and heap_u[left] < u_at_idx
+                    ):
                         smallest = left
                 if right < heap_len:
-                    if (heap_keys[right] < heap_keys[smallest] or
-                        (heap_keys[right] == heap_keys[smallest] and heap_u[right] < heap_u[smallest])):
+                    if heap_keys[right] < heap_keys[smallest] or (
+                        heap_keys[right] == heap_keys[smallest]
+                        and heap_u[right] < heap_u[smallest]
+                    ):
                         smallest = right
 
                 if smallest != idx:
@@ -133,8 +136,9 @@ def vat_prim_mst_numba(
                 parent = (idx - 1) // 2
                 parent_key = heap_keys[parent]
                 parent_u = heap_u[parent]
-                if (saved_key < parent_key or
-                    (saved_key == parent_key and saved_u < parent_u)):
+                if saved_key < parent_key or (
+                    saved_key == parent_key and saved_u < parent_u
+                ):
                     heap_keys[idx] = parent_key
                     heap_u[idx] = parent_u
                     heap_v[idx] = heap_v[parent]

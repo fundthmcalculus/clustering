@@ -8,6 +8,7 @@ from tribbleclustering.pcvat import compute_vat_c, pairwise_distances_c
 
 print("\n")
 
+
 def to_np_array(data: pd.DataFrame) -> np.ndarray:
     y = data.to_numpy(np.float32)
     return y
