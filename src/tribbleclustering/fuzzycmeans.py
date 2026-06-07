@@ -1,9 +1,14 @@
-from typing import Optional, Literal
+from typing import Optional
 
 import numpy as np
 from numpy import ndarray
 
-from .fcm import fuzzy_c_means as fcm_algorithm
+try:
+    from .cfcm import fuzzy_c_means as fcm_algorithm
+    _has_compiled_fcm = True
+except ImportError:
+    from .fcm import fuzzy_c_means as fcm_algorithm
+    _has_compiled_fcm = False
 
 
 class FuzzyCMeans:
@@ -15,12 +20,10 @@ class FuzzyCMeans:
         self,
         n_clusters: int,
         m: float = 2.0,
-        method: Literal["gd", "iter"] = "iter",
         random_state: Optional[int] = None,
     ):
         self.n_clusters = n_clusters
         self.m = m
-        self.method = method
         self.random_state = random_state
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
@@ -57,7 +60,7 @@ class FuzzyCMeans:
             np.random.seed(self.random_state)
 
         self.cluster_centers_, self.membership_matrix_ = fcm_algorithm(
-            X, self.n_clusters, m=self.m, method=self.method
+            X, self.n_clusters, m=self.m
         )
 
         self.labels_ = self._get_hard_labels()

@@ -4,7 +4,15 @@ import numpy as np
 from numpy import ndarray
 
 from .pvat import compute_ivat, get_ivat_levels, IvatMeansResult
-from .util import pairwise_distances
+
+try:
+    from .pcvat import pairwise_distances_c as _pairwise_distances
+    from .pcvat import compute_ivat_c as _compute_ivat
+    _has_compiled_distances = True
+except ImportError:
+    from .util import pairwise_distances as _pairwise_distances
+    from .pvat import compute_ivat as _compute_ivat
+    _has_compiled_distances = False
 
 
 class IVATMeans:
@@ -49,7 +57,7 @@ class IVATMeans:
         if self.random_state is not None:
             np.random.seed(self.random_state)
 
-        distances = pairwise_distances(X)
+        distances = _pairwise_distances(X)
         ivat_matrix, vat_matrix, _, vat_order = compute_ivat(distances, inplace=False)
 
         self._ivat_result = get_ivat_levels(
@@ -57,11 +65,11 @@ class IVATMeans:
         )
 
         if self.n_levels == 1:
-            result: IvatMeansResult = IvatMeansResult(self._ivat_result)
+            result: IvatMeansResult = self._ivat_result
             self.cluster_centers_ = result.initial_centroids
             self.labels_ = self._assign_clusters(X)
         else:
-            result = IvatMeansResult(self._ivat_result[0])
+            result = self._ivat_result[0]
             self.cluster_centers_ = result.initial_centroids
             self.labels_ = self._assign_clusters(X)
 
