@@ -5,9 +5,11 @@ from numpy import ndarray
 
 try:
     from .cfcm import fuzzy_c_means as fcm_algorithm
+
     _has_compiled_fcm = True
 except ImportError:
     from .fcm import fuzzy_c_means as fcm_algorithm
+
     _has_compiled_fcm = False
 
 

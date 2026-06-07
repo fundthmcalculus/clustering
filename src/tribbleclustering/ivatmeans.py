@@ -8,10 +8,12 @@ from .pvat import get_ivat_levels, IvatMeansResult
 try:
     from .pcvat import pairwise_distances_c as _pairwise_distances
     from .pcvat import compute_ivat_c as _compute_ivat
+
     _has_compiled_distances = True
 except ImportError:
     from .util import pairwise_distances as _pairwise_distances
     from .pvat import compute_ivat as _compute_ivat
+
     _has_compiled_distances = False
 
 
