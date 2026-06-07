@@ -350,11 +350,8 @@ def test_fuzzy_c_means():
     mid_single = time.time()
     _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2)
     end_single = time.time()
-    _, _ = fcm.fuzzy_c_means(all_cities, n_clusters, 2, method="gd")
-    end_gd = time.time()
     smart_fcm_time = mid_single - start_single
     single_fcm_time = end_single - mid_single
-    iter_fcm_time = end_gd - end_single
     single_ivat_time = start_single - start_ivat
 
     # Print performance comparison
@@ -363,7 +360,6 @@ def test_fuzzy_c_means():
     print(f"{'=' * 60}")
     print(f"Elbow Method (n=2 to {n_clusters}): {elbow_time:.4f} seconds")
     print(f"Single iter-FCM (n={n_clusters}):     {single_fcm_time:.4f} seconds")
-    print(f"Single GD-FCM (n={n_clusters}):     {iter_fcm_time:.4f} seconds")
     print(f"Smart FCM (n={n_clusters}):     {smart_fcm_time:.4f} seconds")
     print(f"IVAT (n={n_clusters}):           {single_ivat_time:.4f} seconds")
     print(f"Time difference:          {elbow_time - single_ivat_time:.4f} seconds")
