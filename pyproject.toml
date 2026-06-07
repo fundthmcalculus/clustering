@@ -28,7 +28,8 @@ dev = [
     "pandas-stubs~=3.0.3",
     "matplotlib",
     "pytest",
-    "black"
+    "black",
+    "scipy"
 ]
 
 [project.urls]
