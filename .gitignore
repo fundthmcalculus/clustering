@@ -146,3 +146,6 @@ cython_debug/
 
 # PyCharm
 .idea/
+/src/tribbleclustering/cfcm.c
+/src/tribbleclustering/pcvat.c
+/.claude/settings.local.json

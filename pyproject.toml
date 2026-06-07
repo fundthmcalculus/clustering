@@ -11,14 +11,13 @@ authors = [
 description = "An optimized Visualization Assessment Tendency (VAT/IVAT) and fuzzy clustering (FCM) package"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
     "numba",
     "numpy>=2.4.6",
-    "scipy>=1.17.1",
     "numba-progress>=1.2.0",
     "matplotlib>=3.10.9",
 ]
@@ -29,7 +28,8 @@ dev = [
     "pandas-stubs~=3.0.3",
     "matplotlib",
     "pytest",
-    "black"
+    "black",
+    "scipy"
 ]
 
 [project.urls]
