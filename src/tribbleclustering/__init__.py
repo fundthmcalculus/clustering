@@ -12,3 +12,6 @@ from .pvat import (
 from .util import pairwise_distances
 
 from .fcm import fuzzy_c_means
+
+from .ivatmeans import IVATMeans
+from .fuzzycmeans import FuzzyCMeans
