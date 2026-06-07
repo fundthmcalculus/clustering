@@ -26,7 +26,10 @@ def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
 
 
 def _get_v_ij(w_ij: ndarray, m: float, x: ndarray) -> ndarray:
-    v_ij = np.sum(w_ij[:, :, np.newaxis]**m * (x[:, np.newaxis, :]), axis=0) / np.sum(w_ij ** m, axis=0)[:, np.newaxis]
+    v_ij = (
+        np.sum(w_ij[:, :, np.newaxis] ** m * (x[:, np.newaxis, :]), axis=0)
+        / np.sum(w_ij**m, axis=0)[:, np.newaxis]
+    )
     return v_ij
 
 
@@ -35,9 +38,9 @@ def fuzzy_c_means(
     n: int,
     m: float = 2.0,
     *,
-    method: Literal["gd","iter"] = "iter",
+    method: Literal["gd", "iter"] = "iter",
     indices: Optional[np.ndarray | list[int]] = None,
-    initial_guess: Optional[np.ndarray] = None
+    initial_guess: Optional[np.ndarray] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute the fuzzy c-means tribbleclustering algorithm.

@@ -42,7 +42,9 @@ def compute_ivat(
     return d_p_star, d_star, argmin_seq, p_seq
 
 
-def compute_vat(matrix_of_pairwise_distance: np.ndarray, inplace: bool = False) -> tuple[np.ndarray, np.ndarray]:
+def compute_vat(
+    matrix_of_pairwise_distance: np.ndarray, inplace: bool = False
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes the visualization assessment of cluster tendency (VAT) for the provided dissimilarity (distance) matrix
     :param matrix_of_pairwise_distance: dissimilarity matrix, typically an L2-norm matrix, it must be symmetric and positive semi-definite
@@ -362,7 +364,10 @@ def get_ivat_levels(
 
         # Compute the initial guess as the centroid of each city cluster
         initial_centroids_item = np.array(
-            [np.mean(all_cities[cluster_ids], axis=0) for cluster_ids in cluster_city_indexs]
+            [
+                np.mean(all_cities[cluster_ids], axis=0)
+                for cluster_ids in cluster_city_indexs
+            ]
         )
 
         results.append(
@@ -402,7 +407,9 @@ def get_ivat_hierarchy(
         levels_results = [levels_results]
 
     # Root node contains everything
-    root = ClusterNode(indices=np.arange(len(all_cities)), centroid=np.mean(all_cities, axis=0))
+    root = ClusterNode(
+        indices=np.arange(len(all_cities)), centroid=np.mean(all_cities, axis=0)
+    )
 
     # current_level_nodes starts with root
     current_level_nodes = [root]
