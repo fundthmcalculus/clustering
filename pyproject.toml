@@ -26,7 +26,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ucimlrepo",
+    "ucimlrepo>=0.0.7",
+    "pandas-stubs~=3.0.3",
     "matplotlib",
     "pytest"
 ]

@@ -6,7 +6,15 @@
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -m pip install --quiet \"cython\" \"setuptools\" 2>&1)",
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -c \"import importlib.util as u; [print\\(m, bool\\(u.find_spec\\(m\\)\\)\\) for m in ['setuptools','Cython']]\")",
       "PowerShell(cmd /c \"C:\\\\personal\\\\clustering\\\\build_test\\\\build.bat\" 2>&1 | Select-Object -Last 15)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "PowerShell(python setup.py build_ext --inplace 2>&1 | Select-Object -Last 40)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe --version; \\(Get-Command uv -ErrorAction SilentlyContinue\\).Source; .\\\\.venv\\\\Scripts\\\\python.exe -m pip list 2>$null | Select-String -Pattern \"Cython|setuptools|numpy|pip\")",
+      "PowerShell(uv pip *)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe setup.py build_ext --inplace 2>&1 | Select-Object -Last 40)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -c \"import numpy as np; from scipy.spatial.distance import pdist, squareform; from tribbleclustering.pcvat import pairwise_distances_c_32, pairwise_distances_c_64, pairwise_distances_c; np.random.seed\\(0\\); X=np.random.randn\\(600,5\\); ref=squareform\\(pdist\\(X,'euclidean'\\)\\); d64=pairwise_distances_c_64\\(X.astype\\(np.float64\\)\\); d32=pairwise_distances_c_32\\(X.astype\\(np.float32\\)\\); print\\('64 max err', np.abs\\(d64-ref\\).max\\(\\)\\); print\\('32 max err', np.abs\\(d32-ref\\).max\\(\\)\\); print\\('dispatch dtypes', pairwise_distances_c\\(X.astype\\(np.float32\\)\\).dtype, pairwise_distances_c\\(X.astype\\(np.float64\\)\\).dtype\\); print\\('symmetric64', np.allclose\\(d64,d64.T\\), 'diag0', np.all\\(np.diag\\(d64\\)==0\\)\\)\")",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -m pytest tests/test_pairwise_distances.py -v -s 2>&1 | Select-Object -Last 60)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -m pytest tests/test_pairwise_distances.py::TestPerformance -v -s 2>&1 | Select-Object -Last 25)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe -m pytest tests/test_pairwise_distances.py tests/test_heapq.py::TestCorrectness -q 2>&1 | Select-Object -Last 15)"
     ]
   }
 }

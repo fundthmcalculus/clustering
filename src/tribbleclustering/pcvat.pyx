@@ -2,7 +2,7 @@
 
 import numpy as np
 cimport cython
-from libc.math cimport INFINITY, INFINITY as INFINITY_F
+from libc.math cimport INFINITY, INFINITY as INFINITY_F, sqrt
 from libc.stdlib cimport malloc, free
 from cython.parallel cimport prange, threadid
 cimport openmp
@@ -438,6 +438,141 @@ def compute_vat_c_32(float[:, ::1] adj):
                 dst[IP[c]] = src[c]
 
     return out_np, heap_seq_np, parent_seq_np
+
+
+# =========================================================================
+# PAIRWISE DISTANCES (OpenMP)
+# =========================================================================
+#
+# Full dense Euclidean distance matrix: out[i, j] = ||data[i] - data[j]||_2,
+# the C/OpenMP equivalent of util.pairwise_distances. The work is the upper
+# triangle (i < j), mirrored into the lower triangle; the diagonal stays 0.
+#
+# Threading: prange over the outer row index i. Row i does (n - i - 1) inner
+# pairs, so the per-row cost shrinks as i grows — a 'guided' schedule keeps
+# threads balanced over that triangular profile. Write safety: the thread
+# owning row i is the ONLY writer of both out[i, j] and its mirror out[j, i]
+# for every j > i, so no two threads ever touch the same cell. Gated on
+# _PAR_THRESHOLD, like the other parallel regions.
+
+
+# ---------------------------------------------------------------------------
+# Core pairwise-distance kernel — float64 variant
+# ---------------------------------------------------------------------------
+cdef void _pairwise_distances_kernel_64(
+    const double* data, int n, int d, double* out, int nthreads
+) noexcept nogil:
+    cdef int i, j, k
+    cdef double diff, acc
+    cdef const double* ri
+    cdef const double* rj
+    for i in prange(n, schedule='guided', num_threads=nthreads):
+        ri = data + <Py_ssize_t>i * d
+        for j in range(i + 1, n):
+            rj = data + <Py_ssize_t>j * d
+            acc = 0.0
+            for k in range(d):
+                diff = ri[k] - rj[k]
+                acc = acc + diff * diff
+            acc = sqrt(acc)
+            out[<Py_ssize_t>i * n + j] = acc
+            out[<Py_ssize_t>j * n + i] = acc
+
+
+# ---------------------------------------------------------------------------
+# Public: pairwise distances — float64
+# ---------------------------------------------------------------------------
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def pairwise_distances_c_64(double[:, ::1] data):
+    """
+    Dense Euclidean pairwise-distance matrix (float64), OpenMP parallel.
+
+    `data` is (n_samples, n_features), C-contiguous. Returns an
+    (n_samples, n_samples) float64 matrix with a zero diagonal.
+    """
+    cdef int n = data.shape[0]
+    cdef int d = data.shape[1]
+    out_np = np.zeros((n, n), dtype=np.float64)
+    if n == 0:
+        return out_np
+    cdef double[:, ::1] out = out_np
+
+    cdef int nthreads = openmp.omp_get_max_threads()
+    if n < _PAR_THRESHOLD or nthreads < 2:
+        nthreads = 1
+
+    with nogil:
+        _pairwise_distances_kernel_64(&data[0, 0], n, d, &out[0, 0], nthreads)
+    return out_np
+
+
+# ---------------------------------------------------------------------------
+# Core pairwise-distance kernel — float32 variant
+# ---------------------------------------------------------------------------
+cdef void _pairwise_distances_kernel_32(
+    const float* data, int n, int d, float* out, int nthreads
+) noexcept nogil:
+    # Accumulate in double to keep the squared-sum well-conditioned, then store
+    # the float32 result — matches numpy's higher-precision reduction.
+    cdef int i, j, k
+    cdef double diff, acc
+    cdef const float* ri
+    cdef const float* rj
+    for i in prange(n, schedule='guided', num_threads=nthreads):
+        ri = data + <Py_ssize_t>i * d
+        for j in range(i + 1, n):
+            rj = data + <Py_ssize_t>j * d
+            acc = 0.0
+            for k in range(d):
+                diff = <double>ri[k] - <double>rj[k]
+                acc = acc + diff * diff
+            out[<Py_ssize_t>i * n + j] = <float>sqrt(acc)
+            out[<Py_ssize_t>j * n + i] = <float>sqrt(acc)
+
+
+# ---------------------------------------------------------------------------
+# Public: pairwise distances — float32
+# ---------------------------------------------------------------------------
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def pairwise_distances_c_32(float[:, ::1] data):
+    """
+    Dense Euclidean pairwise-distance matrix (float32), OpenMP parallel.
+
+    `data` is (n_samples, n_features), C-contiguous. Returns an
+    (n_samples, n_samples) float32 matrix with a zero diagonal.
+    """
+    cdef int n = data.shape[0]
+    cdef int d = data.shape[1]
+    out_np = np.zeros((n, n), dtype=np.float32)
+    if n == 0:
+        return out_np
+    cdef float[:, ::1] out = out_np
+
+    cdef int nthreads = openmp.omp_get_max_threads()
+    if n < _PAR_THRESHOLD or nthreads < 2:
+        nthreads = 1
+
+    with nogil:
+        _pairwise_distances_kernel_32(&data[0, 0], n, d, &out[0, 0], nthreads)
+    return out_np
+
+
+def pairwise_distances_c(data):
+    """
+    Dense Euclidean pairwise-distance matrix.
+    Automatically dispatches to float32 or float64 based on input dtype.
+    Returns an (n, n) distance matrix of the same dtype.
+    """
+    if data.dtype == np.float32:
+        data_c = np.require(data, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        return pairwise_distances_c_32(data_c)
+    elif data.dtype == np.float64:
+        data_c = np.require(data, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        return pairwise_distances_c_64(data_c)
+    else:
+        raise TypeError(f"Expected float32 or float64, got {data.dtype}")
 
 
 # ---------------------------------------------------------------------------
