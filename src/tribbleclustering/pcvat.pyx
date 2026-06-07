@@ -608,3 +608,183 @@ def compute_vat_c(adj):
         return compute_vat_c_64(adj_c)
     else:
         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
+
+
+# =========================================================================
+# IVAT COMPUTATION (builds on VAT)
+# =========================================================================
+#
+# compute_ivat_c: Takes a distance matrix, computes VAT, then builds IVAT.
+# The IVAT algorithm refines the VAT matrix by computing the "reachability"
+# distance — the maximum of the minimum distances along a path in the MST.
+
+
+cdef void _compute_ivat_kernel_64(
+    const double* vat_matrix, int n, double* ivat_matrix,
+    int* argmin_seq, int nthreads
+) noexcept nogil:
+    """
+    Build IVAT matrix from VAT matrix (float64).
+
+    For each row r from 1 to n-1:
+      - Find minimum distance in columns [0, r)
+      - Set ivat[r, jj] and ivat[jj, r] to this minimum
+      - For c != jj, set ivat[c, r] = ivat[r, c] = max(vat[r, jj], ivat[jj, c])
+    """
+    cdef int r, c, jj, best_jj
+    cdef double min_val, max_val
+    cdef const double* vat_row
+
+    for r in range(1, n):
+        vat_row = vat_matrix + <Py_ssize_t>r * n
+
+        # Find minimum distance in columns [0, r)
+        min_val = vat_row[0]
+        best_jj = 0
+        for c in range(1, r):
+            if vat_row[c] < min_val:
+                min_val = vat_row[c]
+                best_jj = c
+
+        argmin_seq[r - 1] = best_jj
+
+        # Set diagonal connection
+        ivat_matrix[<Py_ssize_t>r * n + best_jj] = min_val
+        ivat_matrix[<Py_ssize_t>best_jj * n + r] = min_val
+
+        # Set remaining columns
+        for c in range(r):
+            if c != best_jj:
+                max_val = min_val if min_val > ivat_matrix[<Py_ssize_t>best_jj * n + c] else ivat_matrix[<Py_ssize_t>best_jj * n + c]
+                ivat_matrix[<Py_ssize_t>c * n + r] = max_val
+                ivat_matrix[<Py_ssize_t>r * n + c] = max_val
+
+
+cdef void _compute_ivat_kernel_32(
+    const float* vat_matrix, int n, float* ivat_matrix,
+    int* argmin_seq, int nthreads
+) noexcept nogil:
+    """Build IVAT matrix from VAT matrix (float32)."""
+    cdef int r, c, jj, best_jj
+    cdef float min_val, max_val
+    cdef const float* vat_row
+
+    for r in range(1, n):
+        vat_row = vat_matrix + <Py_ssize_t>r * n
+
+        # Find minimum distance in columns [0, r)
+        min_val = vat_row[0]
+        best_jj = 0
+        for c in range(1, r):
+            if vat_row[c] < min_val:
+                min_val = vat_row[c]
+                best_jj = c
+
+        argmin_seq[r - 1] = best_jj
+
+        # Set diagonal connection
+        ivat_matrix[<Py_ssize_t>r * n + best_jj] = min_val
+        ivat_matrix[<Py_ssize_t>best_jj * n + r] = min_val
+
+        # Set remaining columns
+        for c in range(r):
+            if c != best_jj:
+                max_val = min_val if min_val > ivat_matrix[<Py_ssize_t>best_jj * n + c] else ivat_matrix[<Py_ssize_t>best_jj * n + c]
+                ivat_matrix[<Py_ssize_t>c * n + r] = max_val
+                ivat_matrix[<Py_ssize_t>r * n + c] = max_val
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def compute_ivat_c_64(double[:, ::1] adj):
+    """
+    Compute IVAT (improved VAT) for float64 distance matrix.
+
+    Returns (ivat_matrix, vat_matrix, argmin_seq, p_seq) where:
+      - ivat_matrix: improved VAT matrix (n x n)
+      - vat_matrix: VAT matrix (n x n)
+      - argmin_seq: sequence of minimum indices
+      - p_seq: permutation sequence from VAT
+    """
+    cdef int n = adj.shape[0]
+
+    # Compute VAT using the C implementation
+    vat_np, p_seq_np, q_seq_np = compute_vat_c_64(adj)
+    cdef double[:, ::1] vat = vat_np
+
+    # Allocate IVAT matrix (copy of VAT initially)
+    ivat_np = np.zeros((n, n), dtype=np.float64)
+    cdef double[:, ::1] ivat = ivat_np
+
+    # Copy VAT to IVAT initially
+    cdef int i, j
+    for i in range(n):
+        for j in range(n):
+            ivat[i, j] = vat[i, j]
+
+    # Allocate argmin sequence
+    argmin_seq_np = np.zeros(n - 1, dtype=np.int32)
+    cdef int[:] argmin_seq = argmin_seq_np
+
+    cdef int nthreads = openmp.omp_get_max_threads()
+
+    with nogil:
+        _compute_ivat_kernel_64(&vat[0, 0], n, &ivat[0, 0], &argmin_seq[0], nthreads)
+
+    return ivat_np, vat_np, argmin_seq_np, p_seq_np
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def compute_ivat_c_32(float[:, ::1] adj):
+    """
+    Compute IVAT (improved VAT) for float32 distance matrix.
+
+    Returns (ivat_matrix, vat_matrix, argmin_seq, p_seq).
+    """
+    cdef int n = adj.shape[0]
+
+    # Compute VAT using the C implementation
+    vat_np, p_seq_np, q_seq_np = compute_vat_c_32(adj)
+    cdef float[:, ::1] vat = vat_np
+
+    # Allocate IVAT matrix (copy of VAT initially)
+    ivat_np = np.zeros((n, n), dtype=np.float32)
+    cdef float[:, ::1] ivat = ivat_np
+
+    # Copy VAT to IVAT initially
+    cdef int i, j
+    for i in range(n):
+        for j in range(n):
+            ivat[i, j] = vat[i, j]
+
+    # Allocate argmin sequence
+    argmin_seq_np = np.zeros(n - 1, dtype=np.int32)
+    cdef int[:] argmin_seq = argmin_seq_np
+
+    cdef int nthreads = openmp.omp_get_max_threads()
+
+    with nogil:
+        _compute_ivat_kernel_32(&vat[0, 0], n, &ivat[0, 0], &argmin_seq[0], nthreads)
+
+    return ivat_np, vat_np, argmin_seq_np, p_seq_np
+
+
+def compute_ivat_c(adj, inplace=False):
+    """
+    Compute IVAT (improved VAT) for a distance matrix.
+    Automatically dispatches to float32 or float64 based on input dtype.
+
+    Note: The `inplace` parameter is accepted for API compatibility but is ignored
+    (the compiled version always returns new matrices).
+
+    Returns (ivat_matrix, vat_matrix, argmin_seq, p_seq).
+    """
+    if adj.dtype == np.float32:
+        adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        return compute_ivat_c_32(adj_c)
+    elif adj.dtype == np.float64:
+        adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        return compute_ivat_c_64(adj_c)
+    else:
+        raise TypeError(f"Expected float32 or float64, got {adj.dtype}")

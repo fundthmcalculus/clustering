@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 from numpy import ndarray
 
-from .pvat import compute_ivat, get_ivat_levels, IvatMeansResult
+from .pvat import get_ivat_levels, IvatMeansResult
 
 try:
     from .pcvat import pairwise_distances_c as _pairwise_distances
@@ -58,7 +58,7 @@ class IVATMeans:
             np.random.seed(self.random_state)
 
         distances = _pairwise_distances(X)
-        ivat_matrix, vat_matrix, _, vat_order = compute_ivat(distances, inplace=False)
+        ivat_matrix, vat_matrix, _, vat_order = _compute_ivat(distances, inplace=False)
 
         self._ivat_result = get_ivat_levels(
             X, ivat_matrix, vat_order, n_levels=self.n_levels
