@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 import numpy
 
@@ -57,6 +57,9 @@ def _cythonize(exts):
 
 
 setup(
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     ext_modules=_cythonize(extensions),
     cmdclass={"build_ext": build_ext_opts},
+    zip_safe=False,
 )
