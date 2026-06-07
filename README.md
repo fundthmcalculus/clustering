@@ -1,11 +1,11 @@
 # Clustering Package
 
-A simple Python package for clustering tasks.
+An optimized implementation of VAT/IVAT, including priority-queue MST speedups as discussed at the NAFIPS 2025/2026 conferences. In addition, there are now C-based SIMD extensions which can improve the performance again by a factor of 15-20.
 
 ## Installation
 
 ```bash
-pip install tribbleclustering
+pip install tribble-clustering
 ```
 
 ## Usage
