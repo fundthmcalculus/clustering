@@ -20,7 +20,15 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.11"
+        
+    - name: Extract version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Update version in pyproject.toml
+      run: |
+        sed -i "s/^version = .*/version = \"${{ steps.get_version.outputs.VERSION }}\"/" pyproject.toml
 
     - name: Install build dependencies
       run: |
