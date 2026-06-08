@@ -5,20 +5,24 @@ cimport cython
 from libc.math cimport sqrt, isnan, isinf
 from libc.stdint cimport int64_t, int32_t
 
+ctypedef fused float_type:
+    float
+    double
+
 
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void _compute_distances(
-    const double[:, ::1] x,
-    const double[:, ::1] c,
-    double[:, ::1] distances
+    const float_type[:, ::1] x,
+    const float_type[:, ::1] c,
+    float_type[:, ::1] distances
 ) noexcept nogil:
     cdef int n_samples = x.shape[0]
     cdef int n_clusters = c.shape[0]
     cdef int n_features = x.shape[1]
     cdef int i, j, k
-    cdef double d, diff
+    cdef float_type d, diff
 
     for i in range(n_samples):
         for j in range(n_clusters):
@@ -33,14 +37,14 @@ cdef void _compute_distances(
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void _compute_weights(
-    const double[:, ::1] distances,
-    double m,
-    double[:, ::1] w_ij
+    const float_type[:, ::1] distances,
+    float_type m,
+    float_type[:, ::1] w_ij
 ) noexcept nogil:
     cdef int n_samples = distances.shape[0]
     cdef int n_clusters = distances.shape[1]
     cdef int i, j, jj
-    cdef double denom, dist_ratio, val
+    cdef float_type denom, dist_ratio, val
 
     for i in range(n_samples):
         for j in range(n_clusters):
@@ -71,16 +75,16 @@ cdef void _compute_weights(
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void _compute_new_centers(
-    const double[:, ::1] w_ij,
-    const double[:, ::1] x,
-    double m,
-    double[:, ::1] v_ij
+    const float_type[:, ::1] w_ij,
+    const float_type[:, ::1] x,
+    float_type m,
+    float_type[:, ::1] v_ij
 ) noexcept nogil:
     cdef int n_samples = x.shape[0]
     cdef int n_clusters = w_ij.shape[1]
     cdef int n_features = x.shape[1]
     cdef int i, j, k
-    cdef double wm, w_sum
+    cdef float_type wm, w_sum
 
     for j in range(n_clusters):
         w_sum = 0.0
@@ -102,10 +106,10 @@ cdef void _compute_new_centers(
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void _init_centers(
-    const double[:, ::1] x,
+    const float_type[:, ::1] x,
     int n_clusters,
     const int64_t[::1] indices,
-    double[:, ::1] c
+    float_type[:, ::1] c
 ) noexcept nogil:
     cdef int n_features = x.shape[1]
     cdef int i, k
@@ -116,12 +120,12 @@ cdef void _init_centers(
 
 
 def fuzzy_c_means(
-    double[:, ::1] x,
+    float_type[:, ::1] x,
     int n,
-    double m = 2.0,
+    float_type m = 2.0,
     *,
     indices = None,
-    double[:, ::1] initial_guess = None,
+    float_type[:, ::1] initial_guess = None,
 ) -> tuple:
     """
     Compute the fuzzy c-means clustering algorithm (Cython-optimized).
@@ -135,21 +139,21 @@ def fuzzy_c_means(
     """
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
-    cdef double[:, ::1] c
-    cdef double[:, ::1] c_new
-    cdef double[:, ::1] w_ij
-    cdef double[:, ::1] distances
+    cdef float_type[:, ::1] c
+    cdef float_type[:, ::1] c_new
+    cdef float_type[:, ::1] w_ij
+    cdef float_type[:, ::1] distances
     cdef int i, j, k, iteration
-    cdef double delta, max_delta
+    cdef float_type delta, max_delta
     cdef int64_t[::1] indices_view
 
     if initial_guess is not None and indices is not None:
         raise ValueError("initial_guess and indices cannot both be provided")
 
-    c = np.zeros((n, n_features), dtype=np.float64)
-    c_new = np.zeros((n, n_features), dtype=np.float64)
-    w_ij = np.zeros((n_samples, n), dtype=np.float64)
-    distances = np.zeros((n_samples, n), dtype=np.float64)
+    c = np.zeros((n, n_features), dtype=x.dtype)
+    c_new = np.zeros((n, n_features), dtype=x.dtype)
+    w_ij = np.zeros((n_samples, n), dtype=x.dtype)
+    distances = np.zeros((n_samples, n), dtype=x.dtype)
 
     if initial_guess is not None:
         if initial_guess.shape[0] != n or initial_guess.shape[1] != n_features:
