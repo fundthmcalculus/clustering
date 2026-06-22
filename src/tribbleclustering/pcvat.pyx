@@ -626,19 +626,21 @@ cdef void _compute_ivat_kernel_64(
     """
     Build IVAT matrix from VAT matrix (float64).
 
-    For each row r from 1 to n-1:
-      - Find minimum distance in columns [0, r)
-      - Set ivat[r, jj] and ivat[jj, r] to this minimum
-      - For c != jj, set ivat[c, r] = ivat[r, c] = max(vat[r, jj], ivat[jj, c])
+    Exploits symmetry: the main construction loop only writes to the lower
+    triangle (row r, columns 0..r-1). Reads of previously-computed ivat values
+    are canonicalised to the lower triangle (swap indices when best_jj < c).
+    After the sequential loop finishes, a single parallelisable back-copy pass
+    mirrors lower → upper. This halves the scattered write traffic during the
+    O(n^2) construction phase.
     """
-    cdef int r, c, jj, best_jj
-    cdef double min_val, max_val
+    cdef int r, c, best_jj
+    cdef double min_val, cur_val, max_val
     cdef const double* vat_row
 
     for r in range(1, n):
         vat_row = vat_matrix + <Py_ssize_t>r * n
 
-        # Find minimum distance in columns [0, r)
+        # Find minimum distance in columns [0, r) — lower-triangle VAT reads.
         min_val = vat_row[0]
         best_jj = 0
         for c in range(1, r):
@@ -648,31 +650,41 @@ cdef void _compute_ivat_kernel_64(
 
         argmin_seq[r - 1] = best_jj
 
-        # Set diagonal connection
+        # Write edge weight — lower triangle only (r > best_jj always holds).
         ivat_matrix[<Py_ssize_t>r * n + best_jj] = min_val
-        ivat_matrix[<Py_ssize_t>best_jj * n + r] = min_val
 
-        # Set remaining columns
+        # For every other already-visited vertex c, the minimax distance is
+        # ivat[r, c] = max(ivat[r, best_jj], ivat[best_jj, c]).
+        # Reads are canonicalised to the lower triangle: swap when best_jj < c.
         for c in range(r):
             if c != best_jj:
-                max_val = min_val if min_val > ivat_matrix[<Py_ssize_t>best_jj * n + c] else ivat_matrix[<Py_ssize_t>best_jj * n + c]
-                ivat_matrix[<Py_ssize_t>c * n + r] = max_val
+                if best_jj > c:
+                    cur_val = ivat_matrix[<Py_ssize_t>best_jj * n + c]
+                else:
+                    cur_val = ivat_matrix[<Py_ssize_t>c * n + best_jj]
+                max_val = min_val if min_val > cur_val else cur_val
                 ivat_matrix[<Py_ssize_t>r * n + c] = max_val
+
+    # Back-copy: mirror lower triangle to upper. All lower-triangle values are
+    # final, so threads own exclusive (r, c) pairs — no races.
+    for r in prange(1, n, schedule='static', num_threads=nthreads):
+        for c in range(r):
+            ivat_matrix[<Py_ssize_t>c * n + r] = ivat_matrix[<Py_ssize_t>r * n + c]
 
 
 cdef void _compute_ivat_kernel_32(
     const float* vat_matrix, int n, float* ivat_matrix,
     int* argmin_seq, int nthreads
 ) noexcept nogil:
-    """Build IVAT matrix from VAT matrix (float32)."""
-    cdef int r, c, jj, best_jj
-    cdef float min_val, max_val
+    """Build IVAT matrix from VAT matrix (float32). See _compute_ivat_kernel_64 for rationale."""
+    cdef int r, c, best_jj
+    cdef float min_val, cur_val, max_val
     cdef const float* vat_row
 
     for r in range(1, n):
         vat_row = vat_matrix + <Py_ssize_t>r * n
 
-        # Find minimum distance in columns [0, r)
+        # Find minimum distance in columns [0, r) — lower-triangle VAT reads.
         min_val = vat_row[0]
         best_jj = 0
         for c in range(1, r):
@@ -682,16 +694,26 @@ cdef void _compute_ivat_kernel_32(
 
         argmin_seq[r - 1] = best_jj
 
-        # Set diagonal connection
+        # Write edge weight — lower triangle only (r > best_jj always holds).
         ivat_matrix[<Py_ssize_t>r * n + best_jj] = min_val
-        ivat_matrix[<Py_ssize_t>best_jj * n + r] = min_val
 
-        # Set remaining columns
+        # For every other already-visited vertex c, the minimax distance is
+        # ivat[r, c] = max(ivat[r, best_jj], ivat[best_jj, c]).
+        # Reads are canonicalised to the lower triangle: swap when best_jj < c.
         for c in range(r):
             if c != best_jj:
-                max_val = min_val if min_val > ivat_matrix[<Py_ssize_t>best_jj * n + c] else ivat_matrix[<Py_ssize_t>best_jj * n + c]
-                ivat_matrix[<Py_ssize_t>c * n + r] = max_val
+                if best_jj > c:
+                    cur_val = ivat_matrix[<Py_ssize_t>best_jj * n + c]
+                else:
+                    cur_val = ivat_matrix[<Py_ssize_t>c * n + best_jj]
+                max_val = min_val if min_val > cur_val else cur_val
                 ivat_matrix[<Py_ssize_t>r * n + c] = max_val
+
+    # Back-copy: mirror lower triangle to upper. All lower-triangle values are
+    # final, so threads own exclusive (r, c) pairs — no races.
+    for r in prange(1, n, schedule='static', num_threads=nthreads):
+        for c in range(r):
+            ivat_matrix[<Py_ssize_t>c * n + r] = ivat_matrix[<Py_ssize_t>r * n + c]
 
 
 @cython.boundscheck(False)
@@ -712,26 +734,17 @@ def compute_ivat_c_64(double[:, ::1] adj):
     vat_np, p_seq_np, q_seq_np = compute_vat_c_64(adj)
     cdef double[:, ::1] vat = vat_np
 
-    # Allocate IVAT matrix (copy of VAT initially)
-    ivat_np = np.zeros((n, n), dtype=np.float64)
-    cdef double[:, ::1] ivat = ivat_np
-
-    # Copy VAT to IVAT initially
-    cdef int i, j
-    for i in range(n):
-        for j in range(n):
-            ivat[i, j] = vat[i, j]
-
-    # Allocate argmin sequence
     argmin_seq_np = np.zeros(n - 1, dtype=np.int32)
     cdef int[:] argmin_seq = argmin_seq_np
 
     cdef int nthreads = openmp.omp_get_max_threads()
+    if n < _PAR_THRESHOLD or nthreads < 2:
+        nthreads = 1
 
     with nogil:
-        _compute_ivat_kernel_64(&vat[0, 0], n, &ivat[0, 0], &argmin_seq[0], nthreads)
+        _compute_ivat_kernel_64(&vat[0, 0], n, &vat[0, 0], &argmin_seq[0], nthreads)
 
-    return ivat_np, vat_np, argmin_seq_np, p_seq_np
+    return vat_np, vat_np, argmin_seq_np, p_seq_np
 
 
 @cython.boundscheck(False)
@@ -748,26 +761,17 @@ def compute_ivat_c_32(float[:, ::1] adj):
     vat_np, p_seq_np, q_seq_np = compute_vat_c_32(adj)
     cdef float[:, ::1] vat = vat_np
 
-    # Allocate IVAT matrix (copy of VAT initially)
-    ivat_np = np.zeros((n, n), dtype=np.float32)
-    cdef float[:, ::1] ivat = ivat_np
-
-    # Copy VAT to IVAT initially
-    cdef int i, j
-    for i in range(n):
-        for j in range(n):
-            ivat[i, j] = vat[i, j]
-
-    # Allocate argmin sequence
     argmin_seq_np = np.zeros(n - 1, dtype=np.int32)
     cdef int[:] argmin_seq = argmin_seq_np
 
     cdef int nthreads = openmp.omp_get_max_threads()
+    if n < _PAR_THRESHOLD or nthreads < 2:
+        nthreads = 1
 
     with nogil:
-        _compute_ivat_kernel_32(&vat[0, 0], n, &ivat[0, 0], &argmin_seq[0], nthreads)
+        _compute_ivat_kernel_32(&vat[0, 0], n, &vat[0, 0], &argmin_seq[0], nthreads)
 
-    return ivat_np, vat_np, argmin_seq_np, p_seq_np
+    return vat_np, vat_np, argmin_seq_np, p_seq_np
 
 
 def compute_ivat_c(adj, inplace=False):
