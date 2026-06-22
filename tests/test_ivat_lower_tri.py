@@ -1,24 +1,29 @@
 """
-Correctness and performance tests for the lower-triangular IVAT kernel.
+Correctness and performance tests for the lower-triangular VAT and IVAT kernels.
 
 Methodology under test
 -----------------------
-Instead of writing both ivat[r,c] and ivat[c,r] on every cell fill, the
-kernel writes only the lower triangle during the O(n^2) construction loop,
-then back-copies it to the upper triangle in a single (parallelisable) pass.
-Reads of previously-computed IVAT entries are canonicalised to the lower
-triangle (swap indices when best_jj < c).
+VAT gather: instead of reading adj[P[i],:] sequentially and scattering to
+out[i,:] via an inverse permutation, fill only out[i,j] for j<=i via a direct
+gather (out[i,j] = adj[P[i],P[j]]), then back-copy lower → upper. Eliminates
+the invp array entirely.
 
-The reference is the Python/Numba implementation in pvat.compute_ivat(), which
-produces the ground-truth result.
+IVAT kernel: only the lower triangle is written during the sequential O(n^2)
+construction loop; reads of previous IVAT values are canonicalised to the lower
+triangle. A separate parallelisable back-copy mirrors lower → upper.
+
+Reference: the Python/Numba implementations in pvat, which produce ground truth.
 """
 import time
 
 import numpy as np
 import pytest
 
-from tribbleclustering.pvat import compute_ivat as compute_ivat_py
-from tribbleclustering.pcvat import compute_ivat_c_64, compute_ivat_c_32
+from tribbleclustering.pvat import compute_ivat as compute_ivat_py, compute_vat as compute_vat_py
+from tribbleclustering.pcvat import (
+    compute_ivat_c_64, compute_ivat_c_32,
+    compute_vat_c_64, compute_vat_c_32,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -39,8 +44,57 @@ def _py_ivat(dist):
     return compute_ivat_py(dist.astype(np.float64))
 
 
+def _py_vat(dist):
+    """Python reference: returns (vat, p_seq)."""
+    return compute_vat_py(dist.astype(np.float64))
+
+
 # ---------------------------------------------------------------------------
-# Correctness tests
+# VAT correctness tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
+def test_vat_f64_matches_python(n):
+    dist = _random_sym_dist(n, seed=n)
+    vat_ref, p_ref = _py_vat(dist)
+
+    vat_c, p_c, _ = compute_vat_c_64(np.ascontiguousarray(dist, dtype=np.float64))
+
+    np.testing.assert_allclose(
+        vat_c, vat_ref, rtol=1e-10, atol=1e-12,
+        err_msg=f"VAT mismatch (n={n}, float64)"
+    )
+    np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
+
+
+@pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
+def test_vat_f32_matches_python(n):
+    dist = _random_sym_dist(n, seed=n, dtype=np.float32)
+    vat_ref, p_ref = _py_vat(dist)
+
+    vat_c, p_c, _ = compute_vat_c_32(np.ascontiguousarray(dist, dtype=np.float32))
+
+    np.testing.assert_allclose(
+        vat_c.astype(np.float64), vat_ref, rtol=1e-5, atol=1e-6,
+        err_msg=f"VAT mismatch (n={n}, float32)"
+    )
+    np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
+
+
+def test_vat_f64_symmetric():
+    dist = _random_sym_dist(100, seed=42)
+    vat, _, _ = compute_vat_c_64(np.ascontiguousarray(dist))
+    np.testing.assert_allclose(vat, vat.T, atol=0, err_msg="VAT matrix is not symmetric")
+
+
+def test_vat_f32_symmetric():
+    dist = _random_sym_dist(100, seed=42, dtype=np.float32)
+    vat, _, _ = compute_vat_c_32(np.ascontiguousarray(dist))
+    np.testing.assert_allclose(vat, vat.T, atol=0, err_msg="VAT matrix is not symmetric (float32)")
+
+
+# ---------------------------------------------------------------------------
+# IVAT correctness tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
@@ -103,39 +157,31 @@ def test_ivat_n2():
 # Performance benchmark (not a pass/fail test — prints timings)
 # ---------------------------------------------------------------------------
 
-def _bench_ivat(n, dtype, repeats=3):
+def _bench(fn, n, dtype, repeats=3):
     dist = _random_sym_dist(n, seed=7, dtype=dtype)
     dist_c = np.ascontiguousarray(dist)
-
-    fn = compute_ivat_c_64 if dtype == np.float64 else compute_ivat_c_32
-
-    # Warm-up
-    fn(dist_c)
-
+    fn(dist_c)  # warm-up
     times = []
     for _ in range(repeats):
         t0 = time.perf_counter()
         fn(dist_c)
         times.append(time.perf_counter() - t0)
-    return min(times)
+    return min(times) * 1000  # ms
 
 
-def test_ivat_performance(capsys):
-    """Print timing comparison across matrix sizes."""
+def test_performance(capsys):
+    """Print timing for VAT and IVAT across matrix sizes."""
     sizes = [100, 300, 500, 1000]
-    print("\n\nIVAT kernel performance (lower-tri write + back-copy):")
-    print(f"{'n':>6}  {'f64 (ms)':>10}  {'f32 (ms)':>10}")
-    print("-" * 32)
-    for n in sizes:
-        t64 = _bench_ivat(n, np.float64) * 1000
-        t32 = _bench_ivat(n, np.float32) * 1000
-        print(f"{n:>6}  {t64:>10.2f}  {t32:>10.2f}")
+    header = f"{'n':>6}  {'VAT f64':>10}  {'VAT f32':>10}  {'IVAT f64':>10}  {'IVAT f32':>10}"
+    sep = "-" * len(header)
 
     with capsys.disabled():
-        print("\nIVAT kernel performance (lower-tri write + back-copy):")
-        print(f"{'n':>6}  {'f64 (ms)':>10}  {'f32 (ms)':>10}")
-        print("-" * 32)
+        print(f"\n\nLower-tri VAT + IVAT performance (ms, best of 3):")
+        print(header)
+        print(sep)
         for n in sizes:
-            t64 = _bench_ivat(n, np.float64) * 1000
-            t32 = _bench_ivat(n, np.float32) * 1000
-            print(f"{n:>6}  {t64:>10.2f}  {t32:>10.2f}")
+            tv64  = _bench(compute_vat_c_64,  n, np.float64)
+            tv32  = _bench(compute_vat_c_32,  n, np.float32)
+            ti64  = _bench(compute_ivat_c_64, n, np.float64)
+            ti32  = _bench(compute_ivat_c_32, n, np.float32)
+            print(f"{n:>6}  {tv64:>10.2f}  {tv32:>10.2f}  {ti64:>10.2f}  {ti32:>10.2f}")

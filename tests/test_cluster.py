@@ -111,7 +111,7 @@ def plot_vat_ivat(ivat_mst: np.ndarray, vat_mst: np.ndarray):
     ax2.set_title("iVAT Matrix")
     plt.colorbar(im2, ax=ax2)
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 def test_fcm_with_center_on_datapoint():
@@ -203,7 +203,7 @@ def test_heirarchy_ivat_means():
             r.abrupt_change_indices,
         )
         plot_voronoi(all_cities, r.initial_centroids)
-    plt.show()
+    # plt.show()
 
 
 def plot_voronoi(all_cities, centroids):
@@ -309,7 +309,7 @@ def test_multi_dim_pairwise_dist_perf():
     ax_ratio.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    plt.show()
+    # plt.show()
 
 
 def test_fuzzy_c_means():
@@ -388,7 +388,7 @@ def test_fuzzy_c_means():
     )
 
     plot_membership(all_cities, res.cluster_city_ids, meth_c, w_c)
-    plt.show()
+    # plt.show()
 
 
 def plot_membership(
@@ -660,5 +660,5 @@ def test_visualize_hierarchy():
     anim.save("hierarchy_animation.gif", writer="imagemagick")
     fig_tree.savefig("hierarchy_tree.png")
 
-    plt.show()
+    # plt.show()
     assert len(root.children) > 0
