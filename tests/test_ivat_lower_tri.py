@@ -102,15 +102,11 @@ def test_ivat_f64_matches_python(n):
     dist = _random_sym_dist(n, seed=n)
     ivat_ref, vat_ref, _, p_ref = _py_ivat(dist)
 
-    ivat_c, vat_c, _, p_c = compute_ivat_c_64(np.ascontiguousarray(dist, dtype=np.float64))
+    ivat_c, _, p_c = compute_ivat_c_64(np.ascontiguousarray(dist, dtype=np.float64))
 
     np.testing.assert_allclose(
         ivat_c, ivat_ref, rtol=1e-10, atol=1e-12,
         err_msg=f"IVAT mismatch (n={n}, float64)"
-    )
-    np.testing.assert_allclose(
-        vat_c, vat_ref, rtol=1e-10, atol=1e-12,
-        err_msg=f"VAT mismatch (n={n}, float64)"
     )
     np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
 
@@ -120,7 +116,7 @@ def test_ivat_f32_matches_python(n):
     dist = _random_sym_dist(n, seed=n, dtype=np.float32)
     ivat_ref, vat_ref, _, p_ref = _py_ivat(dist)
 
-    ivat_c, vat_c, _, p_c = compute_ivat_c_32(np.ascontiguousarray(dist, dtype=np.float32))
+    ivat_c, _, p_c = compute_ivat_c_32(np.ascontiguousarray(dist, dtype=np.float32))
 
     # float32 kernel accumulates in float32, so tolerance is wider.
     np.testing.assert_allclose(
@@ -133,14 +129,14 @@ def test_ivat_f32_matches_python(n):
 def test_ivat_f64_symmetric():
     """IVAT result must be symmetric (lower-tri back-copy correctness)."""
     dist = _random_sym_dist(100, seed=42)
-    ivat, _, _, _ = compute_ivat_c_64(np.ascontiguousarray(dist))
+    ivat, _, _ = compute_ivat_c_64(np.ascontiguousarray(dist))
     np.testing.assert_allclose(ivat, ivat.T, atol=0,
                                err_msg="IVAT matrix is not symmetric")
 
 
 def test_ivat_f32_symmetric():
     dist = _random_sym_dist(100, seed=42, dtype=np.float32)
-    ivat, _, _, _ = compute_ivat_c_32(np.ascontiguousarray(dist))
+    ivat, _, _ = compute_ivat_c_32(np.ascontiguousarray(dist))
     np.testing.assert_allclose(ivat, ivat.T, atol=0,
                                err_msg="IVAT matrix is not symmetric (float32)")
 
@@ -148,7 +144,7 @@ def test_ivat_f32_symmetric():
 def test_ivat_n2():
     """Minimal case: 2×2 matrix."""
     dist = np.array([[0.0, 3.14], [3.14, 0.0]], dtype=np.float64)
-    ivat, vat, argmin, perm = compute_ivat_c_64(dist)
+    ivat, argmin, perm = compute_ivat_c_64(dist)
     assert ivat.shape == (2, 2)
     np.testing.assert_allclose(ivat, ivat.T, atol=0)
 

@@ -212,7 +212,7 @@ def plot_voronoi(all_cities, centroids):
         fig = voronoi_plot_2d(v)
         fig.axes[0].set_title("Voronoi plot")
         fig.axes[0].scatter(all_cities[:, 0], all_cities[:, 1])
-        fig.show()
+        # fig.show()
     except QhullError:
         pass
 

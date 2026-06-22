@@ -39,7 +39,7 @@ def compute_ivat(
             if c != jj:
                 d_p_star[c, r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c])
 
-    return d_p_star, d_star, argmin_seq, p_seq
+    return d_p_star, argmin_seq, p_seq
 
 
 def compute_vat(

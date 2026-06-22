@@ -717,10 +717,13 @@ def compute_ivat_c_64(double[:, ::1] adj):
     """
     Compute IVAT (improved VAT) for float64 distance matrix.
 
-    Returns (ivat_matrix, vat_matrix, argmin_seq, p_seq) where:
+    The VAT matrix is computed first (modified in-place from MST), then IVAT is
+    built from VAT using a sequential O(n^2) kernel followed by a parallelized
+    back-copy to mirror the lower triangle to the upper triangle.
+
+    Returns (ivat_matrix, argmin_seq, p_seq) where:
       - ivat_matrix: improved VAT matrix (n x n)
-      - vat_matrix: VAT matrix (n x n)
-      - argmin_seq: sequence of minimum indices
+      - argmin_seq: sequence of minimum indices from IVAT construction
       - p_seq: permutation sequence from VAT
     """
     cdef int n = adj.shape[0]
@@ -745,7 +748,7 @@ def compute_ivat_c_64(double[:, ::1] adj):
     with nogil:
         _compute_ivat_kernel_64(&vat[0, 0], n, &ivat[0, 0], &argmin_seq[0], nthreads)
 
-    return ivat_np, vat_np, argmin_seq_np, p_seq_np
+    return ivat_np, argmin_seq_np, p_seq_np
 
 
 @cython.boundscheck(False)
@@ -754,7 +757,14 @@ def compute_ivat_c_32(float[:, ::1] adj):
     """
     Compute IVAT (improved VAT) for float32 distance matrix.
 
-    Returns (ivat_matrix, vat_matrix, argmin_seq, p_seq).
+    The VAT matrix is computed first (modified in-place from MST), then IVAT is
+    built from VAT using a sequential O(n^2) kernel followed by a parallelized
+    back-copy to mirror the lower triangle to the upper triangle.
+
+    Returns (ivat_matrix, argmin_seq, p_seq) where:
+      - ivat_matrix: improved VAT matrix (n x n)
+      - argmin_seq: sequence of minimum indices from IVAT construction
+      - p_seq: permutation sequence from VAT
     """
     cdef int n = adj.shape[0]
 
@@ -773,7 +783,7 @@ def compute_ivat_c_32(float[:, ::1] adj):
     with nogil:
         _compute_ivat_kernel_32(&vat[0, 0], n, &ivat[0, 0], &argmin_seq[0], nthreads)
 
-    return ivat_np, vat_np, argmin_seq_np, p_seq_np
+    return ivat_np, argmin_seq_np, p_seq_np
 
 
 def compute_ivat_c(adj, inplace=False):
@@ -781,10 +791,18 @@ def compute_ivat_c(adj, inplace=False):
     Compute IVAT (improved VAT) for a distance matrix.
     Automatically dispatches to float32 or float64 based on input dtype.
 
-    Note: The `inplace` parameter is accepted for API compatibility but is ignored
-    (the compiled version always returns new matrices).
+    The computation is performed in-place where possible: the VAT matrix is
+    computed from the MST in-place, then IVAT is built from VAT, with the lower
+    triangle mirrored back to the upper triangle via a parallel back-copy pass.
+    The input adjacency matrix is not modified.
 
-    Returns (ivat_matrix, vat_matrix, argmin_seq, p_seq).
+    Note: The `inplace` parameter is accepted for API compatibility but is ignored
+    (the compiled version always uses its own internal work buffers).
+
+    Returns (ivat_matrix, argmin_seq, p_seq) where:
+      - ivat_matrix: improved VAT matrix (n x n, symmetric)
+      - argmin_seq: sequence of minimum indices from IVAT construction (n-1,)
+      - p_seq: permutation sequence from VAT (n,)
     """
     if adj.dtype == np.float32:
         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
