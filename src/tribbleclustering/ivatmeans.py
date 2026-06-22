@@ -60,7 +60,7 @@ class IVATMeans:
             np.random.seed(self.random_state)
 
         distances = _pairwise_distances(X)
-        ivat_matrix, vat_matrix, _, vat_order = _compute_ivat(distances, inplace=False)
+        ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=False)
 
         self._ivat_result = get_ivat_levels(
             X, ivat_matrix, vat_order, n_levels=1, n_clusters=self.n_clusters
