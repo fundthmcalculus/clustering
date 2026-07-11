@@ -44,3 +44,25 @@ The resident matrix must fit VRAM: n×n×8 bytes for float64 caps n≈38 000 on 
 (`gpu.pairwise_distances_gpu`) + the CPU VAT engine, or a future tiled on-device
 MST. The iVAT minimax recurrence itself is still built on the host from the
 returned ordering; moving it on-device is the natural follow-up.
+
+## Full `IVATMeans` fit — exact, but not (yet) a full-fit speedup
+
+`IVATMeans(on_device=True)` runs the whole front-end (distances + Boruvka MST +
+ordering) on the GPU, then finishes the **serial iVAT minimax recurrence on the
+host** (via `gpu_vat.ivat_gpu`). Labels and centers are **bit-identical** to the
+CPU path. But the recurrence needs the matrix on the host, so the resident
+matrix is copied back device→host once and reordered there — and that copy +
+host reorder + recurrence offset the ~5–6× front-end win:
+
+| n | CPU fit ms | on_device fit ms | ratio |
+|---|-----------|------------------|-------|
+| 4000 | 128 | 134 | 0.96× |
+| 8000 | 376 | 546 | 0.69× |
+| 16000 | 1369 | 2297 | 0.60× |
+| 32000 | 6412 | 6356 | 1.01× |
+
+So `on_device` is **opt-in and exact**, not a speedup for the *full* fit on this
+hardware. The fast, recommended GPU use is `gpu_vat.vat_gpu` when you need the
+**ordering / MST** (5–6.6×). A full-fit win requires moving the iVAT recurrence
+on-device too (it is serial — the open follow-up), so the matrix never leaves
+the GPU.

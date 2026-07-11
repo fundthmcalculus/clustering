@@ -20,6 +20,7 @@ from __future__ import annotations
 import heapq
 
 import numpy as np
+from numba import njit
 
 from . import gpu as _gpu
 
@@ -224,3 +225,51 @@ def vat_gpu(X, high_precision: bool = True, return_distances: bool = False):
     del Dg
     _cp.get_default_memory_pool().free_all_blocks()
     return order, parent
+
+
+@njit(cache=True)
+def _ivat_from_vat_ordered(V):
+    """In-place minimax iVAT recurrence on an already-VAT-ordered matrix V.
+    Mirrors pcvat's _compute_ivat_kernel (lower triangle then back-copy)."""
+    n = V.shape[0]
+    for r in range(1, n):
+        jj = 0
+        mn = V[r, 0]
+        for c in range(1, r):
+            if V[r, c] < mn:
+                mn = V[r, c]
+                jj = c
+        for c in range(r):
+            if c == jj:
+                V[r, c] = mn
+            else:
+                cur = V[jj, c] if jj > c else V[c, jj]
+                V[r, c] = mn if mn > cur else cur
+    for i in range(1, n):
+        for j in range(i):
+            V[j, i] = V[i, j]
+    return V
+
+
+def ivat_gpu(X, high_precision: bool = True):
+    """Compute the IVAT matrix and VAT ordering using the on-device front-end.
+
+    Distances and the exact MST are built on the GPU (matrix resident); the
+    ordering is derived on-device. The iVAT minimax recurrence itself is still
+    serial and runs on the host (moving it on-device is future work), so the
+    resident matrix is copied to the host once, reordered, and transformed.
+
+    Returns (ivat_matrix, order) — ivat_matrix is bit-identical to
+    ``compute_ivat_c`` and ``order`` is the exact VAT permutation.
+    """
+    if not _gpu.is_available():
+        raise RuntimeError("CuPy/CUDA device not available")
+    order, parent, Dg = vat_gpu(X, high_precision=high_precision,
+                                return_distances=True)
+    n = Dg.shape[0]
+    D_host = _cp.asnumpy(Dg)  # host copy needed for the serial CPU recurrence
+    del Dg
+    _cp.get_default_memory_pool().free_all_blocks()
+    V = np.ascontiguousarray(D_host[np.ix_(order, order)])
+    ivat = _ivat_from_vat_ordered(V)
+    return ivat, order
