@@ -26,6 +26,14 @@ jobs:
         run: |
           black --check .
 
+      - name: Run flake8 lint
+        run: |
+          flake8 src tests
+
+      - name: Run mypy type check
+        run: |
+          mypy src
+
       - name: Run unit tests
         run: |
           pytest
