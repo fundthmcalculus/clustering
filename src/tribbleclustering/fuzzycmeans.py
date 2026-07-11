@@ -115,7 +115,7 @@ class FuzzyCMeans:
 
             distances = np.linalg.norm(
                 X_batch[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :],
-                axis=2
+                axis=2,
             )
             labels[start:end] = np.argmin(distances, axis=1)
 

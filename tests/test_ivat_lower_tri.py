@@ -14,21 +14,27 @@ triangle. A separate parallelisable back-copy mirrors lower → upper.
 
 Reference: the Python/Numba implementations in pvat, which produce ground truth.
 """
+
 import time
 
 import numpy as np
 import pytest
 
-from tribbleclustering.pvat import compute_ivat as compute_ivat_py, compute_vat as compute_vat_py
-from tribbleclustering.pcvat import (
-    compute_ivat_c_64, compute_ivat_c_32,
-    compute_vat_c_64, compute_vat_c_32,
+from tribbleclustering.pvat import (
+    compute_ivat as compute_ivat_py,
+    compute_vat as compute_vat_py,
 )
-
+from tribbleclustering.pcvat import (
+    compute_ivat_c_64,
+    compute_ivat_c_32,
+    compute_vat_c_64,
+    compute_vat_c_32,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _random_sym_dist(n, seed=0, dtype=np.float64):
     """Return a random symmetric distance matrix with zero diagonal."""
@@ -53,6 +59,7 @@ def _py_vat(dist):
 # VAT correctness tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
 def test_vat_f64_matches_python(n):
     dist = _random_sym_dist(n, seed=n)
@@ -61,8 +68,7 @@ def test_vat_f64_matches_python(n):
     vat_c, p_c, _ = compute_vat_c_64(np.ascontiguousarray(dist, dtype=np.float64))
 
     np.testing.assert_allclose(
-        vat_c, vat_ref, rtol=1e-10, atol=1e-12,
-        err_msg=f"VAT mismatch (n={n}, float64)"
+        vat_c, vat_ref, rtol=1e-10, atol=1e-12, err_msg=f"VAT mismatch (n={n}, float64)"
     )
     np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
 
@@ -75,8 +81,11 @@ def test_vat_f32_matches_python(n):
     vat_c, p_c, _ = compute_vat_c_32(np.ascontiguousarray(dist, dtype=np.float32))
 
     np.testing.assert_allclose(
-        vat_c.astype(np.float64), vat_ref, rtol=1e-5, atol=1e-6,
-        err_msg=f"VAT mismatch (n={n}, float32)"
+        vat_c.astype(np.float64),
+        vat_ref,
+        rtol=1e-5,
+        atol=1e-6,
+        err_msg=f"VAT mismatch (n={n}, float32)",
     )
     np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
 
@@ -84,18 +93,23 @@ def test_vat_f32_matches_python(n):
 def test_vat_f64_symmetric():
     dist = _random_sym_dist(100, seed=42)
     vat, _, _ = compute_vat_c_64(np.ascontiguousarray(dist))
-    np.testing.assert_allclose(vat, vat.T, atol=0, err_msg="VAT matrix is not symmetric")
+    np.testing.assert_allclose(
+        vat, vat.T, atol=0, err_msg="VAT matrix is not symmetric"
+    )
 
 
 def test_vat_f32_symmetric():
     dist = _random_sym_dist(100, seed=42, dtype=np.float32)
     vat, _, _ = compute_vat_c_32(np.ascontiguousarray(dist))
-    np.testing.assert_allclose(vat, vat.T, atol=0, err_msg="VAT matrix is not symmetric (float32)")
+    np.testing.assert_allclose(
+        vat, vat.T, atol=0, err_msg="VAT matrix is not symmetric (float32)"
+    )
 
 
 # ---------------------------------------------------------------------------
 # IVAT correctness tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
 def test_ivat_f64_matches_python(n):
@@ -105,8 +119,11 @@ def test_ivat_f64_matches_python(n):
     ivat_c, _, p_c = compute_ivat_c_64(np.ascontiguousarray(dist, dtype=np.float64))
 
     np.testing.assert_allclose(
-        ivat_c, ivat_ref, rtol=1e-10, atol=1e-12,
-        err_msg=f"IVAT mismatch (n={n}, float64)"
+        ivat_c,
+        ivat_ref,
+        rtol=1e-10,
+        atol=1e-12,
+        err_msg=f"IVAT mismatch (n={n}, float64)",
     )
     np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
 
@@ -120,8 +137,11 @@ def test_ivat_f32_matches_python(n):
 
     # float32 kernel accumulates in float32, so tolerance is wider.
     np.testing.assert_allclose(
-        ivat_c.astype(np.float64), ivat_ref, rtol=1e-5, atol=1e-6,
-        err_msg=f"IVAT mismatch (n={n}, float32)"
+        ivat_c.astype(np.float64),
+        ivat_ref,
+        rtol=1e-5,
+        atol=1e-6,
+        err_msg=f"IVAT mismatch (n={n}, float32)",
     )
     np.testing.assert_array_equal(p_c, p_ref, err_msg=f"Permutation mismatch (n={n})")
 
@@ -130,15 +150,17 @@ def test_ivat_f64_symmetric():
     """IVAT result must be symmetric (lower-tri back-copy correctness)."""
     dist = _random_sym_dist(100, seed=42)
     ivat, _, _ = compute_ivat_c_64(np.ascontiguousarray(dist))
-    np.testing.assert_allclose(ivat, ivat.T, atol=0,
-                               err_msg="IVAT matrix is not symmetric")
+    np.testing.assert_allclose(
+        ivat, ivat.T, atol=0, err_msg="IVAT matrix is not symmetric"
+    )
 
 
 def test_ivat_f32_symmetric():
     dist = _random_sym_dist(100, seed=42, dtype=np.float32)
     ivat, _, _ = compute_ivat_c_32(np.ascontiguousarray(dist))
-    np.testing.assert_allclose(ivat, ivat.T, atol=0,
-                               err_msg="IVAT matrix is not symmetric (float32)")
+    np.testing.assert_allclose(
+        ivat, ivat.T, atol=0, err_msg="IVAT matrix is not symmetric (float32)"
+    )
 
 
 def test_ivat_n2():
@@ -152,6 +174,7 @@ def test_ivat_n2():
 # ---------------------------------------------------------------------------
 # Performance benchmark (not a pass/fail test — prints timings)
 # ---------------------------------------------------------------------------
+
 
 def _bench(fn, n, dtype, repeats=3):
     dist = _random_sym_dist(n, seed=7, dtype=dtype)
@@ -176,8 +199,8 @@ def test_performance(capsys):
         print(header)
         print(sep)
         for n in sizes:
-            tv64  = _bench(compute_vat_c_64,  n, np.float64)
-            tv32  = _bench(compute_vat_c_32,  n, np.float32)
-            ti64  = _bench(compute_ivat_c_64, n, np.float64)
-            ti32  = _bench(compute_ivat_c_32, n, np.float32)
+            tv64 = _bench(compute_vat_c_64, n, np.float64)
+            tv32 = _bench(compute_vat_c_32, n, np.float32)
+            ti64 = _bench(compute_ivat_c_64, n, np.float64)
+            ti32 = _bench(compute_ivat_c_32, n, np.float32)
             print(f"{n:>6}  {tv64:>10.2f}  {tv32:>10.2f}  {ti64:>10.2f}  {ti32:>10.2f}")

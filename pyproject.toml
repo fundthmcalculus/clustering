@@ -45,3 +45,10 @@ where = ["src"]
 [tool.setuptools.package-data]
 tribbleclustering = ["*.pyx", "*.c"]
 
+# Code style: Black with default line length (88), matching the `optimizers` repo.
+# target-version is pinned to the project's minimum (py311) so Black does not
+# infer a newer grammar from requires-python and emit a spurious AST-safety
+# warning on older interpreters.
+[tool.black]
+target-version = ["py311"]
+
