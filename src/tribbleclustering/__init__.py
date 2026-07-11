@@ -13,8 +13,11 @@ from .util import pairwise_distances
 
 from .fcm import fuzzy_c_means
 
+from .lk import lin_kernighan, tour_length
+
 from .ivatmeans import IVATMeans
 from .fuzzycmeans import FuzzyCMeans
+from .linkernighan import LinKernighan
 
 from . import gpu
 from . import gpu_vat
@@ -30,8 +33,11 @@ __all__ = [
     "IvatMeansResult",
     "pairwise_distances",
     "fuzzy_c_means",
+    "lin_kernighan",
+    "tour_length",
     "IVATMeans",
     "FuzzyCMeans",
+    "LinKernighan",
     "gpu",
     "gpu_vat",
 ]
