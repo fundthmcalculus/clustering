@@ -241,6 +241,7 @@ def fuzzy_c_means_gpu(
     """
     if not is_available():
         from .fcm import fuzzy_c_means
+
         return fuzzy_c_means(x, n, m=m, indices=indices, initial_guess=initial_guess)
 
     x = np.asarray(x)
@@ -255,14 +256,18 @@ def fuzzy_c_means_gpu(
     elif initial_guess is not None:
         if initial_guess.shape != (n, d):
             raise ValueError(
-                f"initial_guess must have shape ({n}, {d}), got {initial_guess.shape}")
+                f"initial_guess must have shape ({n}, {d}), got {initial_guess.shape}"
+            )
         C = _cp.asarray(np.ascontiguousarray(initial_guess, dtype=dtype))
     else:
         idx = np.random.choice(n_samples, size=n * 2, replace=False)
-        C = _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype)).reshape(
-            n, 2, d).mean(axis=1)
+        C = (
+            _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype))
+            .reshape(n, 2, d)
+            .mean(axis=1)
+        )
 
-    q = 1.0 / (m - 1.0)          # membership exponent on squared distance
+    q = 1.0 / (m - 1.0)  # membership exponent on squared distance
     sqx = _cp.sum(Xd * Xd, axis=1)  # (n_samples,), constant across iterations
 
     def _membership(C):
@@ -284,7 +289,7 @@ def fuzzy_c_means_gpu(
 
     for _ in range(max_iter):
         U = _membership(C)
-        Um = U ** m                              # (n_samples, n)
+        Um = U**m  # (n_samples, n)
         C_new = (Um.T @ Xd) / _cp.sum(Um, axis=0)[:, None]
         if bool(_cp.all(_cp.abs(C_new - C) <= (1e-8 + tol * _cp.abs(C)))):
             C = C_new
