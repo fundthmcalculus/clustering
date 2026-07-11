@@ -18,6 +18,7 @@ except ImportError:
 from tribbleclustering.fcm import fuzzy_c_means as fuzzy_c_means_baseline
 
 
+@pytest.mark.benchmark
 @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
 def test_memory_optimization_benchmark():
     """Benchmark distance caching optimization.

@@ -52,3 +52,12 @@ tribbleclustering = ["*.pyx", "*.c"]
 [tool.black]
 target-version = ["py311"]
 
+# Tests: wall-clock benchmarks (speedup ratios) are unreliable on shared CI
+# runners, so they are marked `benchmark` and deselected by default. Run them
+# explicitly with `pytest -m benchmark`. Correctness tests still gate CI.
+[tool.pytest.ini_options]
+markers = [
+    "benchmark: performance benchmark with wall-clock timing assertions (deselected by default)",
+]
+addopts = "-m 'not benchmark'"
+

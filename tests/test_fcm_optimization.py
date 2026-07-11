@@ -174,6 +174,7 @@ class TestFCMCorrectness:
 class TestFCMPerformance:
     """Benchmark the implementations."""
 
+    @pytest.mark.benchmark
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_performance_small_dataset(self):
         """Benchmark on small dataset (100 samples)."""
@@ -191,6 +192,7 @@ class TestFCMPerformance:
 
         assert time_cy <= time_py * 2.0, "Cython should not be significantly slower"
 
+    @pytest.mark.benchmark
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_performance_medium_dataset(self):
         """Benchmark on medium dataset (1000 samples)."""
@@ -212,6 +214,7 @@ class TestFCMPerformance:
 
         assert time_cy <= time_py * 2.0, "Cython should not be significantly slower"
 
+    @pytest.mark.benchmark
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_performance_large_dataset(self):
         """Benchmark on larger dataset (5000 samples)."""
