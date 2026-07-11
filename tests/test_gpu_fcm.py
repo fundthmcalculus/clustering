@@ -2,6 +2,7 @@
 
 Skipped when no CUDA device / CuPy is available.
 """
+
 import numpy as np
 import pytest
 

@@ -15,6 +15,7 @@ max-dissimilarity seed reproduces it bit-for-bit.
 Everything is gated on CuPy/CUDA availability; callers should check
 gpu.is_available() and fall back to the CPU VAT (pcvat.compute_vat_c) otherwise.
 """
+
 from __future__ import annotations
 
 import heapq
@@ -152,8 +153,11 @@ def boruvka_mst_device(Dg):
         scan((n,), (tpb,), (Dg, comp, np.int32(n), best_w, best_j))
         redw((grid,), (tpb,), (best_w, comp, np.int32(n), comp_min_key))
         pick((grid,), (tpb,), (best_w, comp, np.int32(n), comp_min_key, comp_win))
-        hook((grid,), (tpb,),
-             (comp, best_j, comp_win, np.int32(n), root_parent, mst_u, mst_v, ne))
+        hook(
+            (grid,),
+            (tpb,),
+            (comp, best_j, comp_win, np.int32(n), root_parent, mst_u, mst_v, ne),
+        )
         relabel((grid,), (tpb,), (comp, root_parent, np.int32(n)))
         for _ in range(n_jumps):
             jump((grid,), (tpb,), (comp, np.int32(n)))
@@ -185,7 +189,7 @@ def _order_from_mst(mst_u, mst_v, weights, n, src):
         order[k] = v
         parent[v] = par
         k += 1
-        for (w2, nb) in adj[v]:
+        for w2, nb in adj[v]:
             if not visited[nb]:
                 heapq.heappush(h, (w2, nb, v))
     return order, parent

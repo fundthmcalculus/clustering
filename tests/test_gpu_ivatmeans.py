@@ -2,6 +2,7 @@
 
 Skipped when no CUDA device / CuPy is available.
 """
+
 import numpy as np
 import pytest
 
@@ -37,7 +38,7 @@ def test_auto_uses_gpu_for_highdim_f32_only():
     X_lo = _blobs(500, 8, 4, np.float32)
     X_f64 = _blobs(500, 96, 4, np.float64)
     assert gpu.gpu_pairwise_beneficial(X_hi) is True
-    assert gpu.gpu_pairwise_beneficial(X_lo) is False   # low dimension
+    assert gpu.gpu_pairwise_beneficial(X_lo) is False  # low dimension
     assert gpu.gpu_pairwise_beneficial(X_f64) is False  # float64 loses on GPU
 
 

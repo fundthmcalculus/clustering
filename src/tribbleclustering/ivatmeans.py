@@ -71,7 +71,8 @@ class IVATMeans:
             return _gpu.pairwise_distances_gpu(X)
         if backend not in ("auto", "cpu", "gpu"):
             raise ValueError(
-                f"distance_backend must be 'auto', 'gpu', or 'cpu', got {backend!r}")
+                f"distance_backend must be 'auto', 'gpu', or 'cpu', got {backend!r}"
+            )
         return _pairwise_distances(X)
 
     def fit(
