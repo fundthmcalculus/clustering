@@ -121,6 +121,63 @@ once with `boruvka_gpu.alloc_unified` / `as_unified` (or build it on-device with
 the same pages with no copy. The device-resident win survives, the transfer wall
 does not, and the memory ceiling moves from tens of GB to ~128 GB.
 
+## Precision: f32 and f16 on GB10 (~2× per step, ~4× at f16)
+
+The `n×n` matrix *is* the memory footprint and the per-round scan is
+bandwidth-bound, so narrowing the element type should both shrink the matrix and
+speed the scan. The GPU Borůvka kernels were templated over three storage types
+(`experiments/boruvka_gpu.py`): `TREAL` stores the matrix at f64/f32/**f16**,
+while the compare/reduce type `TCOMP` and the monotonic-bit-cast key `TKEY` stay
+`float`/`u32` for f16 and f32 (f16 is widened to float on load — no reliance on
+16-bit atomics). Same algorithm, exact same edge-selection logic.
+
+**Speed — a clean ~2× per precision step (matrix build time by storage dtype):**
+
+| n | f64 | f32 | f16 | f16 vs f64 |
+|-------|-------|-------|------|-----------|
+| 4000 | 5.1 | 2.8 | 1.6 | 3.2× |
+| 8000 | 19.2 | 9.8 | 5.2 | 3.7× |
+| 16000 | 75.0 | 38.0 | 19.2 | 3.9× |
+| 32000 | 349.1 | 175.5 | 88.4 | **3.9×** |
+
+Bandwidth-bound as predicted: f32 ≈ 2× f64, f16 ≈ 2× f32 (≈4× f64).
+
+**Accuracy vs f64** (MST weight = the low-precision MST's *chosen edges*
+re-measured on the exact f64 distances; VAT `order_match` vs serial Prim):
+
+| dtype | MST-weight reldiff | VAT order_match | iVAT image mean\|diff\| | verdict |
+|-------|--------------------|-----------------|-------------------------|---------|
+| f32 | ~1e-15 (machine ε) | **1.0000** | **0.0** (bit-identical) | free lunch |
+| f16 | ~1e-6 – 1e-7 | 0.95 – 0.997 | ~1e-4 (max ~2.6% of range) | near-identical |
+
+- **f32 is a free lunch.** ~7 decimal digits is enough to preserve the exact
+  edge selection: bit-identical MST, VAT order, and iVAT image as f64, at half
+  the memory and ~2× the speed. There is no reason to use f64 on GB10.
+- **f16 is near-identical, not exact.** The spanning tree it builds is still
+  within ~1e-6 of the optimal MST weight, but f16's ~3-digit precision flips a
+  small fraction of *near-tie* edges, which perturbs a few percent of the VAT
+  order positions. The iVAT image tracks f64 in the **mean** (~1e-4) — the
+  cluster block structure is visually identical — with a handful of pixels off
+  by up to ~2.6% of range. Good for exploratory cluster-tendency at extreme
+  scale; not for a bit-exact reproduction of the serial engine.
+
+![precision](../figures/boruvka_dgx_precision.png)
+
+**Capacity — narrower dtype buys √(bytes-ratio)× more samples at equal memory.**
+Holding the matrix at ~80 GB (born on device), the reachable n grows as the
+element shrinks; MST time is ~flat because it is the same bytes scanned:
+
+| dtype | n at ~80 GB | pairwise build | GPU Borůvka MST | edges |
+|-------|-------------|----------------|-----------------|-------|
+| f64 | 100000 | 27.6 s | 3.42 s | 99999/99999 |
+| f32 | 141000 | 38.0 s | 3.94 s | 140999/140999 |
+| f16 | **200000** | 76.5 s | 3.55 s | 199999/199999 |
+
+**n = 200000 is a dense VAT MST over 40 billion pairwise dissimilarities in
+3.5 s** — 2× the samples of the f64 ceiling at the same 80 GB, and far past any
+discrete GPU. In the shared 128 GB pool the ceilings rise further still
+(f16 reaches n ≈ 250k for the matrix alone).
+
 ## Verdict
 
 - **Exactness:** Borůvka-MST VAT is provably and empirically identical to serial
@@ -143,9 +200,11 @@ does not, and the memory ceiling moves from tens of GB to ~128 GB.
 - `experiments/boruvka_vat.py` — Numba Borůvka, VAT-order-from-MST, quality &
   scaling figures.
 - `experiments/boruvka_gpu.py` — the real device-side CuPy RawKernel Borůvka,
-  plus `alloc_unified` / `as_unified` (managed-memory helpers) and a tiled
-  `pairwise_distances_gpu` that builds the matrix on-device.
+  templated over f64/f32/f16 storage; plus `alloc_unified` / `as_unified`
+  (managed-memory helpers) and a tiled `pairwise_distances_gpu` (dtype-aware)
+  that builds the matrix on-device.
 - `experiments/boruvka_dgx_spark.py` — DGX Spark (GB10) study: transfer-mode
-  comparison + large-n capability (matrix born on the device).
+  comparison, large-n capability (matrix born on the device), and the
+  precision/capacity study across f64/f32/f16.
 - `experiments/figures/boruvka_vat_{quality,scaling}.png`,
-  `experiments/figures/boruvka_dgx_{transfer,largen}.png`.
+  `experiments/figures/boruvka_dgx_{transfer,largen,precision}.png`.
