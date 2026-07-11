@@ -226,6 +226,25 @@ Transposition," *Proc. PPoPP*, 2014, pp. 193–206. doi:10.1145/2555243.2555253.
   `pvat.shuffle_ordered_column`. Cite so the technique is credited; the novelty is its
   *application to VAT reordering* for the ~2× memory reduction, not the technique.
 
+### GPU minimum-spanning-tree / device-side Borůvka (for the on-device GPU VAT)
+Basis for the exact device-side Borůvka MST behind `gpu_vat.vat_gpu` (see
+`docs/novelty-review.md` §8 for the full novelty positioning). These target
+sparse/edge-list or Euclidean graphs; the VAT use here is a **dense complete
+graph over an arbitrary dissimilarity matrix kept GPU-resident**.
+- **[GPU-MST]** V. Vineet, P. Harish, S. Patidar, P. J. Narayanan, "Fast Minimum
+  Spanning Tree for Large Graphs on the GPU," *Proc. High Performance Graphics
+  (HPG '09)*, 2009, pp. 167–171. doi:10.1145/1572769.1572796. Canonical recursive
+  GPU-Borůvka (scan/segmented-scan/split); sparse graphs; reports 30–50×.
+  https://dl.acm.org/doi/10.1145/1572769.1572796
+- **[kNN-Borůvka-GPU]** M. M. A. Arefin, C. Riveros, et al., "kNN-Borůvka-GPU: A
+  Fast and Scalable MST Construction from kNN Graphs on GPU," *ICA3PP 2012*, LNCS
+  7439. doi:10.1007/978-3-642-31125-3_6. MST from a kNN graph → **approximate**
+  for a complete graph (contrast: our dense graph is exact).
+  https://link.springer.com/chapter/10.1007/978-3-642-31125-3_6
+- **[cudaMST]** J. Pan, "cudaMST — CUDA-accelerated data-parallel Borůvka's
+  algorithm," GitHub reference implementation.
+  https://github.com/jiachengpan/cudaMST
+
 ---
 
 ## Notes on verification
