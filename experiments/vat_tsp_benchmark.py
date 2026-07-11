@@ -125,19 +125,27 @@ def constructions(Df):
     }
 
 
-# LKH is expensive (a single run at n=5000 ~ 7 min), so compute each instance's
-# reference tour exactly once and share it across Part 1 and Part 2.
+# Flat LKH is expensive and does not scale: a single run is ~7 min at n=5000 on
+# uniform data and >15 min on clustered data (elkai exposes no trials/time cap).
+# So above LKH_MAX_N we skip the *flat* reference entirely (the reference becomes
+# flat VAT+2-opt) -- which is exactly the scaling wall the blocking strategy is
+# meant to get around. Per-block LKH on small blocks still runs (see _solve_block).
+LKH_MAX_N = 2000
 _LKH_CACHE = {}
 
 
 def lkh_reference(fam, n, D_int, Df):
+    """(reference_cost, seconds) using flat LKH, cached. Returns (None, None)
+    when n > LKH_MAX_N (flat LKH is impractical) or elkai is absent."""
     key = (fam, n)
     if key not in _LKH_CACHE:
-        t = time.perf_counter()
-        tour = lkh_tour(D_int, runs=1)
-        dt = time.perf_counter() - t
-        ref = _closed_cost(tour, Df) if tour is not None else None
-        _LKH_CACHE[key] = (ref, dt)
+        if not _HAS_LKH or n > LKH_MAX_N:
+            _LKH_CACHE[key] = (None, None)
+        else:
+            t = time.perf_counter()
+            tour = lkh_tour(D_int, runs=1)
+            dt = time.perf_counter() - t
+            _LKH_CACHE[key] = (_closed_cost(tour, Df), dt)
     return _LKH_CACHE[key]
 
 
@@ -347,19 +355,25 @@ def blocking_report(plan, block_of=None):
     for fam, n in plan:
         D_int = instance(fam, n)
         Df = np.ascontiguousarray(D_int.astype(np.float64))
-        base, t_lkh = lkh_reference(fam, n, D_int, Df)
+        lkh_ref, t_lkh = lkh_reference(fam, n, D_int, Df)
 
+        tf = time.perf_counter()
         fo = vat_tour(Df)
         two_opt_tour(fo, Df)
-        flat = _closed_cost(fo, Df)
+        flat, t_flat = _closed_cost(fo, Df), time.perf_counter() - tf
         B = block_of[fam]
-        if base is None:
-            base = flat
+        # reference: flat LKH where affordable, else flat VAT+2-opt (LKH skipped)
+        base = lkh_ref if lkh_ref is not None else flat
+        ref_name = "LKH" if lkh_ref is not None else "flat VAT+2opt"
 
         rows = {"flat": (100 * (flat - base) / base, None)}
-        print(f"\n  {fam} n={n}  B={B}   LKH ref={base:.0f} (flat LKH {t_lkh:.1f}s)")
-        print(f"    {'strategy':26s} {'% over LKH':>11s} {'t_par s':>9s}")
-        print(f"    {'flat VAT + 2opt':26s} {rows['flat'][0]:11.1f} {'-':>9s}")
+        if lkh_ref is not None:
+            hdr = f"LKH ref={base:.0f} (flat LKH {t_lkh:.1f}s, flat VAT+2opt {t_flat:.2f}s)"
+        else:
+            hdr = f"ref=flat VAT+2opt={base:.0f} ({t_flat:.2f}s); flat LKH SKIPPED (>7min)"
+        print(f"\n  {fam} n={n}  B={B}   {hdr}")
+        print(f"    {'strategy':26s} {'% over ' + ref_name:>13s} {'t_par s':>9s}")
+        print(f"    {'flat VAT + 2opt':26s} {rows['flat'][0]:13.1f} {'-':>9s}")
         for blk in ("vat", "maximin"):
             paths, ep, btimes = solve_blocks(Df, B, blk)
             for tag, opt, pol in (
@@ -371,7 +385,7 @@ def blocking_report(plan, block_of=None):
                 g = 100 * (_closed_cost(tour, Df) - base) / base
                 t_par = max(btimes) + ds + tp
                 rows[(blk, tag)] = (g, t_par)
-                print(f"    {'  ' + blk + ' block ' + tag:26s} {g:11.1f} {t_par:9.2f}")
+                print(f"    {'  ' + blk + ' block ' + tag:26s} {g:13.1f} {t_par:9.2f}")
         out[(fam, n)] = (base, t_lkh, rows)
     return out
 
@@ -436,30 +450,43 @@ def figure(bench, blk):
     ax.set_title("B. cluster-blocking + stitch (n=500)", fontsize=11)
     ax.legend(fontsize=7)
 
-    # C: scale -- flat LKH time vs blocked opt+polish, at n=5000
+    # C: scale n=5000 -- blocking vs flat VAT+2opt (flat LKH impractical here)
     ax = axes[2]
     big = [k for k in blk if k[1] == 5000]
     if big:
-        names, tl, tp, gp = [], [], [], []
-        for k in big:
-            base, t_lkh, rows = blk[k]
-            names.append(k[0])
-            tl.append(t_lkh)
-            tp.append(rows[("vat", "opt+polish")][1])
-            gp.append(rows[("vat", "opt+polish")][0])
-        xx = np.arange(len(names))
-        ax.bar(xx - 0.2, tl, 0.4, label="flat LKH", color="#c44")
-        ax.bar(xx + 0.2, tp, 0.4, label="blocked opt+polish", color="#268")
-        ax.set_yscale("log")
+        k = big[0]
+        _, _, rows = blk[k]
+        strat_c = [
+            ("vat", "naive"),
+            ("vat", "opt"),
+            ("vat", "opt+polish"),
+            ("maximin", "opt+polish"),
+        ]
+        labs_c = ["vat naive", "vat opt", "vat opt+polish", "maximin opt+polish"]
+        colc = ["#c44", "#e93", "#268", "#6b9"]
+        vals = [rows[s][0] for s in strat_c]
+        tpar = [rows[s][1] for s in strat_c]
+        xx = np.arange(len(strat_c))
+        ax.bar(xx, vals, 0.6, color=colc)
+        ax.axhline(0, color="#345", lw=1.2, ls="--", label="flat VAT+2opt (ref)")
+        for i, (v, tp) in enumerate(zip(vals, tpar)):
+            ax.text(
+                i,
+                v + (0.5 if v >= 0 else -0.5),
+                f"{tp:.1f}s",
+                ha="center",
+                va="bottom" if v >= 0 else "top",
+                fontsize=7,
+            )
         ax.set_xticks(xx)
-        ax.set_xticklabels(names, fontsize=8)
-        ax.set_ylabel("wall-clock s (log)")
-        for i, g in enumerate(gp):
-            ax.text(i + 0.2, tp[i] * 1.3, f"+{g:.0f}%", ha="center", fontsize=8)
+        ax.set_xticklabels(labs_c, rotation=20, ha="right", fontsize=7)
+        ax.set_ylabel("% over flat VAT+2opt")
         ax.set_title(
-            "C. scale n=5000: blocked is far faster\n(+% = gap over LKH)", fontsize=11
+            f"C. scale n=5000 ({k[0]}): blocked beats flat\n"
+            f"flat LKH ~7-15min (impractical); labels = t_par",
+            fontsize=10,
         )
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=7)
     else:
         ax.axis("off")
 
@@ -482,11 +509,9 @@ if __name__ == "__main__":
     print(f"LKH (elkai) available: {_HAS_LKH}")
     t0 = time.perf_counter()
     small = ("blobs", "uniform", "moons", "circles")
-    # n=5000 uses one clustered instance (blobs) shared across both parts: a
-    # single flat-LKH reference there costs ~7 min, so we spend it once.
-    bench_plan = (
-        [(f, 50) for f in small] + [(f, 500) for f in small] + [("blobs", 5000)]
-    )
+    # Part 1 is LKH-referenced, so it stays at n<=500 (flat LKH is impractical at
+    # 5000). The n=5000 scale case lives in Part 2, referenced to flat VAT+2-opt.
+    bench_plan = [(f, 50) for f in small] + [(f, 500) for f in small]
     block_plan = [(f, 500) for f in ("blobs", "uniform", "moons")] + [("blobs", 5000)]
     bench = benchmark_report(bench_plan)
     blk = blocking_report(block_plan)
