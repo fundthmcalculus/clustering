@@ -1,5 +1,15 @@
 # Spike: structure-aware partition + light cross-block stitch VAT — findings
 
+> **Critical caveat (read `ADVERSARIAL_EVAL_FINDINGS.md`).** The ARI=1.0 numbers
+> below are on Gaussian **blobs**, where k-means already scores ~1.0 — so on
+> their own they do NOT prove the stitch beats its k-means partition. The
+> adversarial evaluation (non-convex data + k-means/single-linkage controls) is
+> what actually validates the method: on two-moons/circles k-means fails (0.27,
+> 0.00) while stitched hits 1.0 = exact single-linkage, refuting the confound —
+> AND it honestly inherits single-linkage's failures (aniso, bridged). Trust the
+> adversarial results, not the blob numbers here.
+
+
 The fix for the block-decomposition seam artifact
 (`BLOCKWISE_VAT_FINDINGS.md`), sitting between naive block-concat (approximate,
 ~N² parallel, seams) and exact Borůvka-VAT (all cross-edges, no seams).
