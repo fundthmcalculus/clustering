@@ -17,6 +17,7 @@ This script quantifies both sides and renders the artifact.
 
 Run:  python -m experiments.blockwise_vat
 """
+
 from __future__ import annotations
 
 import time
@@ -26,10 +27,14 @@ import numpy as np
 from numba import njit
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from tribbleclustering.pcvat import compute_ivat_c, pairwise_distances_c_64  # noqa: E402
+from tribbleclustering.pcvat import (
+    compute_ivat_c,
+    pairwise_distances_c_64,
+)  # noqa: E402
 
 FIG_DIR = Path(__file__).parent / "figures"
 
@@ -141,13 +146,15 @@ def n_label_runs(order, labels):
 
 
 def adjusted_rand(a, b):
-    a = np.asarray(a); b = np.asarray(b)
+    a = np.asarray(a)
+    b = np.asarray(b)
     ua = np.unique(a, return_inverse=True)[1]
     ub = np.unique(b, return_inverse=True)[1]
     cont = np.zeros((ua.max() + 1, ub.max() + 1), dtype=np.int64)
     for i, j in zip(ua, ub):
         cont[i, j] += 1
     from math import comb
+
     sum_c = sum(comb(v, 2) for v in cont.flatten())
     sa = sum(comb(v, 2) for v in cont.sum(axis=1))
     sb = sum(comb(v, 2) for v in cont.sum(axis=0))
@@ -161,11 +168,11 @@ def labels_from_order(order, ivat_img, k):
     """Cut the iVAT superdiagonal at the top (k-1) gaps -> contiguous segments."""
     n = len(order)
     diag = np.diag(ivat_img, k=1)
-    cut_at = np.sort(np.argsort(diag)[-(k - 1):]) if k > 1 else np.array([], int)
+    cut_at = np.sort(np.argsort(diag)[-(k - 1) :]) if k > 1 else np.array([], int)
     labels = np.empty(n, dtype=np.int64)
     seg, prev = 0, 0
     for c in list(cut_at) + [n - 1]:
-        labels[order[prev:c + 1]] = seg
+        labels[order[prev : c + 1]] = seg
         seg += 1
         prev = c + 1
     return labels
@@ -194,11 +201,14 @@ def quality_figure(n=1600, d=8, k=6, how="random", seed=1):
                 ax.axhline(b - 0.5, color="red", lw=0.8, alpha=0.7)
                 ax.axvline(b - 0.5, color="red", lw=0.8, alpha=0.7)
         ax.set_title(title, fontsize=11)
-        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_xticks([])
+        ax.set_yticks([])
     fig.suptitle(
         f"Block-decomposition VAT — iVAT image (n={n}, {k} true clusters, "
         f"'{how}' partition). Red lines = block boundaries; note the "
-        f"pseudo-clusters that appear there.", fontsize=12)
+        f"pseudo-clusters that appear there.",
+        fontsize=12,
+    )
     fig.tight_layout()
     FIG_DIR.mkdir(exist_ok=True)
     path = FIG_DIR / f"blockwise_vat_quality_{how}.png"
@@ -221,12 +231,16 @@ def report():
             order, bounds, _ = blockwise_vat(D, N, groups, merge="concat")
             img = ivat_image_from_order(D, order)
             ari = adjusted_rand(labels_from_order(order, img, k), lbl)
-            print(f"  {how:10s} N={N}: runs={n_label_runs(order, lbl):3d}  "
-                  f"ARI={ari:.3f}")
+            print(
+                f"  {how:10s} N={N}: runs={n_label_runs(order, lbl):3d}  "
+                f"ARI={ari:.3f}"
+            )
 
     print("\n=== performance vs N (MST+iVAT work; sub-VAT is parallelizable) ===")
-    print(f"{'n':>6} {'exact_ms':>10} {'N':>3} {'sum_blocks_ms':>14} "
-          f"{'max_block_ms':>13} {'work_speedup':>13}")
+    print(
+        f"{'n':>6} {'exact_ms':>10} {'N':>3} {'sum_blocks_ms':>14} "
+        f"{'max_block_ms':>13} {'work_speedup':>13}"
+    )
     for n in (4000, 8000, 16000):
         X, lbl = make_blobs(n, 10, 20, seed=3)
         D = pairwise_distances_c_64(X)
@@ -238,8 +252,10 @@ def report():
             groups = partition(n, N, X, "coordinate", seed=3)
             _, _, times = blockwise_vat(D, N, groups, merge="concat")
             ssum, smax = sum(times), max(times)
-            print(f"{n:>6} {t_exact:>10.1f} {N:>3} {ssum:>14.1f} "
-                  f"{smax:>13.1f} {t_exact / smax:>12.2f}x")
+            print(
+                f"{n:>6} {t_exact:>10.1f} {N:>3} {ssum:>14.1f} "
+                f"{smax:>13.1f} {t_exact / smax:>12.2f}x"
+            )
 
 
 if __name__ == "__main__":

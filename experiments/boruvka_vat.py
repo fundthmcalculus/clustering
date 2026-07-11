@@ -24,6 +24,7 @@ Outputs two figures under experiments/figures/:
 
 Run:  python -m experiments.boruvka_vat
 """
+
 from __future__ import annotations
 
 import heapq
@@ -34,15 +35,19 @@ import numpy as np
 from numba import njit, prange
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from tribbleclustering.pcvat import (  # noqa: E402
-    compute_ivat_c, vat_prim_mst_c, pairwise_distances_c_64,
+    compute_ivat_c,
+    vat_prim_mst_c,
+    pairwise_distances_c_64,
 )
 
 try:
     import cupy as _cp
+
     _HAS_CUPY = _cp.cuda.runtime.getDeviceCount() > 0
 except Exception:
     _cp = None
@@ -260,20 +265,29 @@ def quality_figure():
         diff = np.abs(ivat_serial - ivat_bor)
         diffs.append(float(diff.max()))
         vmax = np.percentile(ivat_serial, 99)
-        for col, (img, title) in enumerate((
-            (ivat_serial, f"serial Prim iVAT\n(n={n}, k={k})"),
-            (ivat_bor, "Boruvka iVAT"),
-            (diff, f"|difference|\nmax={diff.max():.2e}"),
-        )):
+        for col, (img, title) in enumerate(
+            (
+                (ivat_serial, f"serial Prim iVAT\n(n={n}, k={k})"),
+                (ivat_bor, "Boruvka iVAT"),
+                (diff, f"|difference|\nmax={diff.max():.2e}"),
+            )
+        ):
             ax = axes[row, col]
-            im = ax.imshow(img, cmap="viridis" if col < 2 else "magma",
-                           vmax=vmax if col < 2 else None, aspect="equal")
+            im = ax.imshow(
+                img,
+                cmap="viridis" if col < 2 else "magma",
+                vmax=vmax if col < 2 else None,
+                aspect="equal",
+            )
             ax.set_title(title, fontsize=10)
-            ax.set_xticks([]); ax.set_yticks([])
+            ax.set_xticks([])
+            ax.set_yticks([])
             fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    fig.suptitle("VAT/iVAT image: serial Prim vs Boruvka-MST "
-                 "(identical output — Boruvka is a parallel MST build only)",
-                 fontsize=12)
+    fig.suptitle(
+        "VAT/iVAT image: serial Prim vs Boruvka-MST "
+        "(identical output — Boruvka is a parallel MST build only)",
+        fontsize=12,
+    )
     fig.tight_layout()
     FIG_DIR.mkdir(exist_ok=True)
     path = FIG_DIR / "boruvka_vat_quality.png"
@@ -331,27 +345,44 @@ def scaling_figure():
         mu, mv = boruvka_mst_numba(D)
         order = vat_order_from_mst(D, mu, mv)
         order_match.append(float(np.mean(order == p_serial)))
-        gm = (f"  gpu(dev) {t_gpu_dev[-1]:8.1f}ms  gpu(+xfer) {t_gpu_xfer[-1]:8.1f}ms"
-              if _HAS_CUPY else "")
-        print(f"  n={n:6d}: prim {t_prim[-1]:8.1f}ms  boruvka(numba) "
-              f"{t_bnumba[-1]:8.1f}ms" + gm +
-              f"  order_match={order_match[-1]:.4f}")
+        gm = (
+            f"  gpu(dev) {t_gpu_dev[-1]:8.1f}ms  gpu(+xfer) {t_gpu_xfer[-1]:8.1f}ms"
+            if _HAS_CUPY
+            else ""
+        )
+        print(
+            f"  n={n:6d}: prim {t_prim[-1]:8.1f}ms  boruvka(numba) "
+            f"{t_bnumba[-1]:8.1f}ms" + gm + f"  order_match={order_match[-1]:.4f}"
+        )
 
     fig, ax = plt.subplots(figsize=(8.5, 5.8))
     ax.plot(sizes, t_prim, "o-", label="serial Prim (C/OpenMP, O(n^2))")
     ax.plot(sizes, t_bnumba, "s-", label="Boruvka (Numba, 32 cores)")
     if _HAS_CUPY:
-        ax.plot(sizes, t_gpu_dev, "^-", color="tab:red",
-                label="Boruvka (GPU, matrix resident)")
-        ax.plot(sizes, t_gpu_xfer, "^--", color="tab:red", alpha=0.5,
-                label="Boruvka (GPU, incl. host->device transfer)")
+        ax.plot(
+            sizes,
+            t_gpu_dev,
+            "^-",
+            color="tab:red",
+            label="Boruvka (GPU, matrix resident)",
+        )
+        ax.plot(
+            sizes,
+            t_gpu_xfer,
+            "^--",
+            color="tab:red",
+            alpha=0.5,
+            label="Boruvka (GPU, incl. host->device transfer)",
+        )
     ax.set_xlabel("n (samples)")
     ax.set_ylabel("MST build time (ms)")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_title("MST build: serial Prim vs parallel Boruvka\n"
-                 "(VAT order/image identical; MST build time is the only axis "
-                 "that differs)")
+    ax.set_title(
+        "MST build: serial Prim vs parallel Boruvka\n"
+        "(VAT order/image identical; MST build time is the only axis "
+        "that differs)"
+    )
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -359,9 +390,14 @@ def scaling_figure():
     path = FIG_DIR / "boruvka_vat_scaling.png"
     fig.savefig(path, dpi=110)
     plt.close(fig)
-    return path, dict(sizes=sizes, prim=t_prim, boruvka_numba=t_bnumba,
-                      gpu_resident=t_gpu_dev, gpu_xfer=t_gpu_xfer,
-                      order_match=order_match)
+    return path, dict(
+        sizes=sizes,
+        prim=t_prim,
+        boruvka_numba=t_bnumba,
+        gpu_resident=t_gpu_dev,
+        gpu_xfer=t_gpu_xfer,
+        order_match=order_match,
+    )
 
 
 if __name__ == "__main__":

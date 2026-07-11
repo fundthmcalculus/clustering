@@ -21,6 +21,7 @@ Decisive questions:
 
 Run:  python -m experiments.adversarial_eval
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,6 +29,7 @@ from pathlib import Path
 import numpy as np
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -35,10 +37,16 @@ from scipy.cluster.hierarchy import linkage, fcluster  # noqa: E402
 from scipy.spatial.distance import squareform  # noqa: E402
 from scipy.cluster.vq import kmeans2  # noqa: E402
 
-from tribbleclustering.pcvat import compute_ivat_c, pairwise_distances_c_64  # noqa: E402
+from tribbleclustering.pcvat import (
+    compute_ivat_c,
+    pairwise_distances_c_64,
+)  # noqa: E402
 from experiments.blockwise_vat import (  # noqa: E402
-    partition, blockwise_vat, ivat_image_from_order,
-    adjusted_rand, labels_from_order,
+    partition,
+    blockwise_vat,
+    ivat_image_from_order,
+    adjusted_rand,
+    labels_from_order,
 )
 from experiments.stitched_vat import stitched_vat  # noqa: E402
 
@@ -194,23 +202,35 @@ def _figure(data_cache, results):
             ax = axes[i, j]
             ari, lab = results[(dname, mname)]
             if lab is not None:
-                ax.scatter(X[:, 0], X[:, 1], c=np.asarray(lab), s=3,
-                           cmap="tab10", linewidths=0)
-            ax.set_xticks([]); ax.set_yticks([])
+                ax.scatter(
+                    X[:, 0], X[:, 1], c=np.asarray(lab), s=3, cmap="tab10", linewidths=0
+                )
+            ax.set_xticks([])
+            ax.set_yticks([])
             if i == 0:
                 ax.set_title(mname, fontsize=10)
             if j == 0:
                 ax.set_ylabel(dname, fontsize=10)
-            ax.text(0.5, 0.02, f"ARI={ari:.2f}", transform=ax.transAxes,
-                    ha="center", va="bottom", fontsize=8,
-                    color=("green" if ari > 0.9 else "red" if ari < 0.6 else "black"))
-    fig.suptitle("Adversarial evaluation — who recovers non-convex structure? "
-                 "(k-means fails; does VAT win, and does the stitch keep it?)",
-                 fontsize=13)
+            ax.text(
+                0.5,
+                0.02,
+                f"ARI={ari:.2f}",
+                transform=ax.transAxes,
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color=("green" if ari > 0.9 else "red" if ari < 0.6 else "black"),
+            )
+    fig.suptitle(
+        "Adversarial evaluation — who recovers non-convex structure? "
+        "(k-means fails; does VAT win, and does the stitch keep it?)",
+        fontsize=13,
+    )
     fig.tight_layout()
     FIG_DIR.mkdir(exist_ok=True)
     p = FIG_DIR / "adversarial_eval.png"
-    fig.savefig(p, dpi=110); plt.close(fig)
+    fig.savefig(p, dpi=110)
+    plt.close(fig)
     print(f"\nwrote {p}")
 
 
@@ -223,9 +243,11 @@ def _verdict(results):
         sl = results[(dname, "single-linkage")][0]
         vat_wins = vat - km
         stitch_keeps = st - km
-        print(f"  {dname:16s} kmeans={km:.2f} SL={sl:.2f} VAT={vat:.2f} "
-              f"stitched={st:.2f} | VAT-vs-kmeans={vat_wins:+.2f} "
-              f"stitched-vs-kmeans={stitch_keeps:+.2f}")
+        print(
+            f"  {dname:16s} kmeans={km:.2f} SL={sl:.2f} VAT={vat:.2f} "
+            f"stitched={st:.2f} | VAT-vs-kmeans={vat_wins:+.2f} "
+            f"stitched-vs-kmeans={stitch_keeps:+.2f}"
+        )
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ and renders the three iVAT images.
 
 Run:  python -m experiments.stitched_vat
 """
+
 from __future__ import annotations
 
 import heapq
@@ -34,13 +35,22 @@ import numpy as np
 from numba import njit
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from tribbleclustering.pcvat import compute_ivat_c, pairwise_distances_c_64  # noqa: E402
+from tribbleclustering.pcvat import (
+    compute_ivat_c,
+    pairwise_distances_c_64,
+)  # noqa: E402
 from experiments.blockwise_vat import (  # noqa: E402
-    make_blobs, partition, blockwise_vat, ivat_image_from_order,
-    n_label_runs, adjusted_rand, labels_from_order,
+    make_blobs,
+    partition,
+    blockwise_vat,
+    ivat_image_from_order,
+    n_label_runs,
+    adjusted_rand,
+    labels_from_order,
 )
 
 FIG_DIR = Path(__file__).parent / "figures"
@@ -139,7 +149,7 @@ def _order_from_edges(D, edges, n, src):
         visited[v] = True
         order[k] = v
         k += 1
-        for (w2, nb) in adj[v]:
+        for w2, nb in adj[v]:
             if not visited[nb]:
                 heapq.heappush(h, (w2, nb))
     # any leftover (disconnected safety) appended in index order
@@ -195,8 +205,7 @@ def _topm_pairs(block, m):
     return flat // block.shape[1], flat % block.shape[1]
 
 
-def stitch_core(D, groups, n_repr=24, seed=0, reps="random", m_edges=1,
-                full=False):
+def stitch_core(D, groups, n_repr=24, seed=0, reps="random", m_edges=1, full=False):
     """Bounded cross-block stitch over a GIVEN partition -> VAT order.
 
     Per-block exact Prim MST (forest) + cross-block candidate edges -> MST of
@@ -228,8 +237,9 @@ def stitch_core(D, groups, n_repr=24, seed=0, reps="random", m_edges=1,
             if reps == "fps":
                 reps_idx.append(g[_fps(sub, r, seed)])
             else:
-                reps_idx.append(g[rng.choice(len(g), r, replace=False)]
-                                if len(g) > r else g)
+                reps_idx.append(
+                    g[rng.choice(len(g), r, replace=False)] if len(g) > r else g
+                )
 
     for a in range(Ng):
         for b in range(a + 1, Ng):
@@ -261,14 +271,18 @@ def stitched_vat_from_D(D, N, n_repr=24, seed=0):
 # Experiments
 # ---------------------------------------------------------------------------
 def quality_report():
-    print("\n=== quality: exact vs naive-blockwise vs stitched "
-          "(n=4000, k=10; ideal runs=10, ARI=1.0) ===")
+    print(
+        "\n=== quality: exact vs naive-blockwise vs stitched "
+        "(n=4000, k=10; ideal runs=10, ARI=1.0) ==="
+    )
     n, d, k = 4000, 10, 10
     X, lbl = make_blobs(n, d, k, seed=2)
     D = pairwise_distances_c_64(X)
     ivat_ex, _, p_ex = compute_ivat_c(D.copy(), inplace=False)
-    print(f"  exact serial     : runs={n_label_runs(p_ex, lbl):3d} "
-          f"ARI={adjusted_rand(labels_from_order(p_ex, ivat_ex, k), lbl):.3f}")
+    print(
+        f"  exact serial     : runs={n_label_runs(p_ex, lbl):3d} "
+        f"ARI={adjusted_rand(labels_from_order(p_ex, ivat_ex, k), lbl):.3f}"
+    )
     for N in (4, 8, 16):
         # naive blockwise with the best (coordinate) partition, for reference
         g_coord = partition(n, N, X, "coordinate", seed=2)
@@ -279,9 +293,11 @@ def quality_report():
         o_st = stitched_vat(D, X, N, n_repr=24, seed=2)
         img_st = ivat_image_from_order(D, o_st)
         ari_st = adjusted_rand(labels_from_order(o_st, img_st, k), lbl)
-        print(f"  N={N:2d}: naive(coord) runs={n_label_runs(o_naive, lbl):3d} "
-              f"ARI={ari_naive:.3f}   |   stitched runs="
-              f"{n_label_runs(o_st, lbl):3d} ARI={ari_st:.3f}")
+        print(
+            f"  N={N:2d}: naive(coord) runs={n_label_runs(o_naive, lbl):3d} "
+            f"ARI={ari_naive:.3f}   |   stitched runs="
+            f"{n_label_runs(o_st, lbl):3d} ARI={ari_st:.3f}"
+        )
 
 
 def repr_sweep():
@@ -292,8 +308,10 @@ def repr_sweep():
     for r in (4, 8, 16, 32, 64):
         o = stitched_vat(D, X, 8, n_repr=r, seed=5)
         img = ivat_image_from_order(D, o)
-        print(f"  r={r:3d}: runs={n_label_runs(o, lbl):3d} "
-              f"ARI={adjusted_rand(labels_from_order(o, img, k), lbl):.3f}")
+        print(
+            f"  r={r:3d}: runs={n_label_runs(o, lbl):3d} "
+            f"ARI={adjusted_rand(labels_from_order(o, img, k), lbl):.3f}"
+        )
 
 
 def figure():
@@ -319,9 +337,13 @@ def figure():
                 ax.axhline(b - 0.5, color="red", lw=0.7, alpha=0.6)
                 ax.axvline(b - 0.5, color="red", lw=0.7, alpha=0.6)
         ax.set_title(title, fontsize=11)
-        ax.set_xticks([]); ax.set_yticks([])
-    fig.suptitle("Structure-aware partition + light cross-block stitch recovers "
-                 "the exact VAT image (no seam pseudo-clusters)", fontsize=12)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    fig.suptitle(
+        "Structure-aware partition + light cross-block stitch recovers "
+        "the exact VAT image (no seam pseudo-clusters)",
+        fontsize=12,
+    )
     fig.tight_layout()
     FIG_DIR.mkdir(exist_ok=True)
     path = FIG_DIR / "stitched_vat_quality.png"

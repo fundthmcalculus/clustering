@@ -16,6 +16,7 @@ PART B — partition-adversarial robustness.
 
 Run:  python -m experiments.hardening_eval
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -32,10 +34,14 @@ from scipy.sparse.csgraph import shortest_path  # noqa: E402
 
 from tribbleclustering.pcvat import compute_ivat_c  # noqa: E402
 from experiments.blockwise_vat import (  # noqa: E402
-    ivat_image_from_order, adjusted_rand, labels_from_order,
+    ivat_image_from_order,
+    adjusted_rand,
+    labels_from_order,
 )
 from experiments.stitched_vat import (  # noqa: E402
-    stitch_core, maximin_partition, kmeans_partition,
+    stitch_core,
+    maximin_partition,
+    kmeans_partition,
 )
 from experiments.adversarial_eval import two_moons, easy_blobs  # noqa: E402
 
@@ -62,7 +68,7 @@ def d_geodesic(X, k=10):
     """kNN-graph shortest-path (manifold) dissimilarity — non-Euclidean."""
     E = squareform(pdist(X, "euclidean"))
     n = len(X)
-    knn = np.argsort(E, axis=1)[:, 1:k + 1]
+    knn = np.argsort(E, axis=1)[:, 1 : k + 1]
     A = np.full((n, n), 0.0)
     for i in range(n):
         for j in knn[i]:
@@ -107,7 +113,9 @@ def stitched_D_labels(D, k, N=8, r=24, seed=0):
 # ---------------------------------------------------------------------------
 def part_a():
     print("\n=== PART A — arbitrary / non-metric dissimilarity ===")
-    print("(k-means / kd-tree need coordinates+metric; VAT-family consume D directly)\n")
+    print(
+        "(k-means / kd-tree need coordinates+metric; VAT-family consume D directly)\n"
+    )
     Xb, yb = easy_blobs(1200, seed=1)
     Xb = (Xb - Xb.mean(0)) + 20.0  # push off origin so cosine (angle) separates
     Xm, ym = two_moons(1200, noise=0.06, seed=1)
@@ -118,8 +126,10 @@ def part_a():
         ("moons", Xm, ym, 2, "euclidean (metric)", d_euclidean),
         ("moons", Xm, ym, 2, "kNN-geodesic (non-Euclidean)", d_geodesic),
     ]
-    print(f"{'data':6s} {'dissimilarity':30s} {'tri-viol':>9s} "
-          f"{'SL':>6s} {'VAT':>6s} {'stitchD':>8s} {'agree':>6s}")
+    print(
+        f"{'data':6s} {'dissimilarity':30s} {'tri-viol':>9s} "
+        f"{'SL':>6s} {'VAT':>6s} {'stitchD':>8s} {'agree':>6s}"
+    )
     for name, X, y, k, dname, dfn in cases:
         D = dfn(X)
         tv = triangle_violation_rate(D)
@@ -127,8 +137,10 @@ def part_a():
         vat = adjusted_rand(y, vat_labels(D, k))
         st = adjusted_rand(y, stitched_D_labels(D, k))
         agree = adjusted_rand(vat_labels(D, k), stitched_D_labels(D, k))
-        print(f"{name:6s} {dname:30s} {tv:9.2%} {sl:6.2f} {vat:6.2f} "
-              f"{st:8.2f} {agree:6.2f}")
+        print(
+            f"{name:6s} {dname:30s} {tv:9.2%} {sl:6.2f} {vat:6.2f} "
+            f"{st:8.2f} {agree:6.2f}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +194,8 @@ def part_b():
         for ri, pt in enumerate(ptypes):
             order = stitch_core(D, P[pt], n_repr=24, seed=2)
             heat[ri, cj] = adjusted_rand(
-                y, labels_from_order(order, ivat_image_from_order(D, order), k))
+                y, labels_from_order(order, ivat_image_from_order(D, order), k)
+            )
     # r-sweep at N=8
     rcurves = {}
     P8 = parts(8)
@@ -190,8 +203,11 @@ def part_b():
         vals = []
         for r in rs:
             order = stitch_core(D, P8[pt], n_repr=r, seed=2)
-            vals.append(adjusted_rand(
-                y, labels_from_order(order, ivat_image_from_order(D, order), k)))
+            vals.append(
+                adjusted_rand(
+                    y, labels_from_order(order, ivat_image_from_order(D, order), k)
+                )
+            )
         rcurves[pt] = vals
 
     print(f"{'partition':13s} " + " ".join(f"N={n:<4d}" for n in Ns))
@@ -207,9 +223,12 @@ def part_b():
 def _plot_robustness(heat, ptypes, Ns, rcurves, rs):
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(13, 4.8))
     im = a1.imshow(heat, cmap="RdYlGn", vmin=0, vmax=1, aspect="auto")
-    a1.set_xticks(range(len(Ns))); a1.set_xticklabels(Ns)
-    a1.set_yticks(range(len(ptypes))); a1.set_yticklabels(ptypes)
-    a1.set_xlabel("N (partition size)"); a1.set_ylabel("partition strategy")
+    a1.set_xticks(range(len(Ns)))
+    a1.set_xticklabels(Ns)
+    a1.set_yticks(range(len(ptypes)))
+    a1.set_yticklabels(ptypes)
+    a1.set_xlabel("N (partition size)")
+    a1.set_ylabel("partition strategy")
     a1.set_title("stitched ARI on two-moons (r=24)\nbenign -> adversarial partition")
     for i in range(heat.shape[0]):
         for j in range(heat.shape[1]):
@@ -218,15 +237,21 @@ def _plot_robustness(heat, ptypes, Ns, rcurves, rs):
     for pt, vals in rcurves.items():
         a2.plot(rs, vals, "o-", label=pt)
     a2.set_xscale("log", base=2)
-    a2.set_xlabel("# representatives r (N=8)"); a2.set_ylabel("stitched ARI")
+    a2.set_xlabel("# representatives r (N=8)")
+    a2.set_ylabel("stitched ARI")
     a2.set_title("How many cross-block representatives\nrecover the moons?")
-    a2.grid(True, alpha=0.3); a2.legend(fontsize=8); a2.set_ylim(-0.05, 1.05)
-    fig.suptitle("Partition-adversarial robustness of the stitched divide-and-conquer VAT",
-                 fontsize=12)
+    a2.grid(True, alpha=0.3)
+    a2.legend(fontsize=8)
+    a2.set_ylim(-0.05, 1.05)
+    fig.suptitle(
+        "Partition-adversarial robustness of the stitched divide-and-conquer VAT",
+        fontsize=12,
+    )
     fig.tight_layout()
     FIG_DIR.mkdir(exist_ok=True)
     p = FIG_DIR / "hardening_partition_robustness.png"
-    fig.savefig(p, dpi=115); plt.close(fig)
+    fig.savefig(p, dpi=115)
+    plt.close(fig)
     print(f"\nwrote {p}")
 
 
