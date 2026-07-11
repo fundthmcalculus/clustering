@@ -45,3 +45,19 @@ where = ["src"]
 [tool.setuptools.package-data]
 tribbleclustering = ["*.pyx", "*.c"]
 
+# Code style: Black with default line length (88), matching the `optimizers` repo.
+# target-version is pinned to the project's minimum (py311) so Black does not
+# infer a newer grammar from requires-python and emit a spurious AST-safety
+# warning on older interpreters.
+[tool.black]
+target-version = ["py311"]
+
+# Tests: wall-clock benchmarks (speedup ratios) are unreliable on shared CI
+# runners, so they are marked `benchmark` and deselected by default. Run them
+# explicitly with `pytest -m benchmark`. Correctness tests still gate CI.
+[tool.pytest.ini_options]
+markers = [
+    "benchmark: performance benchmark with wall-clock timing assertions (deselected by default)",
+]
+addopts = "-m 'not benchmark'"
+
