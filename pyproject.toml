@@ -29,6 +29,9 @@ dev = [
     "matplotlib",
     "pytest",
     "black",
+    "flake8",
+    "Flake8-pyproject",
+    "mypy",
     "scipy"
 ]
 # Optional GPU acceleration (CUDA 12.x). Install the wheel matching your CUDA
@@ -50,4 +53,47 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 tribbleclustering = ["*.pyx", "*.c"]
+
+# Code style: Black with default line length (88), matching the `optimizers` repo.
+# target-version is pinned to the project's minimum (py311) so Black does not
+# infer a newer grammar from requires-python and emit a spurious AST-safety
+# warning on older interpreters.
+[tool.black]
+target-version = ["py311"]
+
+# Tests: wall-clock benchmarks (speedup ratios) are unreliable on shared CI
+# runners, so they are marked `benchmark` and deselected by default. Run them
+# explicitly with `pytest -m benchmark`. Correctness tests still gate CI.
+[tool.pytest.ini_options]
+markers = [
+    "benchmark: performance benchmark with wall-clock timing assertions (deselected by default)",
+]
+addopts = "-m 'not benchmark'"
+
+# Lint: flake8 (via Flake8-pyproject), settings copied from the `optimizers` repo.
+# max-line-length is 120 while Black formats to 88, so E501 only trips on lines
+# Black cannot split. E203 is ignored because Black and pycodestyle disagree on
+# whitespace before slice colons.
+[tool.flake8]
+max-line-length = 120
+exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv,experiments"
+extend-ignore = ["E203"]
+
+# Types: mypy. Lenient baseline for now — it catches genuine type errors without
+# demanding full annotations. Strictness (disallow_untyped_defs, then strict) is
+# intended to be ratcheted up one module at a time in follow-up PRs.
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_redundant_casts = true
+
+# numba is only partially typed: mypy misreads `prange` as non-iterable and
+# @njit-dispatched calls as type errors, and the exact noise varies by numba
+# version (so line-level ignores would drift between local and CI). Treat numba
+# as untyped so its symbols are Any; the JIT kernels' own bodies are still
+# checked. This keeps the baseline lenient but stable.
+[[tool.mypy.overrides]]
+module = ["numba", "numba.*", "numba_progress", "numba_progress.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
 

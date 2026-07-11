@@ -138,7 +138,7 @@ class FuzzyCMeans:
 
             distances = np.linalg.norm(
                 X_batch[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :],
-                axis=2
+                axis=2,
             )
             labels[start:end] = np.argmin(distances, axis=1)
 
@@ -168,6 +168,7 @@ class FuzzyCMeans:
             Cluster labels for each sample in X.
         """
         self.fit(X, y, sample_weight)
+        assert self.labels_ is not None  # set by fit()
         return self.labels_
 
     def get_soft_labels(self) -> ndarray:
@@ -186,4 +187,5 @@ class FuzzyCMeans:
 
     def _get_hard_labels(self) -> ndarray:
         """Convert soft membership matrix to hard cluster assignments."""
+        assert self.membership_matrix_ is not None  # set by fit()
         return np.argmax(self.membership_matrix_, axis=1)
