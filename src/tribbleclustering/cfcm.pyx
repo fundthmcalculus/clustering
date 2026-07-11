@@ -227,6 +227,33 @@ cdef void _init_centers_64(
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cdef bint _centers_moved_significantly_32(
+    const float[:, ::1] c_old,
+    const float[:, ::1] c_new,
+    float threshold
+) noexcept nogil:
+    """Check if cluster centers moved significantly.
+
+    Returns True if max center delta exceeds threshold.
+    Used to skip distance recomputation in stable phases.
+    """
+    cdef int n = c_old.shape[0]
+    cdef int d = c_old.shape[1]
+    cdef int i, k
+    cdef float max_delta = 0.0, delta
+
+    for i in range(n):
+        for k in range(d):
+            delta = (c_new[i, k] - c_old[i, k]) ** 2
+            if delta > max_delta:
+                max_delta = delta
+
+    return max_delta >= threshold
+
+
+@cython.cdivision(True)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cdef tuple _fuzzy_c_means_kernel_32(
     float[:, ::1] x,
     int n,
@@ -241,6 +268,8 @@ cdef tuple _fuzzy_c_means_kernel_32(
     cdef float[:, ::1] distances
     cdef int i, j, k, iteration
     cdef float delta, max_delta
+    cdef bint recompute_distances
+    cdef float movement_threshold = 1e-6
 
     c = np.zeros((n, n_features), dtype=np.float32)
     c_new = np.zeros((n, n_features), dtype=np.float32)
@@ -251,8 +280,14 @@ cdef tuple _fuzzy_c_means_kernel_32(
         for k in range(n_features):
             c[i, k] = c_init[i, k]
 
+    # Always recompute on first iteration
+    recompute_distances = True
+
     for iteration in range(100):
-        _compute_distances_32(x, c, distances)
+        # Only recompute distances if centers moved significantly
+        if recompute_distances:
+            _compute_distances_32(x, c, distances)
+
         _compute_weights_32(distances, m, w_ij)
 
         for i in range(n):
@@ -271,14 +306,47 @@ cdef tuple _fuzzy_c_means_kernel_32(
         if max_delta < 1e-10:
             break
 
+        # Check if centers moved significantly for next iteration
+        recompute_distances = _centers_moved_significantly_32(
+            c, c_new, movement_threshold
+        )
+
         for i in range(n):
             for k in range(n_features):
                 c[i, k] = c_new[i, k]
 
+    # Final distance/weight computation with latest centers
     _compute_distances_32(x, c, distances)
     _compute_weights_32(distances, m, w_ij)
 
     return np.asarray(c), np.asarray(w_ij)
+
+
+@cython.cdivision(True)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef bint _centers_moved_significantly_64(
+    const double[:, ::1] c_old,
+    const double[:, ::1] c_new,
+    double threshold
+) noexcept nogil:
+    """Check if cluster centers moved significantly.
+
+    Returns True if max center delta exceeds threshold.
+    Used to skip distance recomputation in stable phases.
+    """
+    cdef int n = c_old.shape[0]
+    cdef int d = c_old.shape[1]
+    cdef int i, k
+    cdef double max_delta = 0.0, delta
+
+    for i in range(n):
+        for k in range(d):
+            delta = (c_new[i, k] - c_old[i, k]) ** 2
+            if delta > max_delta:
+                max_delta = delta
+
+    return max_delta >= threshold
 
 
 @cython.cdivision(True)
@@ -298,6 +366,8 @@ cdef tuple _fuzzy_c_means_kernel_64(
     cdef double[:, ::1] distances
     cdef int i, j, k, iteration
     cdef double delta, max_delta
+    cdef bint recompute_distances
+    cdef double movement_threshold = 1e-6
 
     c = np.zeros((n, n_features), dtype=np.float64)
     c_new = np.zeros((n, n_features), dtype=np.float64)
@@ -308,8 +378,14 @@ cdef tuple _fuzzy_c_means_kernel_64(
         for k in range(n_features):
             c[i, k] = c_init[i, k]
 
+    # Always recompute on first iteration
+    recompute_distances = True
+
     for iteration in range(100):
-        _compute_distances_64(x, c, distances)
+        # Only recompute distances if centers moved significantly
+        if recompute_distances:
+            _compute_distances_64(x, c, distances)
+
         _compute_weights_64(distances, m, w_ij)
 
         for i in range(n):
@@ -328,10 +404,16 @@ cdef tuple _fuzzy_c_means_kernel_64(
         if max_delta < 1e-10:
             break
 
+        # Check if centers moved significantly for next iteration
+        recompute_distances = _centers_moved_significantly_64(
+            c, c_new, movement_threshold
+        )
+
         for i in range(n):
             for k in range(n_features):
                 c[i, k] = c_new[i, k]
 
+    # Final distance/weight computation with latest centers
     _compute_distances_64(x, c, distances)
     _compute_weights_64(distances, m, w_ij)
 

@@ -72,14 +72,22 @@ class IVATMeans:
 
         return self
 
-    def predict(self, X: ndarray) -> ndarray:
+    def predict(self, X: ndarray, batch_size: int = 10000) -> ndarray:
         """
         Predict cluster labels for samples in X.
+
+        For large n_samples, prediction is done in batches to avoid
+        allocating huge temporary arrays. Batch size can be tuned
+        based on available memory.
 
         Parameters
         ----------
         X : ndarray of shape (n_samples, n_features)
             New data to predict.
+        batch_size : int, optional
+            Number of samples to process at once. Default 10000.
+            Reduce if you encounter memory errors, increase if you have
+            plenty of RAM and want faster prediction.
 
         Returns
         -------
@@ -93,10 +101,28 @@ class IVATMeans:
         if X.ndim != 2:
             raise ValueError(f"X must be 2-dimensional, got shape {X.shape}")
 
-        distances = np.linalg.norm(
-            X[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :], axis=2
-        )
-        return np.argmin(distances, axis=1)
+        n_samples = X.shape[0]
+        labels = np.empty(n_samples, dtype=np.int32)
+
+        # For small datasets, use direct computation (faster)
+        if n_samples <= batch_size:
+            distances = np.linalg.norm(
+                X[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :], axis=2
+            )
+            return np.argmin(distances, axis=1)
+
+        # For large datasets, process in batches
+        for start in range(0, n_samples, batch_size):
+            end = min(start + batch_size, n_samples)
+            X_batch = X[start:end]
+
+            distances = np.linalg.norm(
+                X_batch[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :],
+                axis=2
+            )
+            labels[start:end] = np.argmin(distances, axis=1)
+
+        return labels
 
     def fit_predict(
         self,
