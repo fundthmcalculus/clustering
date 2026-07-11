@@ -195,7 +195,7 @@ def test_performance(capsys):
     sep = "-" * len(header)
 
     with capsys.disabled():
-        print(f"\n\nLower-tri VAT + IVAT performance (ms, best of 3):")
+        print("\n\nLower-tri VAT + IVAT performance (ms, best of 3):")
         print(header)
         print(sep)
         for n in sizes:
