@@ -3,7 +3,8 @@
 import numpy as np
 cimport cython
 from libc.math cimport INFINITY, INFINITY as INFINITY_F, sqrt
-from libc.stdlib cimport malloc, free
+from libc.stdlib cimport malloc, calloc, free
+from libc.string cimport memcpy
 from cython.parallel cimport prange, threadid
 cimport openmp
 
@@ -171,6 +172,137 @@ cdef void _backcopy_lower_to_upper_32(float* M, int n, int nthreads) noexcept no
     for i in prange(1, n, schedule='static', num_threads=nthreads):
         for j in range(i):
             M[<Py_ssize_t>j * n + i] = M[<Py_ssize_t>i * n + j]
+
+
+# ---------------------------------------------------------------------------
+# In-place symmetric permutation: M[i, j] <- M[p[i], p[j]] for all i, j.
+#
+# This is the memory-frugal alternative to the out-of-place gather. It applies
+# the permutation as P·M·Pᵀ in two independent 1-D passes:
+#
+#   1. Permute rows   so row i becomes old row p[i]  (M1[i,j] = M[p[i], j]).
+#   2. Permute columns so col j becomes old col p[j] (M2[i,j] = M1[i, p[j]]
+#      = M[p[i], p[j]]).
+#
+# Each pass is a standard cycle-following in-place permutation of a 1-D index
+# (rows, then columns-within-each-row), which is provably correct: the walk
+# reads only the *next* (not-yet-visited) element of a cycle before overwriting
+# the current one. Workspace is O(n) — one length-n scratch row plus a length-n
+# visited flag — far less than the n^2 output buffer it replaces.
+#
+# NB: the earlier cycle-following-on-cell-pairs scheme with symmetric
+# mirror-writes (pvat.shuffle_ordered_column) is NOT correct — a mirror-written
+# cell can be read as another cycle's "next" after it has already been given
+# its final value. This row-then-column formulation avoids that entirely by
+# never coupling two cells in a single write.
+#
+# Serial by nature (cycles have data-dependent length); the trade is speed for
+# memory, opted into via inplace=True when the input is destroyable.
+# ---------------------------------------------------------------------------
+cdef void _permute_sym_inplace_64(
+    double* M, int n, const int* p, double* tmp, unsigned char* seen
+) noexcept nogil:
+    cdef int start, i, j, nxt
+    cdef double* row
+
+    # Phase 1: permute rows so new row i = old row p[i].
+    for i in range(n):
+        seen[i] = 0
+    for start in range(n):
+        if seen[start] or p[start] == start:
+            seen[start] = 1
+            continue
+        memcpy(tmp, M + <Py_ssize_t>start * n, <size_t>n * sizeof(double))
+        i = start
+        while True:
+            seen[i] = 1
+            nxt = p[i]
+            if nxt == start:
+                memcpy(M + <Py_ssize_t>i * n, tmp, <size_t>n * sizeof(double))
+                break
+            memcpy(M + <Py_ssize_t>i * n, M + <Py_ssize_t>nxt * n,
+                   <size_t>n * sizeof(double))
+            i = nxt
+
+    # Phase 2: permute columns within each row: new[i,j] = cur[i, p[j]].
+    for i in range(n):
+        row = M + <Py_ssize_t>i * n
+        for j in range(n):
+            tmp[j] = row[j]
+        for j in range(n):
+            row[j] = tmp[p[j]]
+
+
+cdef void _permute_sym_inplace_32(
+    float* M, int n, const int* p, float* tmp, unsigned char* seen
+) noexcept nogil:
+    cdef int start, i, j, nxt
+    cdef float* row
+
+    for i in range(n):
+        seen[i] = 0
+    for start in range(n):
+        if seen[start] or p[start] == start:
+            seen[start] = 1
+            continue
+        memcpy(tmp, M + <Py_ssize_t>start * n, <size_t>n * sizeof(float))
+        i = start
+        while True:
+            seen[i] = 1
+            nxt = p[i]
+            if nxt == start:
+                memcpy(M + <Py_ssize_t>i * n, tmp, <size_t>n * sizeof(float))
+                break
+            memcpy(M + <Py_ssize_t>i * n, M + <Py_ssize_t>nxt * n,
+                   <size_t>n * sizeof(float))
+            i = nxt
+
+    for i in range(n):
+        row = M + <Py_ssize_t>i * n
+        for j in range(n):
+            tmp[j] = row[j]
+        for j in range(n):
+            row[j] = tmp[p[j]]
+
+
+# Run MST then permute the matrix in place. Returns (p_seq, q_seq). The caller
+# owns `M` (already C-contiguous, correct dtype) and it IS the VAT result.
+cdef _vat_inplace_64(double[:, ::1] M):
+    cdef int n = M.shape[0]
+    heap_seq_np = np.empty(n, dtype=np.int32)
+    parent_seq_np = np.empty(n, dtype=np.int32)
+    cdef int[:] p = heap_seq_np
+    cdef int[:] q = parent_seq_np
+    _run_mst_64(&M[0, 0], n, p, q)
+
+    cdef double* tmp = <double*>malloc(<size_t>n * sizeof(double))
+    cdef unsigned char* seen = <unsigned char*>malloc(<size_t>n)
+    if not (tmp and seen):
+        free(tmp); free(seen)
+        raise MemoryError("permutation workspace allocation failed")
+    with nogil:
+        _permute_sym_inplace_64(&M[0, 0], n, &p[0], tmp, seen)
+    free(tmp); free(seen)
+    return heap_seq_np, parent_seq_np
+
+
+cdef _vat_inplace_32(float[:, ::1] M):
+    cdef int n = M.shape[0]
+    heap_seq_np = np.empty(n, dtype=np.int32)
+    parent_seq_np = np.empty(n, dtype=np.int32)
+    cdef int[:] p = heap_seq_np
+    cdef int[:] q = parent_seq_np
+    _run_mst_32(&M[0, 0], n, p, q)
+
+    cdef float* tmp = <float*>malloc(<size_t>n * sizeof(float))
+    cdef unsigned char* seen = <unsigned char*>malloc(<size_t>n)
+    if not (tmp and seen):
+        free(tmp); free(seen)
+        raise MemoryError("permutation workspace allocation failed")
+    with nogil:
+        _permute_sym_inplace_32(&M[0, 0], n, &p[0], tmp, seen)
+    free(tmp); free(seen)
+    return heap_seq_np, parent_seq_np
 
 
 # ---------------------------------------------------------------------------
@@ -593,17 +725,31 @@ def vat_prim_mst_c(adj):
         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
 
 
-def compute_vat_c(adj):
+def compute_vat_c(adj, inplace=False):
     """
     C/OpenMP implementation of compute_ordered_dis_njit_merge.
     Automatically dispatches to float32 or float64 based on input dtype.
     Returns (ordered_matrix, p_seq, q_seq).
+
+    If ``inplace=True`` the input matrix is reordered in place (via a
+    serial, memory-frugal cycle-following permutation with an ~n^2/8-byte
+    bitmask) instead of into a fresh n x n buffer, and the returned VAT matrix
+    IS the input array. This roughly halves peak memory at the cost of a
+    serial permutation pass. The input must be destroyable; if it is not
+    already C-contiguous and of the dispatched dtype, a conforming copy is made
+    and only that copy is modified.
     """
     if adj.dtype == np.float32:
         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        if inplace:
+            p_np, q_np = _vat_inplace_32(adj_c)
+            return adj_c, p_np, q_np
         return compute_vat_c_32(adj_c)
     elif adj.dtype == np.float64:
         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        if inplace:
+            p_np, q_np = _vat_inplace_64(adj_c)
+            return adj_c, p_np, q_np
         return compute_vat_c_64(adj_c)
     else:
         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
@@ -786,18 +932,54 @@ def compute_ivat_c_32(float[:, ::1] adj):
     return vat_np, argmin_seq_np, p_seq_np
 
 
+cdef _ivat_inplace_impl_64(adj_c):
+    cdef int n = adj_c.shape[0]
+    cdef double[:, ::1] M = adj_c
+    # Permute in place -> M is now VAT; only an ~n^2/8-byte bitmask is allocated.
+    p_np, q_np = _vat_inplace_64(M)
+    argmin_np = np.zeros(n - 1, dtype=np.int32)
+    cdef int[:] argmin = argmin_np
+    cdef int nthreads = openmp.omp_get_max_threads()
+    if n < _PAR_THRESHOLD or nthreads < 2:
+        nthreads = 1
+    # Transform VAT -> IVAT in place (PR: in-place IVAT kernel).
+    with nogil:
+        _compute_ivat_kernel_64(&M[0, 0], n, &argmin[0], nthreads)
+    return adj_c, argmin_np, p_np
+
+
+cdef _ivat_inplace_impl_32(adj_c):
+    cdef int n = adj_c.shape[0]
+    cdef float[:, ::1] M = adj_c
+    p_np, q_np = _vat_inplace_32(M)
+    argmin_np = np.zeros(n - 1, dtype=np.int32)
+    cdef int[:] argmin = argmin_np
+    cdef int nthreads = openmp.omp_get_max_threads()
+    if n < _PAR_THRESHOLD or nthreads < 2:
+        nthreads = 1
+    with nogil:
+        _compute_ivat_kernel_32(&M[0, 0], n, &argmin[0], nthreads)
+    return adj_c, argmin_np, p_np
+
+
 def compute_ivat_c(adj, inplace=False):
     """
     Compute IVAT (improved VAT) for a distance matrix.
     Automatically dispatches to float32 or float64 based on input dtype.
 
-    The computation is performed in-place where possible: the VAT matrix is
-    computed from the MST in-place, then IVAT is built from VAT, with the lower
-    triangle mirrored back to the upper triangle via a parallel back-copy pass.
-    The input adjacency matrix is not modified.
+    The IVAT construction always runs in place over its VAT work buffer (the
+    VAT matrix is transformed into IVAT without a third allocation).
 
-    Note: The `inplace` parameter is accepted for API compatibility but is ignored
-    (the compiled version always uses its own internal work buffers).
+    ``inplace`` controls whether the *input* matrix is consumed:
+      - inplace=False (default): the input is not modified. The VAT/IVAT work
+        buffer is a fresh n x n array, so peak memory is ~2 matrices (input +
+        buffer).
+      - inplace=True: the input is reordered in place and transformed into the
+        returned IVAT matrix. Peak memory is ~1 matrix plus an ~n^2/8-byte
+        permutation bitmask, at the cost of a serial in-place permutation pass.
+        The input must be destroyable (e.g. a throwaway distance matrix); if it
+        is not already C-contiguous and of the dispatched dtype, a conforming
+        copy is made and only that copy is consumed.
 
     Returns (ivat_matrix, argmin_seq, p_seq) where:
       - ivat_matrix: improved VAT matrix (n x n, symmetric)
@@ -806,9 +988,13 @@ def compute_ivat_c(adj, inplace=False):
     """
     if adj.dtype == np.float32:
         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        if inplace:
+            return _ivat_inplace_impl_32(adj_c)
         return compute_ivat_c_32(adj_c)
     elif adj.dtype == np.float64:
         adj_c = np.require(adj, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        if inplace:
+            return _ivat_inplace_impl_64(adj_c)
         return compute_ivat_c_64(adj_c)
     else:
         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
