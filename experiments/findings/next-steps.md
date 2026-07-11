@@ -133,6 +133,9 @@ built ⇒ fast/parallel/approximate VAT = fast/parallel/approximate MST.
 **Docs:** `white-paper.md`, `performance-report.md`, `docs/novelty-review.md`
 (§8 = GPU/Borůvka prior art), `docs/vat-tsp-prior-art.md` (VAT↔TSP prior
 art/novelty/benchmarks), `docs/bibliography.md` (§6 = VAT↔TSP refs).
+`popmusic-spacefilling.md` (repo root) = the actionable plan to close the Part-2
+benchmarking gap (POPMUSIC + space-filling baselines, LKH-binary scale harness,
+stronger local search) — for a follow-up agent on a faster/unrestricted machine.
 
 **Experiment code (`experiments/`):** `boruvka_vat.py`,
 `boruvka_gpu.py`, `blockwise_vat.py`, `stitched_vat.py`, `dc_vat_scaling.py`,
