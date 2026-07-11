@@ -348,12 +348,15 @@ cdef tuple _fuzzy_c_means_kernel_32(
     float[:, ::1] x,
     int n,
     float m,
-    float[:, ::1] c_init
+    float[:, ::1] c_init,
+    bint use_nesterov = True,
+    float momentum = 0.9
 ):
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
     cdef float[:, ::1] c
     cdef float[:, ::1] c_new
+    cdef float[:, ::1] c_prev
     cdef float[:, ::1] w_ij
     cdef float[:, ::1] distances
     cdef int i, j, k, iteration
@@ -363,17 +366,26 @@ cdef tuple _fuzzy_c_means_kernel_32(
 
     c = np.zeros((n, n_features), dtype=np.float32)
     c_new = np.zeros((n, n_features), dtype=np.float32)
+    c_prev = np.zeros((n, n_features), dtype=np.float32)
     w_ij = np.zeros((n_samples, n), dtype=np.float32)
     distances = np.zeros((n_samples, n), dtype=np.float32)
 
     for i in range(n):
         for k in range(n_features):
             c[i, k] = c_init[i, k]
+            c_prev[i, k] = c_init[i, k]
 
     # Always recompute on first iteration
     recompute_distances = True
 
     for iteration in range(100):
+        # Nesterov momentum: look ahead with extrapolation
+        if use_nesterov and iteration > 0:
+            # Compute extrapolated center: c + momentum * (c - c_prev)
+            for i in range(n):
+                for k in range(n_features):
+                    c[i, k] = c[i, k] + momentum * (c[i, k] - c_prev[i, k])
+
         # Only recompute distances if centers moved significantly
         if recompute_distances:
             _compute_distances_unrolled_32(x, c, distances)
@@ -401,8 +413,10 @@ cdef tuple _fuzzy_c_means_kernel_32(
             c, c_new, movement_threshold
         )
 
+        # Store previous centers before update
         for i in range(n):
             for k in range(n_features):
+                c_prev[i, k] = c[i, k]
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
@@ -446,12 +460,15 @@ cdef tuple _fuzzy_c_means_kernel_64(
     double[:, ::1] x,
     int n,
     double m,
-    double[:, ::1] c_init
+    double[:, ::1] c_init,
+    bint use_nesterov = True,
+    double momentum = 0.9
 ):
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
     cdef double[:, ::1] c
     cdef double[:, ::1] c_new
+    cdef double[:, ::1] c_prev
     cdef double[:, ::1] w_ij
     cdef double[:, ::1] distances
     cdef int i, j, k, iteration
@@ -461,17 +478,26 @@ cdef tuple _fuzzy_c_means_kernel_64(
 
     c = np.zeros((n, n_features), dtype=np.float64)
     c_new = np.zeros((n, n_features), dtype=np.float64)
+    c_prev = np.zeros((n, n_features), dtype=np.float64)
     w_ij = np.zeros((n_samples, n), dtype=np.float64)
     distances = np.zeros((n_samples, n), dtype=np.float64)
 
     for i in range(n):
         for k in range(n_features):
             c[i, k] = c_init[i, k]
+            c_prev[i, k] = c_init[i, k]
 
     # Always recompute on first iteration
     recompute_distances = True
 
     for iteration in range(100):
+        # Nesterov momentum: look ahead with extrapolation
+        if use_nesterov and iteration > 0:
+            # Compute extrapolated center: c + momentum * (c - c_prev)
+            for i in range(n):
+                for k in range(n_features):
+                    c[i, k] = c[i, k] + momentum * (c[i, k] - c_prev[i, k])
+
         # Only recompute distances if centers moved significantly
         if recompute_distances:
             _compute_distances_unrolled_64(x, c, distances)
@@ -499,8 +525,10 @@ cdef tuple _fuzzy_c_means_kernel_64(
             c, c_new, movement_threshold
         )
 
+        # Store previous centers before update
         for i in range(n):
             for k in range(n_features):
+                c_prev[i, k] = c[i, k]
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
