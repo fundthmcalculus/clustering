@@ -218,7 +218,8 @@ def pairwise_distances(
         return pairwise_distances_c(data)
     if backend != "auto":
         raise ValueError(f"backend must be 'auto', 'gpu', or 'cpu', got {backend!r}")
-    if gpu_pairwise_beneficial(data):
+    # TODO - Check if gpu_pairwise_beneficial includes is_available ad d >=
+    if gpu_pairwise_beneficial(data) and is_available() and d >= _GPU_DIM_CROSSOVER:
         return pairwise_distances_gpu(data, high_precision=high_precision)
     return pairwise_distances_c(data)
 

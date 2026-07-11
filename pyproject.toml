@@ -64,9 +64,14 @@ target-version = ["py311"]
 # Tests: wall-clock benchmarks (speedup ratios) are unreliable on shared CI
 # runners, so they are marked `benchmark` and deselected by default. Run them
 # explicitly with `pytest -m benchmark`. Correctness tests still gate CI.
+#
+# `ci_slow` is a lighter-weight marker for scaling/plotting tests that stay in
+# the default local run but are skipped in reduced "CI-fast" mode (auto-enabled
+# on GitHub Actions, or via `pytest --ci-fast`). See tests/conftest.py.
 [tool.pytest.ini_options]
 markers = [
     "benchmark: performance benchmark with wall-clock timing assertions (deselected by default)",
+    "ci_slow: wall-clock / plotting benchmark with no correctness assertion; skipped in CI-fast mode (see tests/conftest.py)",
 ]
 addopts = "-m 'not benchmark'"
 

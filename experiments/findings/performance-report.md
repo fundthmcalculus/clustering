@@ -8,7 +8,7 @@ Every comparison and figure that was previously split across PRs #16–#25, in o
 place. All numbers are from clean-condition runs (see each source); figures under
 `experiments/figures/`. Results marked **exact** are bit-identical to the serial
 reference. Scientific interpretation (adversarial validity, prior art, limits) is
-in `white-paper.md`; per-experiment detail is in the `experiments/*_FINDINGS.md`.
+in `white-paper.md`; per-experiment detail is in the `experiments/findings/*_FINDINGS.md`.
 
 ---
 
@@ -18,7 +18,7 @@ The reference: pairwise distances → VAT (compact-Prim MST + gather) → iVAT
 (minimax recurrence), all exact, float64, on 32 cores (subprocess-isolated
 benchmark, PR #16).
 
-![cpu baseline](experiments/figures/cpu_baseline_scaling.png)
+![cpu baseline](../figures/cpu_baseline_scaling.png)
 
 All three stages are O(n²); iVAT construction dominates and is serial. This is
 what the rest of the work speeds up or shrinks.
@@ -31,7 +31,7 @@ iVAT originally held **3** simultaneous n×n matrices; two in-place transforms
 reduce this to **1**, which is what lifts the feasible problem size on a 64 GB
 box. Analytic peak (float64) vs the 64 GB wall:
 
-![memory reduction](experiments/figures/memory_reduction.png)
+![memory reduction](../figures/memory_reduction.png)
 
 | n (float64 iVAT) | 3 matrices (orig.) | 2 (PR #17) | 1 (PR #18) |
 |---|---|---|---|
@@ -48,7 +48,7 @@ throughout; a latent in-place-permutation correctness bug was also fixed here.
 
 FCM is iterative and data-resident, so it amortizes transfer. `FuzzyCMeans(use_gpu="auto")`.
 
-![gpu fcm](experiments/figures/gpu_fcm_speedup.png)
+![gpu fcm](../figures/gpu_fcm_speedup.png)
 
 | n (k=10, d=20) | CPU | GPU | speedup |
 |---|---|---|---|
@@ -66,7 +66,7 @@ The n×n result must transfer back over PCIe, and consumer FP64 is weak, so the
 GPU only wins at higher feature dimension and float32 (timings **include** the
 device→host copy):
 
-![gpu pairwise regime](experiments/figures/gpu_pairwise_regime.png)
+![gpu pairwise regime](../figures/gpu_pairwise_regime.png)
 
 - Low d / float64 (VAT's common case): **GPU loses** — stays on CPU.
 - float32, d ≳ 100: GPU wins (1.3× at d=200; **2.47×** with fast-accum at n=32000).
@@ -80,7 +80,7 @@ device→host copy):
 VAT order depends only on the MST, so an exact device-side Borůvka MST reproduces
 bit-identical VAT ordering. Build time vs serial Prim (matrix device-resident):
 
-![boruvka scaling](experiments/figures/boruvka_vat_scaling.png)
+![boruvka scaling](../figures/boruvka_vat_scaling.png)
 
 | MST build, n | serial Prim | Numba Borůvka | **GPU Borůvka** | GPU speedup |
 |---|---|---|---|---|
@@ -105,16 +105,16 @@ so a **fully on-device front-end** (distances→MST→order) gives 4.8–6.6× e
 
 Partition into N blocks, VAT each, merge. Ideal-parallel speedup grows ≈ N²…
 
-![dc speedup](experiments/figures/dc_vat_speedup_heatmap.png)
+![dc speedup](../figures/dc_vat_speedup_heatmap.png)
 
 …but naive quality collapses as N grows, while the structure-aware **stitch**
 stays ≈ exact across the whole grid (this is the speed↔accuracy tradeoff):
 
-![dc quality](experiments/figures/dc_vat_quality_heatmap.png)
+![dc quality](../figures/dc_vat_quality_heatmap.png)
 
 MST-build spectrum — naive (fast/approx) ↔ Borůvka (exact/parallel):
 
-![dc spectrum](experiments/figures/dc_vat_spectrum.png)
+![dc spectrum](../figures/dc_vat_spectrum.png)
 
 ---
 
