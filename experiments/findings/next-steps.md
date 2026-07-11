@@ -136,9 +136,11 @@ built ⇒ fast/parallel/approximate VAT = fast/parallel/approximate MST.
 **Experiment code (`experiments/`):** `boruvka_vat.py`,
 `boruvka_gpu.py`, `blockwise_vat.py`, `stitched_vat.py`, `dc_vat_scaling.py`,
 `adversarial_eval.py`, `hardening_eval.py`, `principled_stitch.py`,
-`autok_eval.py`, `perf_report_figs.py` — each with a matching
+`autok_eval.py`, `vat_tsp.py`, `perf_report_figs.py` — each with a matching
 `*_FINDINGS.md` under `experiments/findings/`. Figures in
 `experiments/figures/`; these reports also live in `experiments/findings/`.
+(`vat_tsp.py`: VAT ordering as a TSP/seriation objective + ACO hot start —
+`VAT_TSP_FINDINGS.md`.)
 
 **Reproduce:** `python -m experiments.<name>` (each script regenerates its
 figures); `python -m benchmarks.scale_bench` for the CPU baseline sweep.
