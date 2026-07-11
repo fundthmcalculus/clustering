@@ -63,7 +63,24 @@ def kmeans_partition(X, N, iters=8, seed=0):
             m = labels == j
             if m.any():
                 C[j] = X[m].mean(axis=0)
-    return [np.where(labels == j)[0] for j in range(N)]
+    groups = [np.where(labels == j)[0] for j in range(N)]
+    return [g for g in groups if len(g) > 0]  # drop empty clusters
+
+
+def maximin_partition(D, N, seed=0):
+    """Coordinate-free partition from the dissimilarity matrix alone
+    (farthest-first / MaxiMin seeds, assign each point to its nearest seed).
+    Works on arbitrary/non-metric D where k-means cannot run."""
+    n = D.shape[0]
+    rng = np.random.default_rng(seed)
+    seeds = [int(rng.integers(n))]
+    mind = D[seeds[0]].copy()
+    for _ in range(N - 1):
+        nxt = int(np.argmax(mind))
+        seeds.append(nxt)
+        mind = np.minimum(mind, D[nxt])
+    assign = np.argmin(D[:, np.array(seeds)], axis=1)
+    return [np.where(assign == j)[0] for j in range(N) if np.any(assign == j)]
 
 
 # ---------------------------------------------------------------------------
@@ -155,11 +172,15 @@ def _union_mst(edges, n):
     return kept
 
 
-def stitched_vat(D, X, N, n_repr=24, seed=0):
-    """Structure-aware partition + light cross-block stitch -> VAT order."""
-    n = D.shape[0]
-    groups = kmeans_partition(X, N, seed=seed)
+def stitch_core(D, groups, n_repr=24, seed=0):
+    """Light cross-block stitch over a GIVEN partition -> VAT order.
 
+    Per-block exact Prim MST (forest) + cheapest representative cross-edge per
+    block pair -> MST of the union = approximate global MST -> VAT order. Uses
+    only D and the partition, so it works on arbitrary/non-metric dissimilarity.
+    """
+    n = D.shape[0]
+    Ng = len(groups)
     edges = []
     reps = []
     rng = np.random.default_rng(seed + 1)
@@ -170,14 +191,11 @@ def stitched_vat(D, X, N, n_repr=24, seed=0):
             if par[i] >= 0:
                 gi, gp = int(g[i]), int(g[par[i]])
                 edges.append((gi, gp, float(D[gi, gp])))
-        # representatives: random sample within the block (captures interior +
-        # boundary well enough to find cheap cross-block connectors)
         r = min(len(g), n_repr)
         reps.append(g[rng.choice(len(g), r, replace=False)] if len(g) > r else g)
 
-    # light cross-block edges: cheapest representative pair per block pair
-    for a in range(N):
-        for b in range(a + 1, N):
+    for a in range(Ng):
+        for b in range(a + 1, Ng):
             ra, rb = reps[a], reps[b]
             block = D[np.ix_(ra, rb)]
             flat = int(np.argmin(block))
@@ -188,6 +206,17 @@ def stitched_vat(D, X, N, n_repr=24, seed=0):
     mst = _union_mst(edges, n)
     src = int(np.argmax(D)) // n
     return _order_from_edges(D, mst, n, src)
+
+
+def stitched_vat(D, X, N, n_repr=24, seed=0):
+    """Structure-aware (k-means, coordinate) partition + light stitch."""
+    return stitch_core(D, kmeans_partition(X, N, seed=seed), n_repr, seed)
+
+
+def stitched_vat_from_D(D, N, n_repr=24, seed=0):
+    """Coordinate-free variant: MaxiMin partition from D + light stitch.
+    Applicable to arbitrary/non-metric dissimilarity matrices."""
+    return stitch_core(D, maximin_partition(D, N, seed=seed), n_repr, seed)
 
 
 # ---------------------------------------------------------------------------
