@@ -23,12 +23,14 @@ Only a single scalar (edge count) is copied to the host per round to test for
 termination. The O(n^2) matrix read per round is coalesced and bandwidth-bound,
 which is where a GPU's memory bandwidth can beat the CPU.
 """
+
 from __future__ import annotations
 
 import numpy as np
 
 try:
     import cupy as cp
+
     _HAS_CUPY = cp.cuda.runtime.getDeviceCount() > 0
 except Exception:
     cp = None
@@ -180,8 +182,11 @@ def boruvka_mst_gpu(D):
         k_scan((n,), (tpb,), (Dg, comp, np.int32(n), best_w, best_j))
         k_redw((grid1d,), (tpb,), (best_w, comp, np.int32(n), comp_min_key))
         k_pick((grid1d,), (tpb,), (best_w, comp, np.int32(n), comp_min_key, comp_win))
-        k_hook((grid1d,), (tpb,),
-               (comp, best_j, comp_win, np.int32(n), root_parent, mst_u, mst_v, ne))
+        k_hook(
+            (grid1d,),
+            (tpb,),
+            (comp, best_j, comp_win, np.int32(n), root_parent, mst_u, mst_v, ne),
+        )
         k_relabel((grid1d,), (tpb,), (comp, root_parent, np.int32(n)))
         for _ in range(n_jumps):  # sync-free pointer-jumping
             k_jump((grid1d,), (tpb,), (comp, np.int32(n)))
