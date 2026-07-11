@@ -91,6 +91,58 @@ structure-aware one (spatial sort, a coarse k-means, or a canopy/pre-cluster),
 and (b) treat block boundaries as suspect and, ideally, add a light cross-block
 stitching pass (the point at which it becomes Borůvka).
 
+## Novelty (literature review, 2026-07-11)
+
+**Verdict: incremental — novel as a *named VAT variant*, but not as an
+algorithmic idea, and not defensible as exact.** No published paper does exactly
+"split D into within-group diagonal blocks, run VAT/iVAT independently per block,
+concatenate the sub-orderings, accept boundary pseudo-clusters." But that is a
+*naive* instance of **domain-decomposition MST / single-linkage clustering**, a
+well-published family — and every rigorous member of it merges by **recomputing
+the cheapest cross-partition edges** so the result stays exact. Dropping those
+cross-block dissimilarities (the whole speedup) is exactly what creates the seam
+artifact. So: frame it as a **fast *approximate* VAT heuristic**, not a new exact
+algorithm.
+
+**The two distinctions to make explicitly:**
+- **vs clusiVAT / sVAT / bigVAT (sampling):** those pick m ≪ N MaxiMin
+  representatives, build one m×m matrix, VAT it once, and **extend** labels to
+  the rest by nearest-prototype — one ordering, cross-cluster geometry preserved
+  by spread-out samples. Block-decomposition instead **subdivides all N points**
+  into groups, VATs each, and **concatenates** — discarding all inter-block
+  dissimilarities. *clusiVAT sub-samples and extends; this sub-divides and
+  concatenates.* Different approximation family.
+- **vs eVAT (Meng & Yuan 2018, GPU):** eVAT is **exact** parallel VAT (one global
+  MST, replicates the identical image). Parallel VAT ≠ partition-VAT-merge.
+
+**The seam artifact is a known phenomenon** (just not named for VAT): NASA's
+recursive-segmentation "**processing-window artifacts**" (Tilton, *split-remerge*)
+is the same failure — independent windows produce spurious region boundaries at
+window edges, fixed by re-merging across the seam. Exact distributed single-
+linkage/MST (**DiSC**, **SHRINK/PINK**, distance-decomposition EMST) all treat
+cross-partition edges as mandatory *precisely to avoid* this — which is why a
+correct cross-block stitch turns this method into Borůvka-VAT.
+
+Selected prior art (see also `docs/bibliography.md`):
+- eVAT — Meng & Yuan 2018, *IJDSA* — https://doi.org/10.1007/s41060-018-0100-7 (exact parallel VAT)
+- clusiVAT — Kumar et al. 2016, *IEEE T-Cybernetics* 46(10) — https://ieeexplore.ieee.org/document/7302005 (sampling, not partition)
+- sVAT — Hathaway et al. 2006, *Pattern Recognition* — https://doi.org/10.1016/j.patcog.2006.02.011
+- bigVAT — Huband et al. 2005, *Pattern Recognition* — https://doi.org/10.1016/j.patcog.2005.03.018
+- DiSC (distributed single-linkage, MapReduce) — Jin et al. — https://www.researchgate.net/publication/260564139 (exact cross-partition merge)
+- SHRINK/PINK (parallel single-linkage) — Hendrix et al. — https://www.researchgate.net/publication/261451376
+- Distributed EMST/SL via distance decomposition — 2024 — https://arxiv.org/abs/2406.01739
+- Optimal parallel dendrogram / single-linkage (SLD-Merge) — SPAA 2024 — https://dl.acm.org/doi/10.1145/3626183.3659973
+- Processing-window artifact + split-remerge — Tilton (NASA) — https://ntrs.nasa.gov/citations/20100028387 · US Patent 7,697,759
+- Seriation/matrix-reordering survey — Liiv 2010 — https://doi.org/10.1002/sam.10071
+
+**Honesty flags:** (1) the "pVAT / same image, orders-of-magnitude faster" claim
+is a conflation of eVAT (exact) and/or the repo author's own NAFIPS work — not
+external prior art for partition-merge. (2) The IJARCS "Parallel Approach of
+Visual Access Tendency" (2018) is a low-quality machine-translated paper
+describing a reVAT-profile approach, **not** block-merge — do not lean on it.
+(3) A broad novelty claim is not defensible; a "fast approximate VAT, with the
+seam artifact accepted for O(n²/N) work" framing is.
+
 ## Files
 - `experiments/blockwise_vat.py` — partitioners, blockwise VAT + merge, metrics,
   figures.
