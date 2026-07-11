@@ -271,10 +271,26 @@ Every close competitor drops at least one of those. So this is a defensible but
 1. **eVAT pre-empts the headline** — reframe as the dense-matrix-resident,
    arbitrary-dissimilarity, explicit-Borůvka variant; benchmark against eVAT or
    state the precise delta. Never "first GPU VAT."
-2. **Unverified "pVAT."** Searches surfaced a "pVAT" described almost identically
-   (serial Prim → GPU Borůvka → same VAT image), but **no locatable primary
-   source** — likely search-engine conflation. **Verify before relying on the
-   novelty**; if a real pVAT exists it is near-identical prior art.
+2. **"pVAT" — verified as a non-issue (resolved 2026-07-11).** Searches
+   repeatedly surfaced a "pVAT" described almost identically (serial Prim → GPU
+   Borůvka → *same reordered VAT image* → "orders of magnitude" faster), which
+   looked like near-identical prior art. On verification it is **not**:
+   - **No locatable primary source.** Searches restricted to Springer, IEEE
+     Xplore, ACM DL, arXiv, ScienceDirect and ResearchGate return **nothing
+     titled "pVAT"**; every returned link is a *different* method (eVAT, Fast-VAT,
+     Vineet et al. GPU-MST, kNN-Borůvka, cudaMST). The recurring "pVAT / six
+     orders of magnitude" sentence is an **AI-search-summary confabulation** —
+     ungrounded in any retrievable result, and 10⁶× is not a credible MST
+     speedup. Fast-VAT (2025), checked directly, contains no mention of pVAT,
+     Borůvka, GPU, or "orders of magnitude".
+   - **The real "parallel / priority-queue MST VAT" this describes is the
+     author's OWN work** — the priority-queue and compact-Prim MST VAT presented
+     at **NAFIPS 2025/2026** (this repo's `pvat.py` / `pqvat.py`; see the README).
+     So to the extent a "pVAT" exists it is *self-citation*, not third-party
+     prior art, and the on-device GPU Borůvka VAT is a direct extension of the
+     author's own line. Cite the NAFIPS work explicitly rather than treating it
+     as external.
+   The genuine external overlap remains **eVAT** (flag 1), not "pVAT".
 3. **~5–6.6× is modest** next to sparse GPU-Borůvka's 30–50×. Be explicit it is
    the *dense, arbitrary-dissimilarity* regime and report the **full-pipeline**
    curve (the O(n²) distance build can dominate the MST step at large n).
