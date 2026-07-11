@@ -31,6 +31,7 @@ dev = [
     "black",
     "flake8",
     "Flake8-pyproject",
+    "mypy",
     "scipy"
 ]
 
@@ -71,4 +72,13 @@ addopts = "-m 'not benchmark'"
 max-line-length = 120
 exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv,experiments"
 extend-ignore = ["E203"]
+
+# Types: mypy. Lenient baseline for now — it catches genuine type errors without
+# demanding full annotations. Strictness (disallow_untyped_defs, then strict) is
+# intended to be ratcheted up one module at a time in follow-up PRs.
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
 
