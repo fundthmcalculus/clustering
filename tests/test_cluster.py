@@ -1,5 +1,5 @@
 import time
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -101,6 +101,7 @@ def test_merge_ivat():
 
     # Compute VAT matrix separately
     from tribbleclustering.pvat import compute_vat
+
     vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     plot_vat_ivat(ivat_mst, vat_mst)
@@ -178,6 +179,7 @@ def test_heirarchy_ivat_means():
     ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
     # Compute VAT matrix separately
     from tribbleclustering.pvat import compute_vat
+
     vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     # Get cluster information from iVAT
@@ -270,7 +272,10 @@ def test_multi_dim_pairwise_dist_perf():
             x_smooth,
             quadratic_poly(x_smooth),
             linestyle="--",
-            label=f"L2-only={norm} (quadratic fit): {quadratic_coeffs[0]:.2e}x² + {quadratic_coeffs[1]:.2e}x + {quadratic_coeffs[2]:.2e}",
+            label=(
+                f"L2-only={norm} (quadratic fit): {quadratic_coeffs[0]:.2e}x² "
+                f"+ {quadratic_coeffs[1]:.2e}x + {quadratic_coeffs[2]:.2e}"
+            ),
             linewidth=1.5,
             alpha=0.7,
         )
@@ -286,8 +291,8 @@ def test_multi_dim_pairwise_dist_perf():
     fig_ratio, ax_ratio = plt.subplots()
 
     # Extract times for each norm_only value
-    false_results = [(size, time) for norm, size, time in results if norm == False]
-    true_results = [(size, time) for norm, size, time in results if norm == True]
+    false_results = [(size, time) for norm, size, time in results if not norm]
+    true_results = [(size, time) for norm, size, time in results if norm]
 
     # Compute ratios (False / True)
     ratios = []
@@ -353,6 +358,7 @@ def test_fuzzy_c_means():
     ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
     # Compute VAT matrix separately
     from tribbleclustering.pvat import compute_vat
+
     vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
     res = get_ivat_levels(all_cities, ivat_mst, vat_order)
 
@@ -370,7 +376,7 @@ def test_fuzzy_c_means():
 
     # Print performance comparison
     print(f"\n{'=' * 60}")
-    print(f"Performance Comparison:")
+    print("Performance Comparison:")
     print(f"{'=' * 60}")
     print(f"Elbow Method (n=2 to {n_clusters}): {elbow_time:.4f} seconds")
     print(f"Single iter-FCM (n={n_clusters}):     {single_fcm_time:.4f} seconds")
@@ -389,7 +395,7 @@ def test_fuzzy_c_means():
     ), f"Not all cities allocated: {len(all_allocated_cities)} allocated out of {len(all_cities)} total"
     assert len(np.unique(all_allocated_cities)) == len(
         all_cities
-    ), f"Duplicate city allocations detected"
+    ), "Duplicate city allocations detected"
 
     plot_vat_ivat(ivat_mst, vat_mst)
 
@@ -544,6 +550,7 @@ def test_ivat_hierarchy_logic():
     ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
     # Compute VAT matrix separately
     from tribbleclustering.pvat import compute_vat
+
     vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     # We want 2 levels: level 1 should have 2 clusters, level 2 should have 4 clusters
@@ -667,6 +674,7 @@ def test_visualize_hierarchy():
     ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
     # Compute VAT matrix separately
     from tribbleclustering.pvat import compute_vat
+
     vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     # Get hierarchy (3 levels)
