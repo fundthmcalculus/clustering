@@ -12,6 +12,12 @@ except ImportError:
 
     _has_compiled_fcm = False
 
+from . import gpu as _gpu
+
+# GPU FCM wins decisively above a few thousand samples (iterative, data stays
+# resident on the device); below this the launch overhead loses to the CPU.
+_GPU_FCM_MIN_SAMPLES = 5000
+
 
 class FuzzyCMeans:
     """
@@ -23,13 +29,25 @@ class FuzzyCMeans:
         n_clusters: int,
         m: float = 2.0,
         random_state: Optional[int] = None,
+        use_gpu: bool | str = "auto",
     ):
         self.n_clusters = n_clusters
         self.m = m
         self.random_state = random_state
+        # use_gpu: True force GPU, False force CPU, "auto" use the GPU only when
+        # a CUDA device is available and the sample count justifies it. Falls
+        # back to CPU transparently when CuPy/CUDA is absent.
+        self.use_gpu = use_gpu
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
         self.membership_matrix_: Optional[ndarray] = None
+
+    def _should_use_gpu(self, n_samples: int) -> bool:
+        if self.use_gpu is True:
+            return _gpu.is_available()
+        if self.use_gpu == "auto":
+            return _gpu.is_available() and n_samples >= _GPU_FCM_MIN_SAMPLES
+        return False
 
     def fit(
         self,
@@ -61,9 +79,14 @@ class FuzzyCMeans:
         if self.random_state is not None:
             np.random.seed(self.random_state)
 
-        self.cluster_centers_, self.membership_matrix_ = fcm_algorithm(
-            X, self.n_clusters, m=self.m
-        )
+        if self._should_use_gpu(X.shape[0]):
+            self.cluster_centers_, self.membership_matrix_ = _gpu.fuzzy_c_means_gpu(
+                X, self.n_clusters, m=self.m
+            )
+        else:
+            self.cluster_centers_, self.membership_matrix_ = fcm_algorithm(
+                X, self.n_clusters, m=self.m
+            )
 
         self.labels_ = self._get_hard_labels()
 
