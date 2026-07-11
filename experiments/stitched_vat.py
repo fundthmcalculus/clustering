@@ -172,17 +172,49 @@ def _union_mst(edges, n):
     return kept
 
 
-def stitch_core(D, groups, n_repr=24, seed=0):
-    """Light cross-block stitch over a GIVEN partition -> VAT order.
+def _fps(subD, r, seed):
+    """Farthest-point (MaxiMin) sample of r local indices from a block's sub-D
+    — spreads representatives to the block's extremes/boundary."""
+    m = subD.shape[0]
+    if m <= r:
+        return np.arange(m)
+    rng = np.random.default_rng(seed)
+    s = [int(rng.integers(m))]
+    mind = subD[s[0]].copy()
+    for _ in range(r - 1):
+        nx = int(np.argmax(mind))
+        s.append(nx)
+        mind = np.minimum(mind, subD[nx])
+    return np.array(s)
 
-    Per-block exact Prim MST (forest) + cheapest representative cross-edge per
-    block pair -> MST of the union = approximate global MST -> VAT order. Uses
-    only D and the partition, so it works on arbitrary/non-metric dissimilarity.
+
+def _topm_pairs(block, m):
+    """Indices (i, j) of the m smallest entries of a 2-D block."""
+    m = min(m, block.size)
+    flat = np.argpartition(block.ravel(), m - 1)[:m]
+    return flat // block.shape[1], flat % block.shape[1]
+
+
+def stitch_core(D, groups, n_repr=24, seed=0, reps="random", m_edges=1,
+                full=False):
+    """Bounded cross-block stitch over a GIVEN partition -> VAT order.
+
+    Per-block exact Prim MST (forest) + cross-block candidate edges -> MST of
+    the union = approximate global MST -> VAT order. Uses only D + the
+    partition, so it works on arbitrary/non-metric dissimilarity.
+
+    Cross-edge strategy:
+      reps   : 'random' (default) or 'fps' (farthest-point — boundary-aware).
+      m_edges: keep the top-m cheapest cross-edges per block pair (redundancy so
+               one wrong edge cannot dominate). Default 1 = the fragile light stitch.
+      full   : if True, search ALL points (not representatives) for each block
+               pair's min cross-edge -> the EXACT MST (oracle == Boruvka merge),
+               O(n^2). Otherwise cost is O(N^2 r^2), bounded.
     """
     n = D.shape[0]
     Ng = len(groups)
     edges = []
-    reps = []
+    reps_idx = []
     rng = np.random.default_rng(seed + 1)
     for g in groups:
         sub = np.ascontiguousarray(D[np.ix_(g, g)])
@@ -191,17 +223,23 @@ def stitch_core(D, groups, n_repr=24, seed=0):
             if par[i] >= 0:
                 gi, gp = int(g[i]), int(g[par[i]])
                 edges.append((gi, gp, float(D[gi, gp])))
-        r = min(len(g), n_repr)
-        reps.append(g[rng.choice(len(g), r, replace=False)] if len(g) > r else g)
+        if not full:
+            r = min(len(g), n_repr)
+            if reps == "fps":
+                reps_idx.append(g[_fps(sub, r, seed)])
+            else:
+                reps_idx.append(g[rng.choice(len(g), r, replace=False)]
+                                if len(g) > r else g)
 
     for a in range(Ng):
         for b in range(a + 1, Ng):
-            ra, rb = reps[a], reps[b]
+            ra = groups[a] if full else reps_idx[a]
+            rb = groups[b] if full else reps_idx[b]
             block = D[np.ix_(ra, rb)]
-            flat = int(np.argmin(block))
-            ia, ib = flat // block.shape[1], flat % block.shape[1]
-            u, v = int(ra[ia]), int(rb[ib])
-            edges.append((u, v, float(D[u, v])))
+            ii, jj = _topm_pairs(block, 1 if full else m_edges)
+            for ia, ib in zip(ii, jj):
+                u, v = int(ra[ia]), int(rb[ib])
+                edges.append((u, v, float(D[u, v])))
 
     mst = _union_mst(edges, n)
     src = int(np.argmax(D)) // n
