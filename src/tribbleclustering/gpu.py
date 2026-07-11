@@ -17,6 +17,7 @@ which would break the exact-VAT guarantee.
 Everything degrades gracefully: if CuPy or a CUDA device is unavailable,
 ``is_available()`` returns False and callers fall back to the CPU path.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -156,9 +157,17 @@ def pairwise_distances_gpu(
         tile_dev = _cp.empty((R, n), dtype=dtype)
         blocks = (tile_elems + threads - 1) // threads
         kern(
-            (blocks,), (threads,),
-            (X_dev, np.int32(n), np.int32(d), np.int32(R),
-             np.int32(a), np.int64(tile_elems), tile_dev),
+            (blocks,),
+            (threads,),
+            (
+                X_dev,
+                np.int32(n),
+                np.int32(d),
+                np.int32(R),
+                np.int32(a),
+                np.int64(tile_elems),
+                tile_dev,
+            ),
         )
         # Zero this tile's diagonal contribution (rows a..b) exactly, matching
         # the CPU kernel's zero diagonal (sqrt of a tiny residual could be ~1e-7
@@ -176,8 +185,9 @@ def pairwise_distances_gpu(
 _GPU_DIM_CROSSOVER = 64
 
 
-def pairwise_distances(data: np.ndarray, backend: str = "auto",
-                       high_precision: bool = True) -> np.ndarray:
+def pairwise_distances(
+    data: np.ndarray, backend: str = "auto", high_precision: bool = True
+) -> np.ndarray:
     """Dense Euclidean pairwise-distance matrix with backend selection.
 
     backend='auto' (default) uses the GPU only where it is expected to win on

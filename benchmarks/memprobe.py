@@ -13,6 +13,7 @@ of ``(HANDLE)-1``; without an explicit ``restype`` ctypes treats it as a
 silently (returns zeroes). We set the signatures explicitly and check the
 return value.
 """
+
 from __future__ import annotations
 
 import sys
