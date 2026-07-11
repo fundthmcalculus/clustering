@@ -27,7 +27,7 @@ class IVATMeans:
         self.random_state = random_state
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
-        self._ivat_result = None
+        self._ivat_result: Optional[IvatMeansResult] = None
 
     def fit(
         self,
@@ -62,12 +62,14 @@ class IVATMeans:
         distances = _pairwise_distances(X)
         ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=False)
 
-        self._ivat_result = get_ivat_levels(
+        ivat_result = get_ivat_levels(
             X, ivat_matrix, vat_order, n_levels=1, n_clusters=self.n_clusters
         )
+        # n_levels=1 always yields a single result, never a list.
+        assert isinstance(ivat_result, IvatMeansResult)
+        self._ivat_result = ivat_result
 
-        result: IvatMeansResult = self._ivat_result
-        self.cluster_centers_ = result.initial_centroids
+        self.cluster_centers_ = ivat_result.initial_centroids
         self.labels_ = self._assign_clusters(X)
 
         return self
@@ -148,6 +150,7 @@ class IVATMeans:
             Cluster labels for each sample in X.
         """
         self.fit(X, y, sample_weight)
+        assert self.labels_ is not None  # set by fit()
         return self.labels_
 
     def _assign_clusters(self, X: ndarray) -> ndarray:
