@@ -4,6 +4,9 @@
 **Code:** `experiments/vat_tsp_benchmark.py` **· Figure:** `experiments/figures/vat_tsp_benchmark.png`
 **Baseline:** LKH (Lin-Kernighan-Helsgaun) via `elkai` (optional: `pip install .[experiments]`)
 **Builds on:** `VAT_TSP_WARMSTART_FINDINGS.md`
+**Prior art / novelty:** `docs/vat-tsp-prior-art.md` (closest competitors:
+Guttmann-Beck et al. 2000 for the stitch; Ding et al. 2007 for D&C-CTSP; Dai et
+al. 2009 for MST-seeded ACO; POPMUSIC / H-TSP / GLOP for scale)
 
 > There is no Lin-Kernighan implementation in this repo, so the real solver
 > (`elkai` = LKH) is used as the baseline; the script guards the import and falls
