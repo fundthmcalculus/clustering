@@ -178,6 +178,85 @@ element shrinks; MST time is ~flat because it is the same bytes scanned:
 discrete GPU. In the shared 128 GB pool the ceilings rise further still
 (f16 reaches n ≈ 250k for the matrix alone).
 
+## Closing the VAT loop on the device (order + iVAT image on the GPU)
+
+The MST was already on the device, but the two remaining VAT stages still ran on
+the host, forcing the (up to 80 GB) matrix back across the bus. Both are now on
+the GPU (`experiments/gpu_vat.py`), so the whole pipeline
+(distances → MST → order → iVAT image) is device-resident and only O(n) scalars
+ever touch the host.
+
+- **VAT order** is a heap traversal of the *MST tree*, which reads only MST edge
+  weights — O(n) values, not the matrix. The seed (device `argmax`) and the edge
+  weights (device gather at the MST edges) are read on the GPU; the light
+  O(n log n) traversal runs on the host over those O(n) scalars. The n×n matrix
+  never leaves the device for ordering.
+
+- **iVAT image** is the O(n²) reorder + minimax recurrence — the stage that
+  forced the whole matrix onto the host. The recurrence *looks* strictly serial
+  (row r reads rows < r), but each row's pivot `h_r = min_{c<r} V[r,c]` and
+  `jj_r = argmin` reads only the **original** reordered distances (earlier rows
+  never overwrite row r before it is processed). So all (h_r, jj_r) are computed
+  in **one parallel pass**; only the max-propagation
+  `V[r,c] = max(h_r, V[parent,c])` keeps the serial-in-r dependency (one small
+  launch per row). Output is **bit-identical** to the numba reference at f64
+  (`max|GPU−CPU| = 0.0`, order_match 1.0000).
+
+**iVAT stage — on-device beats the host engine and stays resident:**
+
+| n | CPU `compute_ivat_c` | GPU iVAT f64 | GPU iVAT f32 | f32 speedup |
+|-------|----------------------|--------------|--------------|-------------|
+| 8000 | 434 | 191 | 155 | 2.8× |
+| 16000 | 1699 | 704 | 401 | 4.2× |
+| 32000 | 7440 | 3482 | 1529 | **4.9×** |
+
+**End-to-end (X on host → iVAT image on host), closing the loop removes the
+round-trip.** The device-resident path (f32 distances born on device, GPU iVAT,
+image copied to host once) vs the old split (GPU MST, then the n×n matrix copied
+back for the host iVAT):
+
+| n | device-resident | GPU MST + host iVAT | speedup |
+|-------|------------------|---------------------|---------|
+| 8000 | 396 | 739 | 1.9× |
+| 16000 | 1209 | 2605 | 2.2× |
+| 32000 | 4616 | 12724 | **2.8×** |
+
+(The device path carries fixed warm-up/managed-page overhead that dominates
+below n≈8000; the win grows with n as the removed O(n²) round-trip and the
+faster on-device iVAT take over.)
+
+![pipeline](../figures/gpu_vat_pipeline.png)
+
+## Scale ceilings on the 128 GB pool
+
+With the whole pipeline on the device, the limit is how many `n×n` buffers the
+shared pool holds:
+
+- **MST only** needs one matrix. f16 reaches **n = 200000** (80 GB), MST in
+  3.4 s. n = 224000 (100 GB) is **OOM-killed** at build time — not by the MST
+  kernel but by the born-on-device pairwise builder, whose f64 tile
+  intermediates stack on top of the 100 GB matrix and managed overcommit tips
+  past physical RAM. (A pre-built or lower-precision-tiled matrix would push the
+  MST ceiling toward ~250k.)
+
+- **Full iVAT image** needs two matrices (D + the image V). With D at f16 and V
+  at f32 (6·n² bytes) the whole device-resident pipeline runs at:
+
+  | n | D + V | prep (dist+MST+order) | GPU iVAT | peak used |
+  |--------|--------|-----------------------|----------|-----------|
+  | 65536 | 25.8 GB | 7.6 s | 7.2 s | 37 GB |
+  | 100000 | 60.0 GB | 13.0 s | 15.9 s | 75 GB |
+
+  **n = 100000 is a 10-billion-entry iVAT image built end-to-end on the GPU,
+  never touching host memory**; the ceiling for this configuration is ≈140k
+  (6·n² ≤ ~120 GB).
+
+**Optimization frontier.** The on-device iVAT issues one kernel launch per row
+(the serial-in-r max-propagation), so at n = 100k its ~15.9 s is dominated by
+100k Python-level launches, not GPU compute. Folding the row loop into a single
+cooperative-groups kernel (grid-wide sync between rows) would remove that Python
+overhead and is the next lever for the iVAT stage at extreme n.
+
 ## Verdict
 
 - **Exactness:** Borůvka-MST VAT is provably and empirically identical to serial
