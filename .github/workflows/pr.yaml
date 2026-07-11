@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.14'
 
@@ -35,5 +35,9 @@ jobs:
           mypy src
 
       - name: Run unit tests
+        # --ci-fast trims the suite for shared runners: it deselects the
+        # wall-clock/plot benchmarks (marked ci_slow) and shrinks oversized
+        # correctness inputs. It is also auto-enabled by the GITHUB_ACTIONS
+        # env var, so the flag here is explicit documentation of intent.
         run: |
-          pytest
+          pytest --ci-fast

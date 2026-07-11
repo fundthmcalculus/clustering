@@ -40,12 +40,12 @@ built ⇒ fast/parallel/approximate VAT = fast/parallel/approximate MST.
 | Silent correctness bug in old in-place permutation, fixed | fixed | PR #18, `HARDENING`/commit |
 | GPU FCM 30–56× | same fixed point | PR #20, `benchmarks/gpu_fcm.md` |
 | GPU pairwise wins only high-d/f32 (honest negative elsewhere) | exact | PR #19, `benchmarks/gpu_pairwise.md` |
-| Exact GPU-Borůvka MST ~5× (grows with n); on-device front-end 4.8–6.6× | exact | PR #22/#23, `experiments/BORUVKA_VAT_FINDINGS.md` |
-| Divide-and-conquer spectrum (naive ~N² but quality collapses) | measured | PR #25, `experiments/DC_VAT_SCALING_FINDINGS.md` |
-| VAT beats k-means on non-convex; stitch preserves it; both inherit SL failures | measured, controlled | `experiments/ADVERSARIAL_EVAL_FINDINGS.md` |
-| Works on non-metric D (fractional-p0.5, cosine, geodesic) = exact SL | measured | `experiments/HARDENING_FINDINGS.md` |
-| Principled stitch (fps + top-m) robust across partition×N; ablation | measured | `experiments/GAPS_FINDINGS.md` |
-| Auto-k recovers k where SL valid; bounded by dendrogram validity | measured | `experiments/GAPS_FINDINGS.md` |
+| Exact GPU-Borůvka MST ~5× (grows with n); on-device front-end 4.8–6.6× | exact | PR #22/#23, `experiments/findings/BORUVKA_VAT_FINDINGS.md` |
+| Divide-and-conquer spectrum (naive ~N² but quality collapses) | measured | PR #25, `experiments/findings/DC_VAT_SCALING_FINDINGS.md` |
+| VAT beats k-means on non-convex; stitch preserves it; both inherit SL failures | measured, controlled | `experiments/findings/ADVERSARIAL_EVAL_FINDINGS.md` |
+| Works on non-metric D (fractional-p0.5, cosine, geodesic) = exact SL | measured | `experiments/findings/HARDENING_FINDINGS.md` |
+| Principled stitch (fps + top-m) robust across partition×N; ablation | measured | `experiments/findings/GAPS_FINDINGS.md` |
+| Auto-k recovers k where SL valid; bounded by dendrogram validity | measured | `experiments/findings/GAPS_FINDINGS.md` |
 
 ---
 
@@ -133,11 +133,12 @@ built ⇒ fast/parallel/approximate VAT = fast/parallel/approximate MST.
 **Docs:** `white-paper.md`, `performance-report.md`, `docs/novelty-review.md`
 (§8 = GPU/Borůvka prior art), `docs/bibliography.md`.
 
-**Experiment code + findings (`experiments/`):** `boruvka_vat.py`,
+**Experiment code (`experiments/`):** `boruvka_vat.py`,
 `boruvka_gpu.py`, `blockwise_vat.py`, `stitched_vat.py`, `dc_vat_scaling.py`,
 `adversarial_eval.py`, `hardening_eval.py`, `principled_stitch.py`,
-`autok_eval.py`, `perf_report_figs.py` — each with a matching `*_FINDINGS.md`.
-Figures in `experiments/figures/`.
+`autok_eval.py`, `perf_report_figs.py` — each with a matching
+`*_FINDINGS.md` under `experiments/findings/`. Figures in
+`experiments/figures/`; these reports also live in `experiments/findings/`.
 
 **Reproduce:** `python -m experiments.<name>` (each script regenerates its
 figures); `python -m benchmarks.scale_bench` for the CPU baseline sweep.

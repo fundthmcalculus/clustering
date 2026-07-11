@@ -13,7 +13,7 @@ was fragile on non-convex data. Ablation over the two-moons partition×N grid
 | fps only (fps, m=1) | 0.39 | 0.00 | 0.32 |
 | **principled (fps + top-m=8)** | **1.00** | **1.00** | **1.00** |
 
-![stitch ablation](figures/principled_stitch_two_moons.png)
+![stitch ablation](../figures/principled_stitch_two_moons.png)
 
 **Neither boundary-aware representatives (farthest-point) nor cross-edge
 redundancy (top-m) fixes it alone — only both together.** With both, the
@@ -48,7 +48,7 @@ it works on arbitrary D). `experiments/autok_eval.py`.
 | varied_density | 3 | 2 (0.00) | 2 (0.00) |
 | bridged | 2 | 3 (0.00) | 2 (0.00) |
 
-![auto-k](figures/autok_eval.png)
+![auto-k](../figures/autok_eval.png)
 
 - **Where single-linkage is the right model (two_moons, circles, easy_blobs) the
   sorted superdiagonal has a sharp knee at exactly k-1, and BOTH rules recover

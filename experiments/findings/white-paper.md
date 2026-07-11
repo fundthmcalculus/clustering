@@ -90,7 +90,7 @@ its **cluster quality collapses as N grows** — each block boundary manufacture
 Blobs are the wrong data to argue for VAT (k-means already solves them). On
 adversarial data with the missing controls (k-means alone, exact single-linkage):
 
-![adversarial evaluation](experiments/figures/adversarial_eval.png)
+![adversarial evaluation](../figures/adversarial_eval.png)
 
 | dataset | k-means | single-linkage | exact-VAT | naive-block | **stitched** |
 |---|---|---|---|---|---|
@@ -115,7 +115,7 @@ The naive light stitch (random representatives, one cross-edge per block pair) i
 shows the fix requires two ingredients **together** — boundary-aware
 representatives (farthest-point) **and** top-m cross-edges per block pair:
 
-![principled stitch ablation](experiments/figures/principled_stitch_two_moons.png)
+![principled stitch ablation](../figures/principled_stitch_two_moons.png)
 
 | stitch variant (two-moons, over partition × N grid) | mean ARI | min | frac ≥ 0.9 |
 |---|---|---|---|

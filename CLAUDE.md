@@ -32,12 +32,25 @@ src/tribbleclustering/
   util.py            # pairwise_distances (numba), synthetic cluster generators
 tests/               # pytest suite (correctness + benchmark-marked perf tests)
 benchmarks/          # dev-only scale/memory harness (NOT shipped in the wheel)
-docs/                # perf guidance, bibliography, novelty write-ups, source PDFs
+experiments/         # research spikes (NOT shipped): one <name>.py per experiment,
+  figures/           #   generated PNG figures (run: python -m experiments.<name>)
+  findings/          #   *_FINDINGS.md per experiment + the cross-cutting reports
+                     #   (white-paper.md, performance-report.md, next-steps.md)
+docs/                # perf guidance, bibliography, novelty write-ups
+  papers/            #   committed prior-art PDFs
+  sources/           #   git-ignored scratch cache for retrieved PDFs (do not commit)
 ```
 
 Top-level markdown reports (`CODE_QUALITY.md`, `PROFILING_RESULTS.md`,
 `PHASE2_REVERT_SUMMARY.md`) are living design/history docs — read them for
 context before touching lint config or performance code.
+
+The `experiments/` tree is a **research area, not shipped code** — spikes for
+divide-and-conquer VAT, GPU/Borůvka MST, and the scaling/quality studies behind
+the paper. Each `experiments/<name>.py` regenerates its own figures into
+`experiments/figures/` and has a matching `experiments/findings/<NAME>_FINDINGS.md`.
+Start from `experiments/findings/next-steps.md` (the roadmap/artifact index),
+`white-paper.md` (claim + evidence), and `performance-report.md` (all numbers).
 
 ## Compiled-vs-pure-python fallback (important)
 
@@ -137,6 +150,14 @@ ratchet mypy strictness one module at a time).
   assertions that are unreliable on shared CI, so they are marked `benchmark`
   and **deselected by default** (`addopts = "-m 'not benchmark'"`).
 - Run perf benchmarks explicitly: `pytest -m benchmark`.
+- **CI-fast mode** (`tests/conftest.py`) trims the suite on shared runners. It
+  is auto-enabled on GitHub Actions (`GITHUB_ACTIONS`) / generic CI (`CI`), or
+  forced anywhere with `pytest --ci-fast`. In this mode: tests marked
+  `@pytest.mark.ci_slow` (scaling/plotting benchmarks with no correctness
+  assertion) are skipped, and the `ci_scale(full, fast)` fixture returns the
+  smaller size so heavy correctness tests run on reduced inputs. Everything
+  runs full-size locally. This cuts the default CI test step from ~50s to ~5s;
+  run the complete suite locally with a plain `pytest` (no flag, outside CI).
 - Tests requiring the compiled extension guard with
   `@pytest.mark.skipif(not CYTHON_AVAILABLE, ...)`.
 - Some tests/demos pull real datasets via `ucimlrepo` and can allocate tens of

@@ -159,6 +159,7 @@ class TestCorrectness:
         np.testing.assert_array_equal(parent_seq_orig, parent_seq_c)
 
 
+@pytest.mark.ci_slow
 class TestPerformance:
     """Performance validation and benchmarking."""
 

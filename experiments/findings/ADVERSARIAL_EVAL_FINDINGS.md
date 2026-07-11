@@ -8,7 +8,7 @@ it, on data where k-means **must** fail and single-linkage/VAT **should** win,
 with the missing controls (k-means alone, exact single-linkage).
 `experiments/adversarial_eval.py`.
 
-![adversarial](figures/adversarial_eval.png)
+![adversarial](../figures/adversarial_eval.png)
 
 ## ARI vs ground truth (N=8 blocks; bridge points excluded from ARI)
 
