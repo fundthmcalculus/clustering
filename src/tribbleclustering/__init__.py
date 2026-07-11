@@ -16,6 +16,8 @@ from .fcm import fuzzy_c_means
 from .ivatmeans import IVATMeans
 from .fuzzycmeans import FuzzyCMeans
 
+from . import gpu
+
 __all__ = [
     "vat_prim_mst",
     "vat_prim_mst_seq",
@@ -29,4 +31,5 @@ __all__ = [
     "fuzzy_c_means",
     "IVATMeans",
     "FuzzyCMeans",
+    "gpu",
 ]
