@@ -35,7 +35,9 @@ import numpy as np
 _BYTES = {"f32": 4, "f64": 8}
 _STAGES = ("pairwise", "vat", "ivat")
 # Memory cost as a multiple of one n x n matrix, per stage (current buffering).
-_STAGE_MATRICES = {"pairwise": 1, "vat": 2, "ivat": 3}
+# IVAT is built in place over the VAT buffer, so it holds 2 matrices (caller's
+# input + the shared VAT/IVAT buffer), not 3.
+_STAGE_MATRICES = {"pairwise": 1, "vat": 2, "ivat": 2}
 
 
 def make_blobs(n: int, d: int, n_clusters: int, dtype, seed: int = 0) -> np.ndarray:
@@ -172,7 +174,7 @@ def main() -> None:
 
     results = []
     hdr = "{:>7} {:>4} {:>6}  {:>20} {:>20} {:>20}".format(
-        "n", "dt", "1mat", "pairwise", "VAT(2buf)", "IVAT(3buf)")
+        "n", "dt", "1mat", "pairwise", "VAT(2buf)", "IVAT(2buf)")
     print("\n" + hdr)
     for n in args.sizes:
         for dt in args.dtypes:
