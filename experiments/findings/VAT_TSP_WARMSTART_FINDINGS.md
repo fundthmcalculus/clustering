@@ -101,10 +101,18 @@ degrades gracefully into the non-metric regime.** Its weakness is honest and
 predictable: on structureless (uniform) data it has no MST structure to exploit
 and loses to greedy-edge.
 
+> **Follow-up done — see `VAT_TSP_BENCHMARK_FINDINGS.md`.** A real Lin-Kernighan
+> (LKH, via `elkai`) baseline plus a VAT-cluster-blocking strategy at n≈50/500/5000.
+> Two findings sharpen the picture: for *closed-tour* TSP the raw VAT start is
+> weak (closing its open path adds one long edge), so VAT's value is not as a tour
+> constructor; but **VAT-found blocks + per-block LKH + an optimized block-to-block
+> stitch + one global 2-opt polish beats flat VAT+2-opt and approaches LKH quality
+> far faster at scale** — the divide-and-conquer payoff.
+
 **Status: research spike, not shipped.** Remaining for a paper-grade result:
 - **A dedicated solver baseline (LKH / Or-3-opt with don't-look bits)** rather
   than 2-opt + Or-opt, to test whether the warm-start ranking survives stronger
-  refinement (it may compress further).
+  refinement (it may compress further). *(LKH baseline now added — see above.)*
 - **Multiple data seeds with error bars** — instances here use one seed each
   (random start averaged over five); the ARI-free path-cost gaps are small enough
   that seed variance matters.
