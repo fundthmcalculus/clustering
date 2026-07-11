@@ -71,20 +71,16 @@ def compute_ordered_dis_njit_merge(
             matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype
         )
     p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
-    # Step 3 - since this is symmetric, we only have to do half
-    n_bit_mask = int(np.ceil(n / 8))
-    # Boolean is stored as a byte, so this is smaller
-    visited = np.zeros((n, n_bit_mask), dtype=np.uint8)
 
     if progress_bar is not None:
         progress_bar.set(0)
 
     if inplace:
-        # Due to loop-walking, we cannot use the parallel operations since we cannot know a-priori which loops are different.
-        for ij in range(n):
-            shuffle_ordered_column(n, ij, ordered_matrix, p, visited)
-            if progress_bar is not None:
-                progress_bar.update(1)
+        # Reorder in place as P·M·Pᵀ (see _permute_sym_inplace). Serial by
+        # nature, so the round-count is reported in one progress step.
+        _permute_sym_inplace(ordered_matrix, p)
+        if progress_bar is not None:
+            progress_bar.update(n)
     else:
         for ij in prange(n):
             for jk in range(ij, n):
@@ -94,42 +90,48 @@ def compute_ordered_dis_njit_merge(
                 if progress_bar is not None:
                     progress_bar.update(1)
 
-    # Step 4 - since this is symmetric, we only have to do half
     return ordered_matrix, p, q
 
 
-@njit(cache=True)
-def shuffle_ordered_column(
-    n: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray
-):
-    for jk in range(ij, n):
-        if _get_bit(visited, ij, jk):
+@njit(cache=True, nogil=True)
+def _permute_sym_inplace(M: ndarray, p: ndarray) -> None:
+    """Reorder a symmetric matrix in place so that M[i, j] <- M[p[i], p[j]].
+
+    Applied as P·M·Pᵀ in two independent 1-D cycle-following passes — permute
+    rows, then permute columns within each row. Each pass reads only the
+    not-yet-visited "next" element of a cycle before overwriting the current
+    one, so it is exact; workspace is O(n).
+
+    This replaces the earlier cycle-following-on-cell-pairs routine, which was
+    incorrect: it wrote both M[r, c] and its mirror M[c, r] in one step, and a
+    mirror-written cell could then be read as another cycle's "next" after it
+    had already received its final value, corrupting O(n) cells.
+    """
+    n = M.shape[0]
+    seen = np.zeros(n, dtype=np.bool_)
+    tmp = np.empty(n, dtype=M.dtype)
+
+    # Phase 1: permute rows so new row i = old row p[i].
+    for start in range(n):
+        if seen[start] or p[start] == start:
+            seen[start] = True
             continue
-        # Walk this loop, and store which visited
-        r0, c0 = ij, jk
-        r1, c1 = -1, -1
-        p0 = ordered_matrix[r0, c0]
-        while r1 != ij or c1 != jk:
-            r1, c1 = p[r0], p[c0]
-            _set_bit(visited, r0, c0)
-            _set_bit(visited, c0, r0)
-            ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[r1, c1]
-            # Next step!
-            r0, c0 = r1, c1
-        # Close the final block
-        ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = p0
-        _set_bit(visited, r0, c0)
-        _set_bit(visited, c0, r0)
+        tmp[:] = M[start, :]
+        i = start
+        while True:
+            seen[i] = True
+            nxt = p[i]
+            if nxt == start:
+                M[i, :] = tmp
+                break
+            M[i, :] = M[nxt, :]
+            i = nxt
 
-
-@njit(cache=True, nogil=True)
-def _set_bit(bitmask: np.ndarray, row: int, col: int) -> None:
-    bitmask[row, col // 8] |= 1 << (col % 8)
-
-
-@njit(cache=True, nogil=True)
-def _get_bit(bitmask: np.ndarray, row: int, col: int) -> int:
-    return (bitmask[row, col // 8] >> (col % 8)) & 1
+    # Phase 2: permute columns within each row: new[i, j] = cur[i, p[j]].
+    for i in range(n):
+        tmp[:] = M[i, :]
+        for j in range(n):
+            M[i, j] = tmp[p[j]]
 
 
 @njit(cache=True, nogil=True)
