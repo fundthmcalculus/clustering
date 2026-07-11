@@ -70,6 +70,26 @@ def test_return_distances_resident():
     assert np.max(np.abs(cp.asnumpy(Dg) - Dc)) < 1e-9
 
 
+def test_ivatmeans_on_device_matches_cpu():
+    """IVATMeans(on_device=True) must produce identical labels/centers to the
+    CPU path (it is exact — the speed tradeoff is separate)."""
+    from tribbleclustering.ivatmeans import IVATMeans
+
+    X = _blobs(3000, 10, 8, seed=5)
+    cpu = IVATMeans(n_clusters=8, on_device=False).fit(X)
+    dev = IVATMeans(n_clusters=8, on_device=True).fit(X)
+    assert np.array_equal(cpu.labels_, dev.labels_)
+    assert np.allclose(cpu.cluster_centers_, dev.cluster_centers_)
+
+
+def test_ivat_gpu_matrix_matches_serial():
+    X = _blobs(1200, 8, 6, seed=6)
+    ivat_dev, order = gpu_vat.ivat_gpu(X)
+    ivat_ser, _, _ = compute_ivat_c(pairwise_distances_c_64(X).copy(), inplace=False)
+    assert np.max(np.abs(ivat_dev - ivat_ser)) < 1e-9
+    assert np.array_equal(ivat_dev, ivat_dev.T)
+
+
 def test_boruvka_device_is_valid_mst():
     import cupy as cp
 
