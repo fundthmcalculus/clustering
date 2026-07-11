@@ -32,51 +32,6 @@ cdef void _compute_distances_32(
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void _compute_distances_unrolled_32(
-    const float[:, ::1] x,
-    const float[:, ::1] c,
-    float[:, ::1] distances
-) noexcept nogil:
-    """SIMD-friendly unrolled distance computation (float32).
-
-    Process 4 features per loop iteration to enable instruction-level
-    parallelism and allow the compiler to auto-vectorize.
-    """
-    cdef int n_samples = x.shape[0]
-    cdef int n_clusters = c.shape[0]
-    cdef int n_features = x.shape[1]
-    cdef int i, j, k, k_end
-    cdef float d, diff0, diff1, diff2, diff3
-
-    k_end = (n_features // 4) * 4
-
-    for i in range(n_samples):
-        for j in range(n_clusters):
-            d = 0.0
-
-            # Unrolled loop: process 4 features per iteration
-            for k in range(0, k_end, 4):
-                diff0 = x[i, k+0] - c[j, k+0]
-                diff1 = x[i, k+1] - c[j, k+1]
-                diff2 = x[i, k+2] - c[j, k+2]
-                diff3 = x[i, k+3] - c[j, k+3]
-
-                d += diff0 * diff0
-                d += diff1 * diff1
-                d += diff2 * diff2
-                d += diff3 * diff3
-
-            # Handle remainder (if n_features not multiple of 4)
-            for k in range(k_end, n_features):
-                diff0 = x[i, k] - c[j, k]
-                d += diff0 * diff0
-
-            distances[i, j] = sqrt(d)
-
-
-@cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef void _compute_distances_64(
     const double[:, ::1] x,
     const double[:, ::1] c,
@@ -94,51 +49,6 @@ cdef void _compute_distances_64(
             for k in range(n_features):
                 diff = x[i, k] - c[j, k]
                 d += diff * diff
-            distances[i, j] = sqrt(d)
-
-
-@cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cdef void _compute_distances_unrolled_64(
-    const double[:, ::1] x,
-    const double[:, ::1] c,
-    double[:, ::1] distances
-) noexcept nogil:
-    """SIMD-friendly unrolled distance computation (float64).
-
-    Process 4 features per loop iteration to enable instruction-level
-    parallelism and allow the compiler to auto-vectorize.
-    """
-    cdef int n_samples = x.shape[0]
-    cdef int n_clusters = c.shape[0]
-    cdef int n_features = x.shape[1]
-    cdef int i, j, k, k_end
-    cdef double d, diff0, diff1, diff2, diff3
-
-    k_end = (n_features // 4) * 4
-
-    for i in range(n_samples):
-        for j in range(n_clusters):
-            d = 0.0
-
-            # Unrolled loop: process 4 features per iteration
-            for k in range(0, k_end, 4):
-                diff0 = x[i, k+0] - c[j, k+0]
-                diff1 = x[i, k+1] - c[j, k+1]
-                diff2 = x[i, k+2] - c[j, k+2]
-                diff3 = x[i, k+3] - c[j, k+3]
-
-                d += diff0 * diff0
-                d += diff1 * diff1
-                d += diff2 * diff2
-                d += diff3 * diff3
-
-            # Handle remainder (if n_features not multiple of 4)
-            for k in range(k_end, n_features):
-                diff0 = x[i, k] - c[j, k]
-                d += diff0 * diff0
-
             distances[i, j] = sqrt(d)
 
 
@@ -348,15 +258,12 @@ cdef tuple _fuzzy_c_means_kernel_32(
     float[:, ::1] x,
     int n,
     float m,
-    float[:, ::1] c_init,
-    bint use_nesterov = True,
-    float momentum = 0.9
+    float[:, ::1] c_init
 ):
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
     cdef float[:, ::1] c
     cdef float[:, ::1] c_new
-    cdef float[:, ::1] c_prev
     cdef float[:, ::1] w_ij
     cdef float[:, ::1] distances
     cdef int i, j, k, iteration
@@ -366,29 +273,20 @@ cdef tuple _fuzzy_c_means_kernel_32(
 
     c = np.zeros((n, n_features), dtype=np.float32)
     c_new = np.zeros((n, n_features), dtype=np.float32)
-    c_prev = np.zeros((n, n_features), dtype=np.float32)
     w_ij = np.zeros((n_samples, n), dtype=np.float32)
     distances = np.zeros((n_samples, n), dtype=np.float32)
 
     for i in range(n):
         for k in range(n_features):
             c[i, k] = c_init[i, k]
-            c_prev[i, k] = c_init[i, k]
 
     # Always recompute on first iteration
     recompute_distances = True
 
     for iteration in range(100):
-        # Nesterov momentum: look ahead with extrapolation
-        if use_nesterov and iteration > 0:
-            # Compute extrapolated center: c + momentum * (c - c_prev)
-            for i in range(n):
-                for k in range(n_features):
-                    c[i, k] = c[i, k] + momentum * (c[i, k] - c_prev[i, k])
-
         # Only recompute distances if centers moved significantly
         if recompute_distances:
-            _compute_distances_unrolled_32(x, c, distances)
+            _compute_distances_32(x, c, distances)
 
         _compute_weights_32(distances, m, w_ij)
 
@@ -413,14 +311,13 @@ cdef tuple _fuzzy_c_means_kernel_32(
             c, c_new, movement_threshold
         )
 
-        # Store previous centers before update
+        # Update centers
         for i in range(n):
             for k in range(n_features):
-                c_prev[i, k] = c[i, k]
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    _compute_distances_unrolled_32(x, c, distances)
+    _compute_distances_32(x, c, distances)
     _compute_weights_32(distances, m, w_ij)
 
     return np.asarray(c), np.asarray(w_ij)
@@ -460,15 +357,12 @@ cdef tuple _fuzzy_c_means_kernel_64(
     double[:, ::1] x,
     int n,
     double m,
-    double[:, ::1] c_init,
-    bint use_nesterov = True,
-    double momentum = 0.9
+    double[:, ::1] c_init
 ):
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
     cdef double[:, ::1] c
     cdef double[:, ::1] c_new
-    cdef double[:, ::1] c_prev
     cdef double[:, ::1] w_ij
     cdef double[:, ::1] distances
     cdef int i, j, k, iteration
@@ -478,29 +372,20 @@ cdef tuple _fuzzy_c_means_kernel_64(
 
     c = np.zeros((n, n_features), dtype=np.float64)
     c_new = np.zeros((n, n_features), dtype=np.float64)
-    c_prev = np.zeros((n, n_features), dtype=np.float64)
     w_ij = np.zeros((n_samples, n), dtype=np.float64)
     distances = np.zeros((n_samples, n), dtype=np.float64)
 
     for i in range(n):
         for k in range(n_features):
             c[i, k] = c_init[i, k]
-            c_prev[i, k] = c_init[i, k]
 
     # Always recompute on first iteration
     recompute_distances = True
 
     for iteration in range(100):
-        # Nesterov momentum: look ahead with extrapolation
-        if use_nesterov and iteration > 0:
-            # Compute extrapolated center: c + momentum * (c - c_prev)
-            for i in range(n):
-                for k in range(n_features):
-                    c[i, k] = c[i, k] + momentum * (c[i, k] - c_prev[i, k])
-
         # Only recompute distances if centers moved significantly
         if recompute_distances:
-            _compute_distances_unrolled_64(x, c, distances)
+            _compute_distances_64(x, c, distances)
 
         _compute_weights_64(distances, m, w_ij)
 
@@ -525,14 +410,13 @@ cdef tuple _fuzzy_c_means_kernel_64(
             c, c_new, movement_threshold
         )
 
-        # Store previous centers before update
+        # Update centers
         for i in range(n):
             for k in range(n_features):
-                c_prev[i, k] = c[i, k]
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    _compute_distances_unrolled_64(x, c, distances)
+    _compute_distances_64(x, c, distances)
     _compute_weights_64(distances, m, w_ij)
 
     return np.asarray(c), np.asarray(w_ij)
