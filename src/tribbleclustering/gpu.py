@@ -208,3 +208,93 @@ def pairwise_distances(
     if is_available() and d >= _GPU_DIM_CROSSOVER:
         return pairwise_distances_gpu(data, high_precision=high_precision)
     return pairwise_distances_c(data)
+
+
+# ---------------------------------------------------------------------------
+# GPU Fuzzy C-Means
+#
+# Unlike pairwise distances (a single pass producing a huge O(n^2) result that
+# must transfer back), FCM is iterative: the data stays resident on the device
+# across ~100 iterations and only the tiny (k, d) centers move. That amortizes
+# the transfer, so this is the regime where the GPU reliably wins for large n.
+#
+# Distances here feed membership *ratios* in an iterative fixed-point solve, so
+# — unlike VAT — the gram formulation ||x_i - c_j||^2 = |x_i|^2 - 2 x_i.c_j +
+# |c_j|^2 is appropriate: it turns the per-iteration distance into a single
+# (n x d)(d x k) GEMM (cuBLAS), and its cancellation error is immaterial to the
+# converged partition.
+# ---------------------------------------------------------------------------
+def fuzzy_c_means_gpu(
+    x: np.ndarray,
+    n: int,
+    m: float = 2.0,
+    *,
+    initial_guess: np.ndarray | None = None,
+    indices=None,
+    max_iter: int = 100,
+    tol: float = 1e-5,
+):
+    """GPU Fuzzy C-Means. Mirrors ``fcm.fuzzy_c_means`` and returns
+    ``(centers, membership)`` with shapes ``(n, d)`` and ``(n_samples, n)``.
+
+    Falls back to the CPU implementation if no CUDA device is available.
+    """
+    if not is_available():
+        from .fcm import fuzzy_c_means
+
+        return fuzzy_c_means(x, n, m=m, indices=indices, initial_guess=initial_guess)
+
+    x = np.asarray(x)
+    dtype = x.dtype if x.dtype in (np.float32, np.float64) else np.float64
+    Xd = _cp.asarray(np.ascontiguousarray(x, dtype=dtype))  # (n_samples, d), resident
+    n_samples, d = Xd.shape
+
+    if initial_guess is not None and indices is not None:
+        raise ValueError("initial_guess and indices cannot both be provided")
+    if indices is not None:
+        C = Xd[_cp.asarray(np.asarray(indices))].copy()
+    elif initial_guess is not None:
+        if initial_guess.shape != (n, d):
+            raise ValueError(
+                f"initial_guess must have shape ({n}, {d}), got {initial_guess.shape}"
+            )
+        C = _cp.asarray(np.ascontiguousarray(initial_guess, dtype=dtype))
+    else:
+        idx = np.random.choice(n_samples, size=n * 2, replace=False)
+        C = (
+            _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype))
+            .reshape(n, 2, d)
+            .mean(axis=1)
+        )
+
+    q = 1.0 / (m - 1.0)  # membership exponent on squared distance
+    sqx = _cp.sum(Xd * Xd, axis=1)  # (n_samples,), constant across iterations
+
+    def _membership(C):
+        # squared distances via the gram identity, clamped to >= 0
+        D2 = sqx[:, None] - 2.0 * (Xd @ C.T) + _cp.sum(C * C, axis=1)[None, :]
+        _cp.maximum(D2, 0.0, out=D2)
+        zero = D2 == 0.0
+        any_zero = _cp.any(zero, axis=1)
+        # u_ij = D2_ij^{-q} / sum_l D2_il^{-q}   (== the ratio-sum FCM weight)
+        with np.errstate(divide="ignore"):
+            inv = D2 ** (-q)
+        U = inv / _cp.sum(inv, axis=1, keepdims=True)
+        # points sitting exactly on centers: hard-assign among the zero cells
+        if bool(any_zero.any()):
+            hz = zero.astype(dtype)
+            hz /= _cp.sum(hz, axis=1, keepdims=True)
+            U = _cp.where(any_zero[:, None], hz, U)
+        return U
+
+    for _ in range(max_iter):
+        U = _membership(C)
+        Um = U**m  # (n_samples, n)
+        C_new = (Um.T @ Xd) / _cp.sum(Um, axis=0)[:, None]
+        if bool(_cp.all(_cp.abs(C_new - C) <= (1e-8 + tol * _cp.abs(C)))):
+            C = C_new
+            break
+        C = C_new
+
+    U = _membership(C)
+    return _cp.asnumpy(C), _cp.asnumpy(U)
