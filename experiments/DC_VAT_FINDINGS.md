@@ -37,9 +37,21 @@ form.
 
 **Catch:** the closure is **O(n³)**, worse than the **O(n²)** serial iVAT. On a
 CPU it loses. Its payoff is parallelism density: the block ops are structurally
-a min-plus/GEMM-like tile, ideal for a GPU. Whether the RTX 4080's throughput
-beats the O(n²) serial CPU engine for useful n is an open, promising question —
-and it slots directly into the GPU work (a tiled (min,max) closure kernel).
+a min-plus/GEMM-like tile, ideal for a GPU.
+
+**Update — measured, and the GPU closure loses (the O(n³) factor wins):** a
+CuPy `(min,max)` Floyd–Warshall closure on the RTX 4080 vs the serial CPU iVAT:
+
+| n | serial iVAT (ms) | GPU closure (ms) | serial/GPU |
+|---|------------------|------------------|-----------|
+| 1000 | 4.9 | 49.6 | 0.10× |
+| 2000 | 22.6 | 734 | 0.031× |
+| 4000 | 101 | 6928 | 0.015× |
+
+The GPU is 10× slower at n=1000 and the gap **widens with n** (68× slower at
+n=4000) — exactly as O(n³) vs O(n²) predicts. GPU parallelism cannot buy back a
+whole factor of n. So the (min,max)-closure route is a dead end for VAT speed;
+it is only useful as an *exactness proof* that the idea is well-posed.
 
 ---
 
@@ -95,15 +107,17 @@ already-optimized O(n²) parallel engine.
   approximate and slower. (It *might* have a niche as an out-of-core tiling
   strategy for `n` beyond RAM, where the matrix can't be held at all — a
   different problem than the one measured here.)
-- **The exact, genuinely-parallel path is the (min, max) closure (Result 1).**
-  It is proven exact and maps to GPU tiles. Recommended next experiment:
-  a CuPy/Numba-CUDA tiled `(min,max)` closure on the RTX 4080, measuring the
-  crossover against the O(n²) serial CPU engine. This unifies the "2D
-  merge-sort" idea with the GPU track.
-- If exact *CPU* parallelism is wanted instead, the classical route is
-  **parallel Borůvka MST** (O(n²) work, O(log n) rounds) — but it only overtakes
-  the serial Prim at very large n / high core counts, given Prim's tiny
-  constant here.
+- **The (min, max) closure is exact but NOT a speed win** — measured 10–68×
+  slower on GPU than the serial CPU iVAT, worsening with n (the O(n³) vs O(n²)
+  gap; see the table above). Do not pursue it for performance. It remains a
+  clean *proof of well-posedness* of the idea.
+- **If exact parallel VAT is ever wanted, the only viable route is parallel
+  Borůvka MST** (O(n²) work, O(log n) depth) — same complexity as serial Prim,
+  so it can win on a GPU/many-core at large n. But the serial Prim here has a
+  very small constant, so this is speculative future work, not a quick win.
+- **Net:** the serial O(n²) engine (now made memory-frugal by the in-place PRs)
+  is the right VAT/iVAT path at scale; the GPU's payoff is elsewhere — FCM
+  (30–56×, data-resident iteration) and high-dimensional float32 distances.
 
 ---
 
