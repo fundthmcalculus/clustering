@@ -293,41 +293,65 @@ def _time(fn, *a, rep=2, warm=1):
     return best * 1e3
 
 
+def _time_gpu(fn, arg):
+    """Time a GPU call, synchronising around it (arg may be a device array)."""
+    _cp.cuda.Stream.null.synchronize()
+    fn(arg)
+    _cp.cuda.Stream.null.synchronize()
+    best = np.inf
+    for _ in range(2):
+        _cp.cuda.Stream.null.synchronize()
+        t = time.perf_counter()
+        fn(arg)
+        _cp.cuda.Stream.null.synchronize()
+        best = min(best, time.perf_counter() - t)
+    return best * 1e3
+
+
 def scaling_figure():
+    from experiments.boruvka_gpu import boruvka_mst_gpu
+
     sizes = [1000, 2000, 4000, 8000, 16000, 32000]
-    cupy_max_n = 16000  # naive per-round n x n mask; cap to avoid VRAM blowup
-    t_prim, t_bnumba, t_bcupy, order_match = [], [], [], []
-    cupy_sizes = []
+    t_prim, t_bnumba, t_gpu_dev, t_gpu_xfer, order_match = [], [], [], [], []
     for n in sizes:
         X = make_blobs(n, 10, 25, seed=7)
         D = pairwise_distances_c_64(X)
         t_prim.append(_time(lambda M: vat_prim_mst_c(M), D))
         t_bnumba.append(_time(lambda M: boruvka_mst_numba(M), D))
-        if _HAS_CUPY and n <= cupy_max_n:
-            t_bcupy.append(_time(lambda M: boruvka_mst_cupy(M), D, rep=2, warm=1))
-            cupy_sizes.append(n)
-        # correctness: does Boruvka-derived VAT order match serial?
+        if _HAS_CUPY:
+            # with host->device transfer of the n x n matrix
+            t_gpu_xfer.append(_time_gpu(lambda M: boruvka_mst_gpu(M), D))
+            # matrix already resident on the device (the on-device-pipeline case)
+            Dg = _cp.asarray(D)
+            t_gpu_dev.append(_time_gpu(lambda M: boruvka_mst_gpu(M), Dg))
+            del Dg
+            _cp.get_default_memory_pool().free_all_blocks()
+        # correctness: does Boruvka-derived VAT order match serial Prim?
         _, _, p_serial = compute_ivat_c(D.copy(), inplace=False)
         mu, mv = boruvka_mst_numba(D)
         order = vat_order_from_mst(D, mu, mv)
         order_match.append(float(np.mean(order == p_serial)))
-        cm = (f"  boruvka(cupy) {t_bcupy[-1]:8.1f}ms"
-              if (_HAS_CUPY and n <= cupy_max_n) else "")
+        gm = (f"  gpu(dev) {t_gpu_dev[-1]:8.1f}ms  gpu(+xfer) {t_gpu_xfer[-1]:8.1f}ms"
+              if _HAS_CUPY else "")
         print(f"  n={n:6d}: prim {t_prim[-1]:8.1f}ms  boruvka(numba) "
-              f"{t_bnumba[-1]:8.1f}ms" + cm +
+              f"{t_bnumba[-1]:8.1f}ms" + gm +
               f"  order_match={order_match[-1]:.4f}")
 
-    fig, ax = plt.subplots(figsize=(8, 5.5))
+    fig, ax = plt.subplots(figsize=(8.5, 5.8))
     ax.plot(sizes, t_prim, "o-", label="serial Prim (C/OpenMP, O(n^2))")
-    ax.plot(sizes, t_bnumba, "s-", label="Boruvka (Numba, 32 cores, O(n^2 log n))")
+    ax.plot(sizes, t_bnumba, "s-", label="Boruvka (Numba, 32 cores)")
     if _HAS_CUPY:
-        ax.plot(cupy_sizes, t_bcupy, "^-", label="Boruvka (CuPy GPU, naive)")
+        ax.plot(sizes, t_gpu_dev, "^-", color="tab:red",
+                label="Boruvka (GPU, matrix resident)")
+        ax.plot(sizes, t_gpu_xfer, "^--", color="tab:red", alpha=0.5,
+                label="Boruvka (GPU, incl. host->device transfer)")
     ax.set_xlabel("n (samples)")
     ax.set_ylabel("MST build time (ms)")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_title("MST build: serial Prim vs parallel Boruvka\n"
-                 "(VAT order/image identical; this is the only axis that differs)")
+                 "(VAT order/image identical; MST build time is the only axis "
+                 "that differs)")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -336,7 +360,8 @@ def scaling_figure():
     fig.savefig(path, dpi=110)
     plt.close(fig)
     return path, dict(sizes=sizes, prim=t_prim, boruvka_numba=t_bnumba,
-                      boruvka_cupy=t_bcupy, order_match=order_match)
+                      gpu_resident=t_gpu_dev, gpu_xfer=t_gpu_xfer,
+                      order_match=order_match)
 
 
 if __name__ == "__main__":
