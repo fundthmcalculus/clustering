@@ -113,9 +113,19 @@ def pairwise_distances_device(data, high_precision: bool = True):
     tile_elems = n * n
     threads = 256
     blocks = (tile_elems + threads - 1) // threads
-    kern((blocks,), (threads,),
-         (X_dev, np.int32(n), np.int32(d), np.int32(n),
-          np.int32(0), np.int64(tile_elems), out))
+    kern(
+        (blocks,),
+        (threads,),
+        (
+            X_dev,
+            np.int32(n),
+            np.int32(d),
+            np.int32(n),
+            np.int32(0),
+            np.int64(tile_elems),
+            out,
+        ),
+    )
     # self-distances are exactly 0 (zero diffs); nothing to fix.
     del X_dev
     return out

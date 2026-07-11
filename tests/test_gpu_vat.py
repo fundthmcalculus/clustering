@@ -2,6 +2,7 @@
 
 Skipped when no CUDA device / CuPy is available.
 """
+
 import heapq
 
 import numpy as np
@@ -45,7 +46,7 @@ def test_gpu_vat_order_matches_serial(n, d, k):
     order, parent = gpu_vat.vat_gpu(X)
     D = pairwise_distances_c_64(X.astype(np.float64))
     _, _, p_serial = compute_ivat_c(D.copy(), inplace=False)
-    assert np.array_equal(order, p_serial)          # exact VAT ordering
+    assert np.array_equal(order, p_serial)  # exact VAT ordering
     # and the iVAT image built from it is identical to the serial engine's
     img_gpu = _ivat_from_order(D, order.astype(np.int64))
     img_ser, _, _ = compute_ivat_c(D.copy(), inplace=False)
@@ -61,9 +62,10 @@ def test_vat_gpu_is_a_permutation():
 
 def test_return_distances_resident():
     import cupy as cp
+
     X = _blobs(500, 6, 4, seed=3)
     order, parent, Dg = gpu_vat.vat_gpu(X, return_distances=True)
-    assert isinstance(Dg, cp.ndarray)               # matrix stayed on device
+    assert isinstance(Dg, cp.ndarray)  # matrix stayed on device
     assert Dg.shape == (500, 500)
     # resident matrix matches the CPU distances
     Dc = pairwise_distances_c_64(X)
@@ -72,12 +74,14 @@ def test_return_distances_resident():
 
 def test_boruvka_device_is_valid_mst():
     import cupy as cp
+
     X = _blobs(1000, 8, 6, seed=4)
     Dg = gpu.pairwise_distances_device(X)
     mu, mv = gpu_vat.boruvka_mst_device(Dg)
-    assert mu.shape[0] == 999                        # spanning tree edge count
+    assert mu.shape[0] == 999  # spanning tree edge count
     # MST weight equals scipy's single-linkage total (unique MST)
     from scipy.sparse.csgraph import minimum_spanning_tree
+
     Dc = pairwise_distances_c_64(X)
     ref_w = minimum_spanning_tree(Dc).sum()
     got_w = float(cp.asnumpy(Dg[mu, mv]).sum())
