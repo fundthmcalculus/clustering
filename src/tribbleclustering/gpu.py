@@ -89,43 +89,77 @@ def _kernel(dtype, high_precision: bool):
     return _KERNELS[key]
 
 
-def pairwise_distances_device(data, high_precision: bool = True):
+def pairwise_distances_device(data, high_precision: bool = True, dtype=None):
     """Dense Euclidean distance matrix computed on the GPU and returned as a
     **device-resident** CuPy array (no host copy).
 
     This is the entry point for a fully on-device pipeline (e.g. GPU Borůvka
     VAT): the O(n^2) matrix never crosses PCIe. Requires the n x n matrix to fit
     in VRAM. Same accuracy contract as pairwise_distances_gpu.
+
+    ``dtype`` chooses the stored precision of the result: ``None`` (default)
+    keeps the input dtype (float32/float64); ``float16``/``float32``/``float64``
+    force it. For float16 the tile is computed in float32 and cast on store, so
+    no full float32 matrix is materialised — halving/quartering the resident
+    footprint for the scaling regime.
     """
     if not is_available():
         raise RuntimeError("CuPy/CUDA device not available")
     data = np.asarray(data)
-    if data.dtype not in (np.float32, np.float64):
-        raise TypeError(f"Expected float32 or float64, got {data.dtype}")
     n, d = data.shape
-    dtype = data.dtype
-    hp = high_precision or dtype == np.float64
-    X_dev = _cp.asarray(np.ascontiguousarray(data))
-    out = _cp.empty((n, n), dtype=dtype)
+    store = np.dtype(data.dtype if dtype is None else dtype)
+    if store not in (np.float16, np.float32, np.float64):
+        raise TypeError(f"Expected float16/float32/float64, got {store}")
+    # compute in f32 for f16 storage (accurate expansion, cast on store), else
+    # in the stored precision directly.
+    compute = np.dtype(np.float32) if store == np.float16 else store
+    hp = high_precision or compute == np.float64
+    X_dev = _cp.asarray(np.ascontiguousarray(data, dtype=compute))
+    out = _cp.empty((n, n), dtype=store)
     if n == 0:
         return out
-    kern = _kernel(dtype, hp)
-    tile_elems = n * n
+    kern = _kernel(compute, hp)
     threads = 256
-    blocks = (tile_elems + threads - 1) // threads
-    kern(
-        (blocks,),
-        (threads,),
-        (
-            X_dev,
-            np.int32(n),
-            np.int32(d),
-            np.int32(n),
-            np.int32(0),
-            np.int64(tile_elems),
-            out,
-        ),
-    )
+    if store == np.float16:
+        # tile so only one R x n float32 buffer is transient (not a full matrix)
+        free_bytes, _ = _cp.cuda.Device().mem_info
+        tile_rows = _tile_rows_for_budget(n, compute.itemsize, int(free_bytes * 0.2))
+        for a in range(0, n, tile_rows):
+            b = min(a + tile_rows, n)
+            R = b - a
+            tile_elems = R * n
+            tile = _cp.empty((R, n), dtype=compute)
+            blocks = (tile_elems + threads - 1) // threads
+            kern(
+                (blocks,),
+                (threads,),
+                (
+                    X_dev,
+                    np.int32(n),
+                    np.int32(d),
+                    np.int32(R),
+                    np.int32(a),
+                    np.int64(tile_elems),
+                    tile,
+                ),
+            )
+            out[a:b] = tile.astype(_cp.float16)
+    else:
+        tile_elems = n * n
+        blocks = (tile_elems + threads - 1) // threads
+        kern(
+            (blocks,),
+            (threads,),
+            (
+                X_dev,
+                np.int32(n),
+                np.int32(d),
+                np.int32(n),
+                np.int32(0),
+                np.int64(tile_elems),
+                out,
+            ),
+        )
     # self-distances are exactly 0 (zero diffs); nothing to fix.
     del X_dev
     return out
