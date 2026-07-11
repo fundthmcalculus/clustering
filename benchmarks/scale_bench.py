@@ -18,6 +18,7 @@ Every stage estimates its peak memory *before* running and is skipped (not
 crashed) if it would exceed --max-gb, so pushing toward the 64 GB envelope is
 safe. Correctness is verified against reference implementations at small n.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -41,8 +42,12 @@ _STAGES = ("pairwise", "vat", "ivat", "ivat_inplace")
 #   ivat_inplace  : input consumed in place (P.M.Pt + IVAT), O(n)  -> 1
 #                   scratch only; no second n x n buffer
 _STAGE_MATRICES = {"pairwise": 1, "vat": 2, "ivat": 2, "ivat_inplace": 1}
-_STAGE_HDR = {"pairwise": "pairwise", "vat": "VAT(2buf)",
-              "ivat": "IVAT(2buf)", "ivat_inplace": "IVAT-inplace(1buf)"}
+_STAGE_HDR = {
+    "pairwise": "pairwise",
+    "vat": "VAT(2buf)",
+    "ivat": "IVAT(2buf)",
+    "ivat_inplace": "IVAT-inplace(1buf)",
+}
 
 
 def make_blobs(n: int, d: int, n_clusters: int, dtype, seed: int = 0) -> np.ndarray:
@@ -52,8 +57,9 @@ def make_blobs(n: int, d: int, n_clusters: int, dtype, seed: int = 0) -> np.ndar
     centers = rng.uniform(-50.0, 50.0, size=(n_clusters, d))
     sizes = np.full(n_clusters, n // n_clusters)
     sizes[: n - int(sizes.sum())] += 1
-    parts = [rng.standard_normal((s, d)) * 2.0 + centers[k]
-             for k, s in enumerate(sizes)]
+    parts = [
+        rng.standard_normal((s, d)) * 2.0 + centers[k] for k, s in enumerate(sizes)
+    ]
     X = np.vstack(parts).astype(dtype)
     rng.shuffle(X)
     return np.ascontiguousarray(X)
@@ -67,9 +73,13 @@ def _worker(n: int, d: int, dt: str, n_clusters: int, stage: str) -> None:
 
     from benchmarks.memprobe import measure_peak_rss
     from tribbleclustering.pcvat import (
-        compute_ivat_c, compute_ivat_c_32, compute_ivat_c_64,
-        compute_vat_c_32, compute_vat_c_64,
-        pairwise_distances_c_32, pairwise_distances_c_64,
+        compute_ivat_c,
+        compute_ivat_c_32,
+        compute_ivat_c_64,
+        compute_vat_c_32,
+        compute_vat_c_64,
+        pairwise_distances_c_32,
+        pairwise_distances_c_64,
     )
 
     dtype = np.float32 if dt == "f32" else np.float64
@@ -99,17 +109,28 @@ def _worker(n: int, d: int, dt: str, n_clusters: int, stage: str) -> None:
         t0 = time.perf_counter()
         fn(*args)
         dt_ms = (time.perf_counter() - t0) * 1e3
-    print("RESULT " + json.dumps(
-        {"time_ms": dt_ms, "peak_gb": m.peak_gb, "delta_gb": m.delta_gb}))
+    print(
+        "RESULT "
+        + json.dumps({"time_ms": dt_ms, "peak_gb": m.peak_gb, "delta_gb": m.delta_gb})
+    )
 
 
 def _run_worker_subprocess(n, d, dt, n_clusters, stage, timeout=1800):
-    cmd = [sys.executable, "-m", "benchmarks.scale_bench", "--worker",
-           str(n), str(d), dt, str(n_clusters), stage]
+    cmd = [
+        sys.executable,
+        "-m",
+        "benchmarks.scale_bench",
+        "--worker",
+        str(n),
+        str(d),
+        dt,
+        str(n_clusters),
+        stage,
+    ]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     for line in proc.stdout.splitlines():
         if line.startswith("RESULT "):
-            return json.loads(line[len("RESULT "):])
+            return json.loads(line[len("RESULT ") :])
     return {"error": (proc.stderr or proc.stdout or "no RESULT").strip()[-400:]}
 
 
@@ -131,11 +152,14 @@ def verify_correctness(n: int = 400, d: int = 6, n_clusters: int = 5) -> dict:
     ivat_c, _, _ = compute_ivat_c_64(D_ref)
     ivat_ref, _, _ = ref_ivat(D_ref, inplace=False)
     out["ivat_sorted_max_abs_err"] = float(
-        np.max(np.abs(np.sort(ivat_c.ravel()) - np.sort(ivat_ref.ravel()))))
+        np.max(np.abs(np.sort(ivat_c.ravel()) - np.sort(ivat_ref.ravel())))
+    )
     out["ivat_symmetric"] = bool(np.allclose(ivat_c, ivat_c.T))
-    out["passed"] = (out["pairwise_max_abs_err"] < 1e-9
-                     and out["ivat_sorted_max_abs_err"] < 1e-9
-                     and out["ivat_symmetric"])
+    out["passed"] = (
+        out["pairwise_max_abs_err"] < 1e-9
+        and out["ivat_sorted_max_abs_err"] < 1e-9
+        and out["ivat_symmetric"]
+    )
     return out
 
 
@@ -149,15 +173,18 @@ def _fmt(stage_res: dict | None) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--worker", nargs=5, default=None,
-                    metavar=("N", "D", "DT", "NCLUST", "STAGE"),
-                    help="internal: measure one stage and print JSON")
-    ap.add_argument("--sizes", type=int, nargs="+",
-                    default=[2000, 8000, 16000, 32000])
-    ap.add_argument("--dtypes", nargs="+", default=["f32", "f64"],
-                    choices=["f32", "f64"])
-    ap.add_argument("--stages", nargs="+", default=list(_STAGES),
-                    choices=list(_STAGES))
+    ap.add_argument(
+        "--worker",
+        nargs=5,
+        default=None,
+        metavar=("N", "D", "DT", "NCLUST", "STAGE"),
+        help="internal: measure one stage and print JSON",
+    )
+    ap.add_argument("--sizes", type=int, nargs="+", default=[2000, 8000, 16000, 32000])
+    ap.add_argument(
+        "--dtypes", nargs="+", default=["f32", "f64"], choices=["f32", "f64"]
+    )
+    ap.add_argument("--stages", nargs="+", default=list(_STAGES), choices=list(_STAGES))
     ap.add_argument("--d", type=int, default=10)
     ap.add_argument("--n-clusters", type=int, default=20)
     ap.add_argument("--max-gb", type=float, default=55.0)
@@ -175,8 +202,10 @@ def main() -> None:
         args.sizes = [500, 2000]
 
     print(f"host={socket.gethostname()}  cpu={platform.processor()}")
-    print(f"sizes={args.sizes} dtypes={args.dtypes} d={args.d} "
-          f"n_clusters={args.n_clusters} max_gb={args.max_gb}")
+    print(
+        f"sizes={args.sizes} dtypes={args.dtypes} d={args.d} "
+        f"n_clusters={args.n_clusters} max_gb={args.max_gb}"
+    )
 
     verify = None
     if not args.no_verify:
@@ -190,14 +219,14 @@ def main() -> None:
     stages = [s for s in _STAGES if s in args.stages]
     colw = 22
     hdr = "{:>7} {:>4} {:>6}  ".format("n", "dt", "1mat") + "".join(
-        f"{_STAGE_HDR[s]:>{colw}}" for s in stages)
+        f"{_STAGE_HDR[s]:>{colw}}" for s in stages
+    )
     print("\n" + hdr)
     for n in args.sizes:
         for dt in args.dtypes:
             b = _BYTES[dt]
             mat_gb = n * n * b / 1e9
-            row = {"n": n, "d": args.d, "dtype": dt, "matrix_gb": mat_gb,
-                   "stages": {}}
+            row = {"n": n, "d": args.d, "dtype": dt, "matrix_gb": mat_gb, "stages": {}}
             cells = []
             for stage in stages:
                 need = _STAGE_MATRICES[stage] * mat_gb
@@ -209,8 +238,10 @@ def main() -> None:
                 row["stages"][stage] = sr
                 cells.append(_fmt(sr))
             results.append(row)
-            print("{:>7} {:>4} {:>6.1f}  ".format(n, dt, mat_gb)
-                  + "".join(f"{c:>{colw}}" for c in cells))
+            print(
+                "{:>7} {:>4} {:>6.1f}  ".format(n, dt, mat_gb)
+                + "".join(f"{c:>{colw}}" for c in cells)
+            )
 
     payload = {
         "meta": {
