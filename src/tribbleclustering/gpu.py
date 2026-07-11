@@ -172,8 +172,21 @@ def pairwise_distances_gpu(
 
 # Empirical crossover on a consumer GPU (RTX 4080, weak float64, PCIe D2H of
 # the O(n^2) result): the GPU only beats 32 CPU cores at higher feature
-# dimension. Below this d the transfer/compute cost loses to the CPU C kernel.
+# dimension AND for float32. float64 loses at every dimension on this class of
+# card (FP64 ~1/64 of FP32); below the crossover d the transfer cost loses too.
 _GPU_DIM_CROSSOVER = 64
+
+
+def gpu_pairwise_beneficial(data: np.ndarray) -> bool:
+    """Whether routing this input's pairwise distances to the GPU is expected
+    to be a win on consumer-class hardware: a device is available, the data is
+    float32, and the feature dimension clears the crossover."""
+    data = np.asarray(data)
+    if data.ndim != 2:
+        return False
+    return (is_available()
+            and data.dtype == np.float32
+            and data.shape[1] >= _GPU_DIM_CROSSOVER)
 
 
 def pairwise_distances(data: np.ndarray, backend: str = "auto",
@@ -181,21 +194,19 @@ def pairwise_distances(data: np.ndarray, backend: str = "auto",
     """Dense Euclidean pairwise-distance matrix with backend selection.
 
     backend='auto' (default) uses the GPU only where it is expected to win on
-    this class of hardware — a CUDA device is available and the feature
-    dimension is at least ~64 (see benchmarks/gpu_pairwise.md) — and otherwise
-    the CPU C/OpenMP kernel. 'gpu'/'cpu' force a backend.
+    this class of hardware (see ``gpu_pairwise_beneficial`` /
+    benchmarks/gpu_pairwise.md) and otherwise the CPU C/OpenMP kernel.
+    'gpu'/'cpu' force a backend.
     """
     from .pcvat import pairwise_distances_c
 
-    data = np.asarray(data)
-    d = data.shape[1] if data.ndim == 2 else 0
     if backend == "gpu":
         return pairwise_distances_gpu(data, high_precision=high_precision)
     if backend == "cpu":
         return pairwise_distances_c(data)
     if backend != "auto":
         raise ValueError(f"backend must be 'auto', 'gpu', or 'cpu', got {backend!r}")
-    if is_available() and d >= _GPU_DIM_CROSSOVER:
+    if gpu_pairwise_beneficial(data):
         return pairwise_distances_gpu(data, high_precision=high_precision)
     return pairwise_distances_c(data)
 
