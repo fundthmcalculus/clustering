@@ -65,6 +65,62 @@ n=32000. The dashed line is the catch: **including the host→device transfer of
 the `n×n` matrix, the GPU loses** (transfer dominates, exactly as for GPU
 pairwise distances).
 
+## DGX Spark (GB10): unified memory dissolves the transfer wall
+
+The numbers above were on a discrete GPU, where the dashed "+transfer" line is
+the whole story: copying the `n×n` matrix over PCIe cost ~10× the resident
+kernel and sank the GPU for host-resident data. Re-running on an **NVIDIA DGX
+Spark (GB10 Grace-Blackwell)** — where the CPU and GPU share ~128 GB of coherent
+LPDDR5X over NVLink-C2C — changes the conclusion in two ways.
+
+**1. The transfer tax collapses (10.7× → ~3×), and unified memory nearly erases
+it.** GB10's GPU is smaller than the discrete card, so the *device-resident*
+kernel is a touch slower in absolute ms — but the copy penalty is far cheaper,
+and allocating the matrix in **CUDA managed (unified) memory** removes the
+explicit copy altogether. MST build time (ms), same blobs, `experiments/boruvka_dgx_spark.py`:
+
+| n | serial Prim | Borůvka Numba | GPU resident | GPU **unified** (no copy) | GPU host+copy |
+|------|------------|---------------|--------------|---------------------------|---------------|
+| 2000 | 3.6 | 1.2 | 1.1 | **1.6** | 3.0 |
+| 4000 | 13.5 | 9.9 | 3.7 | **5.1** | 10.5 |
+| 8000 | 52.6 | 35.6 | 13.5 | **19.1** | 44.0 |
+| 16000 | 202.8 | 138.2 | 53.4 | **75.0** | 163.6 |
+| 32000 | 838.8 | 612.0 | 245.7 | **349.1** | 726.4 |
+
+The unified/managed input tracks device-resident within ~1.4× and is **~2.1×
+faster than the explicit-copy path** (349 vs 726 ms at n=32000) — with only *one*
+`n×n` allocation instead of two. It also beats CPU Numba Borůvka (2.4×) and
+serial Prim (1.75×) *for host-resident data*, which the discrete GPU could not.
+Still exact (MST weight parity with the CPU MST at every size).
+
+![transfer](../figures/boruvka_dgx_transfer.png)
+
+**2. The 128 GB unified pool runs VAT MST past every discrete-GPU VRAM wall.**
+A dense f64 `n×n` matrix hits 24/48/80 GB at n≈54.7k / 77.5k / 100k, so discrete
+GPUs OOM there — and the old host→device path OOMs *even sooner* on GB10 because
+`cp.asarray(D)` needs a second `n×n` buffer (host **and** device copy). Building
+the matrix **on the device** (tiled `pairwise_distances_gpu`, single unified
+allocation) avoids the doubling and roughly doubles the reachable n:
+
+| n | D size | GPU pairwise (one-time) | **GPU Borůvka MST** | edges |
+|-------|--------|-------------------------|---------------------|-------|
+| 16000 | 2.0 GB | 1.0 s | **75 ms** | 15999/15999 |
+| 32000 | 8.2 GB | 3.1 s | **349 ms** | 31999/31999 |
+| 65536 | 34.4 GB | 13.8 s | **1.46 s** | 65535/65535 |
+| 100000 | 80.0 GB | 34.0 s | **3.41 s** | 99999/99999 |
+
+n=100000 is an **80 GB** distance matrix held in the shared pool with a correct
+spanning tree — a size no single discrete GPU can hold at all.
+
+![large-n](../figures/boruvka_dgx_largen.png)
+
+**Takeaway for GB10:** the discrete-GPU verdict's "one condition" (matrix must be
+device-resident) is satisfied *for free* by unified memory — allocate the matrix
+once with `boruvka_gpu.alloc_unified` / `as_unified` (or build it on-device with
+`pairwise_distances_gpu`) and both the CPU distance build and the GPU MST touch
+the same pages with no copy. The device-resident win survives, the transfer wall
+does not, and the memory ceiling moves from tens of GB to ~128 GB.
+
 ## Verdict
 
 - **Exactness:** Borůvka-MST VAT is provably and empirically identical to serial
@@ -86,5 +142,10 @@ pairwise distances).
 
 - `experiments/boruvka_vat.py` — Numba Borůvka, VAT-order-from-MST, quality &
   scaling figures.
-- `experiments/boruvka_gpu.py` — the real device-side CuPy RawKernel Borůvka.
-- `experiments/figures/boruvka_vat_{quality,scaling}.png`.
+- `experiments/boruvka_gpu.py` — the real device-side CuPy RawKernel Borůvka,
+  plus `alloc_unified` / `as_unified` (managed-memory helpers) and a tiled
+  `pairwise_distances_gpu` that builds the matrix on-device.
+- `experiments/boruvka_dgx_spark.py` — DGX Spark (GB10) study: transfer-mode
+  comparison + large-n capability (matrix born on the device).
+- `experiments/figures/boruvka_vat_{quality,scaling}.png`,
+  `experiments/figures/boruvka_dgx_{transfer,largen}.png`.

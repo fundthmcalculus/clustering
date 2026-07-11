@@ -138,6 +138,63 @@ def _module():
     return _MOD
 
 
+def alloc_unified(shape, dtype=None):
+    """Allocate a matrix in CUDA *managed* (unified) memory.
+
+    On a unified-memory device (e.g. DGX Spark / GB10 Grace-Blackwell) the
+    returned array is backed by pages the CPU and GPU share coherently, so the
+    CPU can fill it (e.g. write a pairwise-distance matrix) and ``boruvka_mst_gpu``
+    can consume it with **no explicit host->device copy** and only one ``n x n``
+    allocation instead of two. Returns a cupy ndarray viewing the managed buffer.
+    """
+    if not _HAS_CUPY:
+        raise RuntimeError("CuPy/CUDA device not available")
+    dtype = cp.float64 if dtype is None else dtype
+    n_bytes = int(np.prod(shape)) * cp.dtype(dtype).itemsize
+    mem = cp.cuda.malloc_managed(n_bytes)
+    return cp.ndarray(shape, dtype=dtype, memptr=mem)
+
+
+def as_unified(D):
+    """Copy a host ndarray into a managed (unified-memory) cupy array, once.
+
+    Convenience for the common case where ``D`` already lives in host numpy: the
+    single copy here replaces the per-call ``cp.asarray`` inside the MST loop, so
+    repeated MST builds (or a downstream device pipeline) pay it zero more times.
+    """
+    Dg = alloc_unified(D.shape, dtype=cp.float64)
+    Dg[...] = cp.asarray(D)
+    cp.cuda.Stream.null.synchronize()
+    return Dg
+
+
+def pairwise_distances_gpu(X, out=None, tile=4096):
+    """Dense Euclidean pairwise-distance matrix, built entirely on the GPU.
+
+    ``X`` is a host or device ``(n, d)`` array; the ``(n, n)`` result is written
+    into ``out`` (allocate it with :func:`alloc_unified` to keep the whole VAT
+    pipeline copy-free on a unified-memory device). Rows are computed in tiles so
+    the transient ``||xi||^2 + ||xj||^2 - 2 xi.xj`` expansion never materialises a
+    second full ``n x n`` buffer. Matches the CPU pairwise output to fp tolerance.
+    """
+    if not _HAS_CUPY:
+        raise RuntimeError("CuPy/CUDA device not available")
+    Xg = cp.ascontiguousarray(cp.asarray(X, dtype=cp.float64))
+    n = Xg.shape[0]
+    sq = cp.einsum("ij,ij->i", Xg, Xg)  # per-row squared norm, length n
+    D = alloc_unified((n, n), dtype=cp.float64) if out is None else out
+    for s in range(0, n, tile):
+        e = min(s + tile, n)
+        # (tile, n) block: ||xi||^2 + ||xj||^2 - 2 xi.xj, clamped and sqrt'd
+        g = Xg[s:e] @ Xg.T
+        block = sq[s:e, None] + sq[None, :] - 2.0 * g
+        cp.maximum(block, 0.0, out=block)
+        cp.sqrt(block, out=block)
+        D[s:e] = block
+    cp.cuda.Stream.null.synchronize()
+    return D
+
+
 def boruvka_mst_gpu(D):
     """Device-side Boruvka MST of a dense symmetric dissimilarity matrix.
 
