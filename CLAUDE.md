@@ -32,12 +32,25 @@ src/tribbleclustering/
   util.py            # pairwise_distances (numba), synthetic cluster generators
 tests/               # pytest suite (correctness + benchmark-marked perf tests)
 benchmarks/          # dev-only scale/memory harness (NOT shipped in the wheel)
-docs/                # perf guidance, bibliography, novelty write-ups, source PDFs
+experiments/         # research spikes (NOT shipped): one <name>.py per experiment,
+  figures/           #   generated PNG figures (run: python -m experiments.<name>)
+  findings/          #   *_FINDINGS.md per experiment + the cross-cutting reports
+                     #   (white-paper.md, performance-report.md, next-steps.md)
+docs/                # perf guidance, bibliography, novelty write-ups
+  papers/            #   committed prior-art PDFs
+  sources/           #   git-ignored scratch cache for retrieved PDFs (do not commit)
 ```
 
 Top-level markdown reports (`CODE_QUALITY.md`, `PROFILING_RESULTS.md`,
 `PHASE2_REVERT_SUMMARY.md`) are living design/history docs — read them for
 context before touching lint config or performance code.
+
+The `experiments/` tree is a **research area, not shipped code** — spikes for
+divide-and-conquer VAT, GPU/Borůvka MST, and the scaling/quality studies behind
+the paper. Each `experiments/<name>.py` regenerates its own figures into
+`experiments/figures/` and has a matching `experiments/findings/<NAME>_FINDINGS.md`.
+Start from `experiments/findings/next-steps.md` (the roadmap/artifact index),
+`white-paper.md` (claim + evidence), and `performance-report.md` (all numbers).
 
 ## Compiled-vs-pure-python fallback (important)
 

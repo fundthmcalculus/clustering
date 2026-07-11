@@ -19,13 +19,13 @@ Exact serial VAT vs blockwise N=2/4/8 (red lines = block boundaries).
 so the merged image *repeats the whole cluster set N times* and loses all
 cross-block structure (off-diagonals saturate).
 
-![random](figures/blockwise_vat_quality_random.png)
+![random](../figures/blockwise_vat_quality_random.png)
 
 **Coordinate (spatially-coherent) partition — tolerable:** blocks mostly contain
 whole clusters; the exact structure is largely preserved, with extra
 subdivisions only where a true cluster straddles a boundary.
 
-![coordinate](figures/blockwise_vat_quality_coordinate.png)
+![coordinate](../figures/blockwise_vat_quality_coordinate.png)
 
 ## Quality vs N (n=4000, k=10; ideal label-runs = 10, ARI=1.0 is exact)
 

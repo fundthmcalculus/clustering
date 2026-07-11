@@ -8,7 +8,7 @@ MST-build time (the stage divide-and-conquer targets). `experiments/dc_vat_scali
 
 ## 1. Speed — naive block-decomposition, ideal-parallel speedup vs exact serial
 
-![speedup](figures/dc_vat_speedup_heatmap.png)
+![speedup](../figures/dc_vat_speedup_heatmap.png)
 
 Speedup ≈ **N²** (each block is O((n/N)²), N blocks run in parallel), roughly
 scale-independent:
@@ -23,7 +23,7 @@ scale-independent:
 
 ## 2. Quality — the cost of naivety, and the stitch fix (ARI vs truth)
 
-![quality](figures/dc_vat_quality_heatmap.png)
+![quality](../figures/dc_vat_quality_heatmap.png)
 
 Naive quality **collapses as N grows** (each block-seam manufactures
 pseudo-clusters); the structure-aware partition + light stitch stays **≈ exact
@@ -43,7 +43,7 @@ the speedup structure while restoring exact-quality clusters.
 
 ## 3. The spectrum — naive ↔ Borůvka (MST-build time vs n)
 
-![spectrum](figures/dc_vat_spectrum.png)
+![spectrum](../figures/dc_vat_spectrum.png)
 
 | n | exact serial Prim | Borůvka CPU (Numba) | Borůvka GPU (resident) | naive N=8 (∥) |
 |-----|-------------------|---------------------|------------------------|----------------|
