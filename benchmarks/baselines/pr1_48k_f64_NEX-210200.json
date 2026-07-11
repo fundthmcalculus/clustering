@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "timestamp": "2026-07-11T03:06:22.815396+00:00",
+    "host": "NEX-210200",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.7",
+    "numpy": "2.4.6",
+    "d": 10,
+    "n_clusters": 20,
+    "max_gb": 55.0
+  },
+  "correctness": null,
+  "results": [
+    {
+      "n": 48000,
+      "d": 10,
+      "dtype": "f64",
+      "matrix_gb": 18.432,
+      "stages": {
+        "pairwise": {
+          "time_ms": 6364.15660000057,
+          "peak_gb": 18.443542528,
+          "delta_gb": 18.366697472
+        },
+        "vat": {
+          "time_ms": 9795.832899999368,
+          "peak_gb": 36.870504448,
+          "delta_gb": 18.359820288
+        },
+        "ivat": {
+          "time_ms": 16434.348199998567,
+          "peak_gb": 36.87057408,
+          "delta_gb": 18.359701504
+        }
+      }
+    }
+  ]
+}
