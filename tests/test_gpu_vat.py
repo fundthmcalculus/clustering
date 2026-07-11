@@ -2,9 +2,6 @@
 
 Skipped when no CUDA device / CuPy is available.
 """
-
-import heapq
-
 import numpy as np
 import pytest
 
@@ -26,18 +23,18 @@ def _blobs(n, d, k, dtype=np.float64, seed=0):
 
 def _ivat_from_order(D, order):
     n = len(order)
-    V = D[np.ix_(order, order)].copy()
-    I = np.zeros_like(V)
+    vat_mtx = D[np.ix_(order, order)].copy()
+    ivat_mtx = np.zeros_like(vat_mtx)
     for r in range(1, n):
-        jj = int(np.argmin(V[r, :r]))
-        mn = V[r, jj]
+        jj = int(np.argmin(vat_mtx[r, :r]))
+        mn = vat_mtx[r, jj]
         for c in range(r):
             if c == jj:
-                I[r, c] = mn
+                ivat_mtx[r, c] = mn
             else:
-                cur = I[jj, c] if jj > c else I[c, jj]
-                I[r, c] = max(mn, cur)
-    return I + I.T
+                cur = ivat_mtx[jj, c] if jj > c else ivat_mtx[c, jj]
+                ivat_mtx[r, c] = max(mn, cur)
+    return ivat_mtx + ivat_mtx.T
 
 
 @pytest.mark.parametrize("n,d,k", [(300, 6, 5), (1500, 8, 8)])
