@@ -15,3 +15,5 @@ from .fcm import fuzzy_c_means
 
 from .ivatmeans import IVATMeans
 from .fuzzycmeans import FuzzyCMeans
+
+from . import gpu

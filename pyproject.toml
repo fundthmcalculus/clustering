@@ -31,6 +31,12 @@ dev = [
     "black",
     "scipy"
 ]
+# Optional GPU acceleration (CUDA 12.x). Install the wheel matching your CUDA
+# toolkit, e.g. `pip install tribble-clustering[gpu]`. Falls back to CPU when
+# no CUDA device is present.
+gpu = [
+    "cupy-cuda12x>=13.0",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/fundthmcalculus/clustering"
