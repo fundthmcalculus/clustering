@@ -227,6 +227,36 @@ faster on-device iVAT take over.)
 
 ![pipeline](../figures/gpu_vat_pipeline.png)
 
+## Scale ceilings on the 128 GB pool
+
+With the whole pipeline on the device, the limit is how many `n×n` buffers the
+shared pool holds:
+
+- **MST only** needs one matrix. f16 reaches **n = 200000** (80 GB), MST in
+  3.4 s. n = 224000 (100 GB) is **OOM-killed** at build time — not by the MST
+  kernel but by the born-on-device pairwise builder, whose f64 tile
+  intermediates stack on top of the 100 GB matrix and managed overcommit tips
+  past physical RAM. (A pre-built or lower-precision-tiled matrix would push the
+  MST ceiling toward ~250k.)
+
+- **Full iVAT image** needs two matrices (D + the image V). With D at f16 and V
+  at f32 (6·n² bytes) the whole device-resident pipeline runs at:
+
+  | n | D + V | prep (dist+MST+order) | GPU iVAT | peak used |
+  |--------|--------|-----------------------|----------|-----------|
+  | 65536 | 25.8 GB | 7.6 s | 7.2 s | 37 GB |
+  | 100000 | 60.0 GB | 13.0 s | 15.9 s | 75 GB |
+
+  **n = 100000 is a 10-billion-entry iVAT image built end-to-end on the GPU,
+  never touching host memory**; the ceiling for this configuration is ≈140k
+  (6·n² ≤ ~120 GB).
+
+**Optimization frontier.** The on-device iVAT issues one kernel launch per row
+(the serial-in-r max-propagation), so at n = 100k its ~15.9 s is dominated by
+100k Python-level launches, not GPU compute. Folding the row loop into a single
+cooperative-groups kernel (grid-wide sync between rows) would remove that Python
+overhead and is the next lever for the iVAT stage at extreme n.
+
 ## Verdict
 
 - **Exactness:** Borůvka-MST VAT is provably and empirically identical to serial
