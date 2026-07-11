@@ -52,6 +52,11 @@ extensions = [
         ["src/tribbleclustering/cfcm.pyx"],
         include_dirs=[numpy.get_include()],
     ),
+    Extension(
+        "tribbleclustering.clk",
+        ["src/tribbleclustering/clk.pyx"],
+        include_dirs=[numpy.get_include()],
+    ),
 ]
 
 
