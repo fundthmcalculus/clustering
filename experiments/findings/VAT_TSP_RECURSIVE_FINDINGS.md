@@ -65,7 +65,44 @@ finds no real structure, so the recursion just bisects and every s gives the sam
 tour (2-opt still reaches ~1.4%). The recursive-clustering value is specific to
 data that actually has cluster structure.
 
+## Scaling to larger N (1000 → 20000)
+
+The n=1000 study above polishes with the O(n²) best-improvement GPU 2-opt, which
+does **not** scale (one move per pass → ~O(n) passes × O(n²) scan). At larger N
+the polish is swapped for the **scalable neighbour-list 2-opt** (candidates from
+the resident-matrix kNN, O(n·k)). k blobs grow with N (blob size ~300);
+reference = LKH where affordable (N≤2000) and a flat neighbour-2-opt from the raw
+VAT tour everywhere. `run_scale`, single seed, s=64:
+
+| N | k | leaves | build (IVAT+LKH+stitch) | polish | recursive vs flat-2opt | recursive vs LKH |
+|-------|----|--------|-------------------------|--------|------------------------|------------------|
+| 1000 | 12 | 130 | 0.24 s | 0.22 s | **−8.2%** | +16.0% |
+| 2000 | 12 | 378 | 0.39 s | ~0 s | **−15.4%** | +23.1% |
+| 5000 | 16 | 948 | 1.60 s | ~0 s | **−20.7%** | — |
+| 10000 | 33 | 1912 | 3.62 s | ~0 s | **−16.1%** | — |
+| 20000 | 66 | 3834 | 9.83 s | ~0 s | **−22.4%** | — |
+
+- **The recursive construction is a strong, scalable constructor.** With the
+  *same* neighbour-2-opt polish, the recursive-cluster tour is **8–22% shorter
+  than the flat VAT tour** at every N, and it builds in ~10 s at N=20000 (time
+  grows roughly linearly — the IVAT splits + per-leaf LKH + stitch, all bounded
+  by the leaf size). Raw VAT is +33–74% over flat; the recursive-cc construction
+  alone (no polish) already sits near flat.
+- **Absolute quality at scale is bounded by the polish.** Flat neighbour-2-opt
+  is itself ~+26% over LKH (a weak local search — forward-only moves), so
+  "−22% vs flat" is still ~+16–23% over LKH. The O(n²) 2-opt reaches +2–4% at
+  n=1000 but cannot scale. **Closing this gap at scale is the open lever:** a
+  stronger scalable local search (bidirectional / Or-opt neighbour moves, or a
+  real LK step on the resident kNN lists) — not the construction, which already
+  scales and beats the flat baseline decisively.
+
+![scale](../figures/vat_tsp_recursive_scale.png)
+(A: quality vs the flat neighbour-2-opt baseline — recursive+polish stays 8–22%
+below it. B: build/polish time vs N. C: the N=20000 recursive+polish tour over
+~66 blobs.)
+
 ## Files
 - `experiments/vat_tsp_recursive.py` — `recursive_route`, `_ivat_split`
-  (leverages `get_ivat_levels`), multi-seed sweep.
-- `experiments/figures/vat_tsp_recursive.png`.
+  (leverages `get_ivat_levels`), multi-seed sweep (`run`) + large-N scale sweep
+  (`run_scale`).
+- `experiments/figures/vat_tsp_recursive.png`, `vat_tsp_recursive_scale.png`.

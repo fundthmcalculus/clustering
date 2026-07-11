@@ -45,6 +45,11 @@ from experiments.vat_tsp_reslice import (  # noqa: E402
     uniform_instance,
     closed_len,
 )
+from experiments.vat_tsp_tsplib import (  # noqa: E402
+    knn_device,
+    neighbor_two_opt,
+    _tour_len_coords,
+)
 
 try:
     import elkai  # type: ignore
@@ -282,8 +287,172 @@ def figure(res):
     return path
 
 
+def run_scale(sizes=(1000, 2000, 5000, 10000, 20000), s=64, seed=1):
+    """Scale the recursive IVAT-clustered TSP to larger N with a scalable polish.
+
+    The global O(n^2) GPU 2-opt does not scale, so the polish is the O(n*k)
+    neighbour-list 2-opt with candidate lists from the resident matrix
+    (unified-memory kNN). Reference: LKH where affordable (N<=2000, gold) and a
+    flat neighbour-2-opt from the raw VAT tour everywhere (a strong scalable
+    baseline). k blobs grow with N (blob size ~300)."""
+    print(f"Recursive IVAT-clustered TSP at scale (s={s})")
+    print("=" * 54)
+    print(f"GPU: {gpu.is_available()}   LKH (elkai): {_HAS_LKH}\n")
+    print(
+        f"  {'N':>6s} {'k':>4s} {'leaves':>7s} {'rawVAT':>8s} {'flat2opt':>9s} "
+        f"{'rec-cc':>8s} {'rec+2opt':>9s} {'vs flat':>8s} {'vs LKH':>8s} "
+        f"{'build s':>8s} {'polish s':>9s}"
+    )
+    out = {}
+    for N in sizes:
+        k = max(12, N // 300)
+        coords = clustered_instance(N, k=k, seed=seed)
+        Dg = gpu.pairwise_distances_device(coords, dtype="float64")
+        knn = knn_device(Dg, 10)  # candidate lists from the resident matrix
+
+        lkh = lkh_reference(coords) if N <= 2000 else None
+        order, _ = gpu_vat.vat_gpu(coords, dtype="float64")
+        raw_len = _tour_len_coords(np.ascontiguousarray(order), coords, False)
+
+        t0 = time.perf_counter()
+        flat = neighbor_two_opt(np.ascontiguousarray(order), coords, knn, False)
+        flat_t = time.perf_counter() - t0
+        flat_len = _tour_len_coords(flat, coords, False)
+
+        leaves: list = []
+        t0 = time.perf_counter()
+        tour_cc = recursive_route(
+            np.arange(N), coords, Dg, s, stitch_clusters=True, leaves=leaves
+        )
+        build_t = time.perf_counter() - t0
+        cc_len = _tour_len_coords(np.ascontiguousarray(tour_cc), coords, False)
+
+        t0 = time.perf_counter()
+        pol = neighbor_two_opt(np.ascontiguousarray(tour_cc), coords, knn, False)
+        pol_t = time.perf_counter() - t0
+        pol_len = _tour_len_coords(pol, coords, False)
+
+        vs_flat = 100.0 * (pol_len - flat_len) / flat_len
+        vs_lkh = 100.0 * (pol_len - lkh) / lkh if lkh else np.nan
+        out[N] = dict(
+            k=k,
+            leaves=len(leaves),
+            raw=raw_len,
+            flat=flat_len,
+            cc=cc_len,
+            pol=pol_len,
+            lkh=lkh,
+            vs_flat=vs_flat,
+            vs_lkh=vs_lkh,
+            build_t=build_t,
+            pol_t=pol_t,
+            flat_t=flat_t,
+            coords=coords,
+            tour=pol,
+        )
+
+        def rel(x):
+            return 100.0 * (x - flat_len) / flat_len
+
+        print(
+            f"  {N:6d} {k:4d} {len(leaves):7d} {rel(raw_len):7.0f}% {0.0:8.1f}% "
+            f"{rel(cc_len):7.1f}% {rel(pol_len):8.1f}% {vs_flat:7.1f}% "
+            f"{vs_lkh:7.2f}% {build_t:8.2f} {pol_t:9.3f}"
+        )
+        del Dg
+        cp.get_default_memory_pool().free_all_blocks()
+    return out
+
+
+def scale_figure(out):
+    Ns = sorted(out)
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+
+    # A: quality as % over the flat neighbour-2opt baseline (scalable ref)
+    ax = axes[0]
+    ax.plot(
+        Ns,
+        [100 * (out[N]["raw"] - out[N]["flat"]) / out[N]["flat"] for N in Ns],
+        "s--",
+        color="0.6",
+        label="raw VAT",
+    )
+    ax.plot(
+        Ns,
+        [100 * (out[N]["cc"] - out[N]["flat"]) / out[N]["flat"] for N in Ns],
+        "o-",
+        color="tab:orange",
+        label="recursive (cc-order, no polish)",
+    )
+    ax.plot(
+        Ns,
+        [out[N]["vs_flat"] for N in Ns],
+        "^-",
+        color="tab:green",
+        label="recursive + neighbour-2opt",
+    )
+    ax.axhline(0, color="tab:blue", ls=":", label="flat neighbour-2opt (ref)")
+    ax.set_xscale("log")
+    ax.set_xlabel("N (cities)")
+    ax.set_ylabel("% over flat neighbour-2opt")
+    ax.set_title("A. quality vs flat 2-opt baseline")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend(fontsize=8)
+
+    # B: time vs N (recursive build + polish)
+    ax = axes[1]
+    ax.plot(
+        Ns,
+        [out[N]["build_t"] for N in Ns],
+        "o-",
+        color="tab:orange",
+        label="recursive build (IVAT + LKH leaves + stitch)",
+    )
+    ax.plot(
+        Ns,
+        [out[N]["pol_t"] for N in Ns],
+        "^-",
+        color="tab:green",
+        label="neighbour-2opt polish",
+    )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("N (cities)")
+    ax.set_ylabel("seconds")
+    ax.set_title("B. time vs N")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend(fontsize=8)
+
+    # C: the recursive+polish tour at the largest N
+    ax = axes[2]
+    bigN = Ns[-1]
+    coords, tour = out[bigN]["coords"], out[bigN]["tour"]
+    t = np.append(tour, tour[0])
+    ax.plot(coords[t, 0], coords[t, 1], "-", color="tab:blue", lw=0.4)
+    ax.plot(coords[:, 0], coords[:, 1], ".", color="k", ms=0.8)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    vf = out[bigN]["vs_flat"]
+    ax.set_title(f"C. recursive+2opt tour (N={bigN})\n{vf:+.1f}% vs flat 2-opt")
+
+    fig.suptitle(
+        "Recursive IVAT-clustered TSP at scale (GB10): construction + scalable "
+        "neighbour-2opt polish, N up to 20000",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    FIG_DIR.mkdir(exist_ok=True)
+    path = FIG_DIR / "vat_tsp_recursive_scale.png"
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    return path
+
+
 if __name__ == "__main__":
     if not gpu.is_available():
         raise SystemExit("no CUDA device — nothing to measure")
     res = run(1000)
-    print(f"\nwrote {figure(res)}")
+    print(f"\nwrote {figure(res)}\n")
+    scale = run_scale()
+    print(f"\nwrote {scale_figure(scale)}")
