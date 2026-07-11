@@ -152,5 +152,6 @@ cython_debug/
 /**/*.gif
 /**/*.png
 
-# Collected prior-art PDFs (bibliography is tracked, sources are not)
+# Prior-art PDFs: committed papers live in docs/papers/ (tracked); docs/sources/
+# is a scratch cache for retrieved PDFs that must not be committed.
 /docs/sources/

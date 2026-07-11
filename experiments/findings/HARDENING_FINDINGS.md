@@ -49,7 +49,7 @@ The grid is a **checkerboard** — ARI swings between 0 and 1 with no clean
 monotone structure, and the r-sweep (N=8) is likewise **non-monotonic** (e.g.
 k-means partition: r=32→0.99, r=64→0.00, r=128→1.00). See the figure.
 
-![robustness](figures/hardening_partition_robustness.png)
+![robustness](../figures/hardening_partition_robustness.png)
 
 **Interpretation (honest):** the earlier "stitched → 1.0 at N=8" on two-moons was
 a *favorable operating point*, not a robust guarantee. The stitch adds only the
