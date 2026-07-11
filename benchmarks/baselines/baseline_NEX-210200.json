@@ -1,0 +1,239 @@
+{
+  "meta": {
+    "timestamp": "2026-07-11T02:57:24.278474+00:00",
+    "host": "NEX-210200",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.7",
+    "numpy": "2.4.6",
+    "d": 10,
+    "n_clusters": 20,
+    "max_gb": 55.0
+  },
+  "correctness": {
+    "pairwise_max_abs_err": 2.842170943040401e-14,
+    "ivat_sorted_max_abs_err": 0.0,
+    "ivat_symmetric": true,
+    "passed": true
+  },
+  "results": [
+    {
+      "n": 4000,
+      "d": 10,
+      "dtype": "f32",
+      "matrix_gb": 0.064,
+      "stages": {
+        "pairwise": {
+          "time_ms": 24.94769999975688,
+          "peak_gb": 0.073068544,
+          "delta_gb": 0.0
+        },
+        "vat": {
+          "time_ms": 30.946200000471435,
+          "peak_gb": 0.138899456,
+          "delta_gb": 0.0
+        },
+        "ivat": {
+          "time_ms": 73.46209999923303,
+          "peak_gb": 0.1975296,
+          "delta_gb": 0.058486784
+        }
+      }
+    },
+    {
+      "n": 4000,
+      "d": 10,
+      "dtype": "f64",
+      "matrix_gb": 0.128,
+      "stages": {
+        "pairwise": {
+          "time_ms": 32.843200000570505,
+          "peak_gb": 0.135901184,
+          "delta_gb": 0.062922752
+        },
+        "vat": {
+          "time_ms": 59.3951000009838,
+          "peak_gb": 0.261492736,
+          "delta_gb": 0.058294272
+        },
+        "ivat": {
+          "time_ms": 113.03679999946326,
+          "peak_gb": 0.389500928,
+          "delta_gb": 0.186220544
+        }
+      }
+    },
+    {
+      "n": 16000,
+      "d": 10,
+      "dtype": "f32",
+      "matrix_gb": 1.024,
+      "stages": {
+        "pairwise": {
+          "time_ms": 292.81970000010915,
+          "peak_gb": 1.032486912,
+          "delta_gb": 0.9591808
+        },
+        "vat": {
+          "time_ms": 497.7254000004905,
+          "peak_gb": 2.053705728,
+          "delta_gb": 0.954462208
+        },
+        "ivat": {
+          "time_ms": 1026.062599999932,
+          "peak_gb": 3.07777536,
+          "delta_gb": 1.978257408
+        }
+      }
+    },
+    {
+      "n": 16000,
+      "d": 10,
+      "dtype": "f64",
+      "matrix_gb": 2.048,
+      "stages": {
+        "pairwise": {
+          "time_ms": 426.5728999998828,
+          "peak_gb": 2.057019392,
+          "delta_gb": 1.982976
+        },
+        "vat": {
+          "time_ms": 748.4528999993927,
+          "peak_gb": 4.101804032,
+          "delta_gb": 1.977593856
+        },
+        "ivat": {
+          "time_ms": 1502.372999999352,
+          "peak_gb": 6.1498368,
+          "delta_gb": 4.025401344
+        }
+      }
+    },
+    {
+      "n": 32000,
+      "d": 10,
+      "dtype": "f32",
+      "matrix_gb": 4.096,
+      "stages": {
+        "pairwise": {
+          "time_ms": 1284.557599999971,
+          "peak_gb": 4.105146368,
+          "delta_gb": 4.030861312
+        },
+        "vat": {
+          "time_ms": 2049.15869999968,
+          "peak_gb": 8.197976064,
+          "delta_gb": 4.025581568
+        },
+        "ivat": {
+          "time_ms": 4352.49180000028,
+          "peak_gb": 12.294066176,
+          "delta_gb": 8.121831424
+        }
+      }
+    },
+    {
+      "n": 32000,
+      "d": 10,
+      "dtype": "f64",
+      "matrix_gb": 8.192,
+      "stages": {
+        "pairwise": {
+          "time_ms": 1916.3800999995146,
+          "peak_gb": 8.2023424,
+          "delta_gb": 8.12709888
+        },
+        "vat": {
+          "time_ms": 3287.6390000001265,
+          "peak_gb": 16.39018496,
+          "delta_gb": 8.120901632
+        },
+        "ivat": {
+          "time_ms": 6966.075399999681,
+          "peak_gb": 24.5822464,
+          "delta_gb": 16.312799232
+        }
+      }
+    },
+    {
+      "n": 48000,
+      "d": 10,
+      "dtype": "f32",
+      "matrix_gb": 9.216,
+      "stages": {
+        "pairwise": {
+          "time_ms": 3782.5744999991,
+          "peak_gb": 9.225682944,
+          "delta_gb": 9.151172608
+        },
+        "vat": {
+          "time_ms": 5313.763999998628,
+          "peak_gb": 18.438332416,
+          "delta_gb": 9.14577408
+        },
+        "ivat": {
+          "time_ms": 11302.513500000714,
+          "peak_gb": 27.65436928,
+          "delta_gb": 18.361360384
+        }
+      }
+    },
+    {
+      "n": 48000,
+      "d": 10,
+      "dtype": "f64",
+      "matrix_gb": 18.432,
+      "stages": {
+        "pairwise": {
+          "time_ms": 6213.375700001052,
+          "peak_gb": 18.443485184,
+          "delta_gb": 18.366779392
+        },
+        "vat": {
+          "time_ms": 8935.43370000043,
+          "peak_gb": 36.870578176,
+          "delta_gb": 18.359537664
+        },
+        "ivat": null
+      }
+    },
+    {
+      "n": 64000,
+      "d": 10,
+      "dtype": "f32",
+      "matrix_gb": 16.384,
+      "stages": {
+        "pairwise": {
+          "time_ms": 9666.24099999899,
+          "peak_gb": 16.394448896,
+          "delta_gb": 16.319488
+        },
+        "vat": {
+          "time_ms": 12446.933900000658,
+          "peak_gb": 32.774647808,
+          "delta_gb": 16.313479168
+        },
+        "ivat": {
+          "time_ms": 24741.480099999535,
+          "peak_gb": 49.15900416,
+          "delta_gb": 32.69779456
+        }
+      }
+    },
+    {
+      "n": 64000,
+      "d": 10,
+      "dtype": "f64",
+      "matrix_gb": 32.768,
+      "stages": {
+        "pairwise": {
+          "time_ms": 12031.684100000348,
+          "peak_gb": 32.780832768,
+          "delta_gb": 32.703172608
+        },
+        "vat": null,
+        "ivat": null
+      }
+    }
+  ]
+}
