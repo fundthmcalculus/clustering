@@ -40,7 +40,7 @@ def _random_sym_dist(n, seed=0, dtype=np.float64):
 
 
 def _py_ivat(dist):
-    """Python reference: returns (ivat, vat, argmin_seq, p_seq)."""
+    """Python reference: returns (ivat, argmin_seq, p_seq)."""
     return compute_ivat_py(dist.astype(np.float64))
 
 
@@ -100,7 +100,7 @@ def test_vat_f32_symmetric():
 @pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
 def test_ivat_f64_matches_python(n):
     dist = _random_sym_dist(n, seed=n)
-    ivat_ref, vat_ref, _, p_ref = _py_ivat(dist)
+    ivat_ref, _, p_ref = _py_ivat(dist)
 
     ivat_c, _, p_c = compute_ivat_c_64(np.ascontiguousarray(dist, dtype=np.float64))
 
@@ -114,7 +114,7 @@ def test_ivat_f64_matches_python(n):
 @pytest.mark.parametrize("n", [2, 3, 5, 10, 50, 148])
 def test_ivat_f32_matches_python(n):
     dist = _random_sym_dist(n, seed=n, dtype=np.float32)
-    ivat_ref, vat_ref, _, p_ref = _py_ivat(dist)
+    ivat_ref, _, p_ref = _py_ivat(dist)
 
     ivat_c, _, p_c = compute_ivat_c_32(np.ascontiguousarray(dist, dtype=np.float32))
 
