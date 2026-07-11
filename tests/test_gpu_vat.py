@@ -76,6 +76,7 @@ def test_ivatmeans_on_device_matches_cpu():
     """IVATMeans(on_device=True) must produce identical labels/centers to the
     CPU path (it is exact — the speed tradeoff is separate)."""
     from tribbleclustering.ivatmeans import IVATMeans
+
     X = _blobs(3000, 10, 8, seed=5)
     cpu = IVATMeans(n_clusters=8, on_device=False).fit(X)
     dev = IVATMeans(n_clusters=8, on_device=True).fit(X)

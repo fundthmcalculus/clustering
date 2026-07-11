@@ -268,8 +268,7 @@ def ivat_gpu(X, high_precision: bool = True):
     """
     if not _gpu.is_available():
         raise RuntimeError("CuPy/CUDA device not available")
-    order, parent, Dg = vat_gpu(X, high_precision=high_precision,
-                                return_distances=True)
+    order, parent, Dg = vat_gpu(X, high_precision=high_precision, return_distances=True)
     n = Dg.shape[0]
     D_host = _cp.asnumpy(Dg)  # host copy needed for the serial CPU recurrence
     del Dg
