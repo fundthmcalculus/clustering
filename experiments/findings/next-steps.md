@@ -136,13 +136,16 @@ built ⇒ fast/parallel/approximate VAT = fast/parallel/approximate MST.
 **Experiment code (`experiments/`):** `boruvka_vat.py`,
 `boruvka_gpu.py`, `blockwise_vat.py`, `stitched_vat.py`, `dc_vat_scaling.py`,
 `adversarial_eval.py`, `hardening_eval.py`, `principled_stitch.py`,
-`autok_eval.py`, `vat_tsp.py`, `vat_tsp_warmstart.py`, `perf_report_figs.py` —
-each with a matching `*_FINDINGS.md` under `experiments/findings/`. Figures in
-`experiments/figures/`; these reports also live in `experiments/findings/`.
+`autok_eval.py`, `vat_tsp.py`, `vat_tsp_warmstart.py`, `vat_tsp_benchmark.py`,
+`perf_report_figs.py` — each with a matching `*_FINDINGS.md` under
+`experiments/findings/`. Figures in `experiments/figures/`; these reports also
+live in `experiments/findings/`.
 (`vat_tsp.py`: VAT ordering as a TSP/seriation objective + ACO hot start —
 `VAT_TSP_FINDINGS.md`. `vat_tsp_warmstart.py`: the follow-up "real result" —
 open-path formulation, real construction baselines, harder/non-blob instances,
-and a non-metric study — `VAT_TSP_WARMSTART_FINDINGS.md`.)
+and a non-metric study — `VAT_TSP_WARMSTART_FINDINGS.md`. `vat_tsp_benchmark.py`:
+Lin-Kernighan (LKH via elkai) baseline + a VAT-cluster-blocking strategy that
+beats flat 2-opt at scale — `VAT_TSP_BENCHMARK_FINDINGS.md`.)
 
 **Reproduce:** `python -m experiments.<name>` (each script regenerates its
 figures); `python -m benchmarks.scale_bench` for the CPU baseline sweep.
