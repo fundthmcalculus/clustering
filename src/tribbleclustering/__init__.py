@@ -17,6 +17,7 @@ from .ivatmeans import IVATMeans
 from .fuzzycmeans import FuzzyCMeans
 
 from . import gpu
+from . import gpu_vat
 
 __all__ = [
     "vat_prim_mst",
@@ -32,4 +33,5 @@ __all__ = [
     "IVATMeans",
     "FuzzyCMeans",
     "gpu",
+    "gpu_vat",
 ]
