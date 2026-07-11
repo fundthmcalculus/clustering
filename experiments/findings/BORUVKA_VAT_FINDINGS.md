@@ -65,6 +65,119 @@ n=32000. The dashed line is the catch: **including the host→device transfer of
 the `n×n` matrix, the GPU loses** (transfer dominates, exactly as for GPU
 pairwise distances).
 
+## DGX Spark (GB10): unified memory dissolves the transfer wall
+
+The numbers above were on a discrete GPU, where the dashed "+transfer" line is
+the whole story: copying the `n×n` matrix over PCIe cost ~10× the resident
+kernel and sank the GPU for host-resident data. Re-running on an **NVIDIA DGX
+Spark (GB10 Grace-Blackwell)** — where the CPU and GPU share ~128 GB of coherent
+LPDDR5X over NVLink-C2C — changes the conclusion in two ways.
+
+**1. The transfer tax collapses (10.7× → ~3×), and unified memory nearly erases
+it.** GB10's GPU is smaller than the discrete card, so the *device-resident*
+kernel is a touch slower in absolute ms — but the copy penalty is far cheaper,
+and allocating the matrix in **CUDA managed (unified) memory** removes the
+explicit copy altogether. MST build time (ms), same blobs, `experiments/boruvka_dgx_spark.py`:
+
+| n | serial Prim | Borůvka Numba | GPU resident | GPU **unified** (no copy) | GPU host+copy |
+|------|------------|---------------|--------------|---------------------------|---------------|
+| 2000 | 3.6 | 1.2 | 1.1 | **1.6** | 3.0 |
+| 4000 | 13.5 | 9.9 | 3.7 | **5.1** | 10.5 |
+| 8000 | 52.6 | 35.6 | 13.5 | **19.1** | 44.0 |
+| 16000 | 202.8 | 138.2 | 53.4 | **75.0** | 163.6 |
+| 32000 | 838.8 | 612.0 | 245.7 | **349.1** | 726.4 |
+
+The unified/managed input tracks device-resident within ~1.4× and is **~2.1×
+faster than the explicit-copy path** (349 vs 726 ms at n=32000) — with only *one*
+`n×n` allocation instead of two. It also beats CPU Numba Borůvka (2.4×) and
+serial Prim (1.75×) *for host-resident data*, which the discrete GPU could not.
+Still exact (MST weight parity with the CPU MST at every size).
+
+![transfer](../figures/boruvka_dgx_transfer.png)
+
+**2. The 128 GB unified pool runs VAT MST past every discrete-GPU VRAM wall.**
+A dense f64 `n×n` matrix hits 24/48/80 GB at n≈54.7k / 77.5k / 100k, so discrete
+GPUs OOM there — and the old host→device path OOMs *even sooner* on GB10 because
+`cp.asarray(D)` needs a second `n×n` buffer (host **and** device copy). Building
+the matrix **on the device** (tiled `pairwise_distances_gpu`, single unified
+allocation) avoids the doubling and roughly doubles the reachable n:
+
+| n | D size | GPU pairwise (one-time) | **GPU Borůvka MST** | edges |
+|-------|--------|-------------------------|---------------------|-------|
+| 16000 | 2.0 GB | 1.0 s | **75 ms** | 15999/15999 |
+| 32000 | 8.2 GB | 3.1 s | **349 ms** | 31999/31999 |
+| 65536 | 34.4 GB | 13.8 s | **1.46 s** | 65535/65535 |
+| 100000 | 80.0 GB | 34.0 s | **3.41 s** | 99999/99999 |
+
+n=100000 is an **80 GB** distance matrix held in the shared pool with a correct
+spanning tree — a size no single discrete GPU can hold at all.
+
+![large-n](../figures/boruvka_dgx_largen.png)
+
+**Takeaway for GB10:** the discrete-GPU verdict's "one condition" (matrix must be
+device-resident) is satisfied *for free* by unified memory — allocate the matrix
+once with `boruvka_gpu.alloc_unified` / `as_unified` (or build it on-device with
+`pairwise_distances_gpu`) and both the CPU distance build and the GPU MST touch
+the same pages with no copy. The device-resident win survives, the transfer wall
+does not, and the memory ceiling moves from tens of GB to ~128 GB.
+
+## Precision: f32 and f16 on GB10 (~2× per step, ~4× at f16)
+
+The `n×n` matrix *is* the memory footprint and the per-round scan is
+bandwidth-bound, so narrowing the element type should both shrink the matrix and
+speed the scan. The GPU Borůvka kernels were templated over three storage types
+(`experiments/boruvka_gpu.py`): `TREAL` stores the matrix at f64/f32/**f16**,
+while the compare/reduce type `TCOMP` and the monotonic-bit-cast key `TKEY` stay
+`float`/`u32` for f16 and f32 (f16 is widened to float on load — no reliance on
+16-bit atomics). Same algorithm, exact same edge-selection logic.
+
+**Speed — a clean ~2× per precision step (matrix build time by storage dtype):**
+
+| n | f64 | f32 | f16 | f16 vs f64 |
+|-------|-------|-------|------|-----------|
+| 4000 | 5.1 | 2.8 | 1.6 | 3.2× |
+| 8000 | 19.2 | 9.8 | 5.2 | 3.7× |
+| 16000 | 75.0 | 38.0 | 19.2 | 3.9× |
+| 32000 | 349.1 | 175.5 | 88.4 | **3.9×** |
+
+Bandwidth-bound as predicted: f32 ≈ 2× f64, f16 ≈ 2× f32 (≈4× f64).
+
+**Accuracy vs f64** (MST weight = the low-precision MST's *chosen edges*
+re-measured on the exact f64 distances; VAT `order_match` vs serial Prim):
+
+| dtype | MST-weight reldiff | VAT order_match | iVAT image mean\|diff\| | verdict |
+|-------|--------------------|-----------------|-------------------------|---------|
+| f32 | ~1e-15 (machine ε) | **1.0000** | **0.0** (bit-identical) | free lunch |
+| f16 | ~1e-6 – 1e-7 | 0.95 – 0.997 | ~1e-4 (max ~2.6% of range) | near-identical |
+
+- **f32 is a free lunch.** ~7 decimal digits is enough to preserve the exact
+  edge selection: bit-identical MST, VAT order, and iVAT image as f64, at half
+  the memory and ~2× the speed. There is no reason to use f64 on GB10.
+- **f16 is near-identical, not exact.** The spanning tree it builds is still
+  within ~1e-6 of the optimal MST weight, but f16's ~3-digit precision flips a
+  small fraction of *near-tie* edges, which perturbs a few percent of the VAT
+  order positions. The iVAT image tracks f64 in the **mean** (~1e-4) — the
+  cluster block structure is visually identical — with a handful of pixels off
+  by up to ~2.6% of range. Good for exploratory cluster-tendency at extreme
+  scale; not for a bit-exact reproduction of the serial engine.
+
+![precision](../figures/boruvka_dgx_precision.png)
+
+**Capacity — narrower dtype buys √(bytes-ratio)× more samples at equal memory.**
+Holding the matrix at ~80 GB (born on device), the reachable n grows as the
+element shrinks; MST time is ~flat because it is the same bytes scanned:
+
+| dtype | n at ~80 GB | pairwise build | GPU Borůvka MST | edges |
+|-------|-------------|----------------|-----------------|-------|
+| f64 | 100000 | 27.6 s | 3.42 s | 99999/99999 |
+| f32 | 141000 | 38.0 s | 3.94 s | 140999/140999 |
+| f16 | **200000** | 76.5 s | 3.55 s | 199999/199999 |
+
+**n = 200000 is a dense VAT MST over 40 billion pairwise dissimilarities in
+3.5 s** — 2× the samples of the f64 ceiling at the same 80 GB, and far past any
+discrete GPU. In the shared 128 GB pool the ceilings rise further still
+(f16 reaches n ≈ 250k for the matrix alone).
+
 ## Verdict
 
 - **Exactness:** Borůvka-MST VAT is provably and empirically identical to serial
@@ -86,5 +199,12 @@ pairwise distances).
 
 - `experiments/boruvka_vat.py` — Numba Borůvka, VAT-order-from-MST, quality &
   scaling figures.
-- `experiments/boruvka_gpu.py` — the real device-side CuPy RawKernel Borůvka.
-- `experiments/figures/boruvka_vat_{quality,scaling}.png`.
+- `experiments/boruvka_gpu.py` — the real device-side CuPy RawKernel Borůvka,
+  templated over f64/f32/f16 storage; plus `alloc_unified` / `as_unified`
+  (managed-memory helpers) and a tiled `pairwise_distances_gpu` (dtype-aware)
+  that builds the matrix on-device.
+- `experiments/boruvka_dgx_spark.py` — DGX Spark (GB10) study: transfer-mode
+  comparison, large-n capability (matrix born on the device), and the
+  precision/capacity study across f64/f32/f16.
+- `experiments/figures/boruvka_vat_{quality,scaling}.png`,
+  `experiments/figures/boruvka_dgx_{transfer,largen,precision}.png`.

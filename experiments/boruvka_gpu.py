@@ -36,24 +36,33 @@ except Exception:
     cp = None
     _HAS_CUPY = False
 
-_SRC = r"""
+# Kernel source is templated over three type tokens so the identical algorithm
+# runs at f64/f32/f16 storage. TREAL is the on-device element type of the n x n
+# matrix (the memory that dominates); TCOMP is the compare/reduce type (float for
+# f16/f32, double for f64 — f16 is widened on load so we never rely on 16-bit
+# atomics or comparisons); TKEY is the monotonic bit-cast of a *non-negative*
+# TCOMP weight, on which atomicMin gives the true min (u32 for float, u64 for
+# double). TLOAD widens a stored TREAL to TCOMP (identity for f32/f64,
+# __half2float for f16); TASKEY is the TCOMP->TKEY bit-cast intrinsic.
+_TEMPLATE = r"""
 #include <math_constants.h>
+TEXTRAHDR
 extern "C" {
 
-__global__ void min_out_edge(const double* __restrict__ D, const int* __restrict__ comp,
-                             int n, double* __restrict__ best_w, int* __restrict__ best_j) {
+__global__ void min_out_edge(const TREAL* __restrict__ D, const int* __restrict__ comp,
+                             int n, TCOMP* __restrict__ best_w, int* __restrict__ best_j) {
     int i = blockIdx.x;                 // one block per row
     if (i >= n) return;
     int ci = comp[i];
-    const double* row = D + (size_t)i * n;
-    double lb = CUDART_INF; int lj = -1;
+    const TREAL* row = D + (size_t)i * n;
+    TCOMP lb = TINF; int lj = -1;
     for (int j = threadIdx.x; j < n; j += blockDim.x) {
         if (comp[j] != ci) {
-            double d = row[j];
+            TCOMP d = TLOAD(row[j]);
             if (d < lb) { lb = d; lj = j; }
         }
     }
-    __shared__ double sw[256];
+    __shared__ TCOMP sw[256];
     __shared__ int sj[256];
     sw[threadIdx.x] = lb; sj[threadIdx.x] = lj;
     __syncthreads();
@@ -69,21 +78,21 @@ __global__ void min_out_edge(const double* __restrict__ D, const int* __restrict
     if (threadIdx.x == 0) { best_w[i] = sw[0]; best_j[i] = sj[0]; }
 }
 
-__global__ void reduce_minw(const double* __restrict__ best_w, const int* __restrict__ comp,
-                            int n, unsigned long long* __restrict__ comp_min_key) {
+__global__ void reduce_minw(const TCOMP* __restrict__ best_w, const int* __restrict__ comp,
+                            int n, TKEY* __restrict__ comp_min_key) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    // non-negative doubles are monotonic as u64 bit patterns
-    unsigned long long k = (unsigned long long)__double_as_longlong(best_w[i]);
+    // non-negative TCOMP weights are monotonic as TKEY bit patterns
+    TKEY k = (TKEY)TASKEY(best_w[i]);
     atomicMin(&comp_min_key[comp[i]], k);
 }
 
-__global__ void pick_vertex(const double* __restrict__ best_w, const int* __restrict__ comp,
-                            int n, const unsigned long long* __restrict__ comp_min_key,
+__global__ void pick_vertex(const TCOMP* __restrict__ best_w, const int* __restrict__ comp,
+                            int n, const TKEY* __restrict__ comp_min_key,
                             int* __restrict__ comp_win) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    unsigned long long k = (unsigned long long)__double_as_longlong(best_w[i]);
+    TKEY k = (TKEY)TASKEY(best_w[i]);
     if (k == comp_min_key[comp[i]]) atomicMin(&comp_win[comp[i]], i);
 }
 
@@ -128,25 +137,138 @@ __global__ void jump(int* __restrict__ comp, int n) {
 }  // extern C
 """
 
-_MOD = None
+# Per-dtype token substitutions. f16 and f32 share the float compute/key path;
+# only the stored TREAL and the widening TLOAD differ.
+_SUBST = {
+    "float64": dict(
+        TREAL="double",
+        TCOMP="double",
+        TKEY="unsigned long long",
+        TLOAD="",
+        TASKEY="__double_as_longlong",
+        TINF="CUDART_INF",
+        TEXTRAHDR="",
+    ),
+    "float32": dict(
+        TREAL="float",
+        TCOMP="float",
+        TKEY="unsigned int",
+        TLOAD="",
+        TASKEY="__float_as_uint",
+        TINF="CUDART_INF_F",
+        TEXTRAHDR="",
+    ),
+    "float16": dict(
+        TREAL="__half",
+        TCOMP="float",
+        TKEY="unsigned int",
+        TLOAD="__half2float",
+        TASKEY="__float_as_uint",
+        TINF="CUDART_INF_F",
+        TEXTRAHDR="#include <cuda_fp16.h>",
+    ),
+}
+# COMP/KEY host dtypes and the "no edge" key sentinel per storage dtype.
+_COMP_DT = {"float64": "float64", "float32": "float32", "float16": "float32"}
+_KEY_DT = {"float64": "uint64", "float32": "uint32", "float16": "uint32"}
+_KEY_MAX = {
+    "float64": 0xFFFFFFFFFFFFFFFF,
+    "float32": 0xFFFFFFFF,
+    "float16": 0xFFFFFFFF,
+}
+_SUPPORTED = tuple(_SUBST)
+
+_MODS: dict = {}
 
 
-def _module():
-    global _MOD
-    if _MOD is None:
-        _MOD = cp.RawModule(code=_SRC, options=("--std=c++14",))
-    return _MOD
+def _module(dtype_name):
+    if dtype_name not in _MODS:
+        src = _TEMPLATE
+        for tok, val in _SUBST[dtype_name].items():
+            src = src.replace(tok, val)
+        _MODS[dtype_name] = cp.RawModule(code=src, options=("--std=c++14",))
+    return _MODS[dtype_name]
+
+
+def alloc_unified(shape, dtype=None):
+    """Allocate a matrix in CUDA *managed* (unified) memory.
+
+    On a unified-memory device (e.g. DGX Spark / GB10 Grace-Blackwell) the
+    returned array is backed by pages the CPU and GPU share coherently, so the
+    CPU can fill it (e.g. write a pairwise-distance matrix) and ``boruvka_mst_gpu``
+    can consume it with **no explicit host->device copy** and only one ``n x n``
+    allocation instead of two. Returns a cupy ndarray viewing the managed buffer.
+    """
+    if not _HAS_CUPY:
+        raise RuntimeError("CuPy/CUDA device not available")
+    dtype = cp.float64 if dtype is None else dtype
+    n_bytes = int(np.prod(shape)) * cp.dtype(dtype).itemsize
+    mem = cp.cuda.malloc_managed(n_bytes)
+    return cp.ndarray(shape, dtype=dtype, memptr=mem)
+
+
+def as_unified(D, dtype=None):
+    """Copy a host ndarray into a managed (unified-memory) cupy array, once.
+
+    Convenience for the common case where ``D`` already lives in host numpy: the
+    single copy here replaces the per-call ``cp.asarray`` inside the MST loop, so
+    repeated MST builds (or a downstream device pipeline) pay it zero more times.
+    Pass ``dtype`` (``float16``/``float32``/``float64``) to also downcast on the
+    way in, halving/quartering the resident ``n x n`` footprint.
+    """
+    dtype = D.dtype if dtype is None else dtype
+    Dg = alloc_unified(D.shape, dtype=dtype)
+    Dg[...] = cp.asarray(D)
+    cp.cuda.Stream.null.synchronize()
+    return Dg
+
+
+def pairwise_distances_gpu(X, out=None, tile=4096, dtype=None):
+    """Dense Euclidean pairwise-distance matrix, built entirely on the GPU.
+
+    ``X`` is a host or device ``(n, d)`` array; the ``(n, n)`` result is written
+    into ``out`` (allocate it with :func:`alloc_unified` to keep the whole VAT
+    pipeline copy-free on a unified-memory device). Rows are computed in tiles so
+    the transient ``||xi||^2 + ||xj||^2 - 2 xi.xj`` expansion never materialises a
+    second full ``n x n`` buffer. Tiles are computed in f64 and cast to ``dtype``
+    (``float16``/``float32``/``float64``, default f64) on store, so the stored
+    matrix is at the target precision while the expansion stays accurate. Matches
+    the CPU pairwise output to fp tolerance (at f64).
+    """
+    if not _HAS_CUPY:
+        raise RuntimeError("CuPy/CUDA device not available")
+    dtype = cp.float64 if dtype is None else cp.dtype(dtype)
+    Xg = cp.ascontiguousarray(cp.asarray(X, dtype=cp.float64))
+    n = Xg.shape[0]
+    sq = cp.einsum("ij,ij->i", Xg, Xg)  # per-row squared norm, length n
+    D = alloc_unified((n, n), dtype=dtype) if out is None else out
+    for s in range(0, n, tile):
+        e = min(s + tile, n)
+        # (tile, n) block: ||xi||^2 + ||xj||^2 - 2 xi.xj, clamped and sqrt'd
+        g = Xg[s:e] @ Xg.T
+        block = sq[s:e, None] + sq[None, :] - 2.0 * g
+        cp.maximum(block, 0.0, out=block)
+        cp.sqrt(block, out=block)
+        D[s:e] = block.astype(dtype, copy=False)  # downcast on store
+    cp.cuda.Stream.null.synchronize()
+    return D
 
 
 def boruvka_mst_gpu(D):
     """Device-side Boruvka MST of a dense symmetric dissimilarity matrix.
 
-    Accepts a host ndarray or a cupy array (float64). Returns (mst_u, mst_v) as
-    host int32 arrays of length n-1.
+    Accepts a host ndarray or a cupy array in float16/float32/float64. The stored
+    dtype is honoured (it is the ``n x n`` memory footprint); f16 is widened to
+    f32 for all comparison/reduction so the result stays a valid MST of the stored
+    matrix. Any non-supported dtype is promoted to float64. Returns (mst_u, mst_v)
+    as host int32 arrays of length n-1.
     """
     if not _HAS_CUPY:
         raise RuntimeError("CuPy/CUDA device not available")
-    mod = _module()
+    dt = cp.dtype(getattr(D, "dtype", cp.float64)).name
+    if dt not in _SUPPORTED:
+        dt = "float64"
+    mod = _module(dt)
     k_scan = mod.get_function("min_out_edge")
     k_redw = mod.get_function("reduce_minw")
     k_pick = mod.get_function("pick_vertex")
@@ -154,13 +276,13 @@ def boruvka_mst_gpu(D):
     k_relabel = mod.get_function("relabel")
     k_jump = mod.get_function("jump")
 
-    Dg = cp.ascontiguousarray(cp.asarray(D, dtype=cp.float64))
+    Dg = cp.ascontiguousarray(cp.asarray(D, dtype=dt))
     n = Dg.shape[0]
 
     comp = cp.arange(n, dtype=cp.int32)
-    best_w = cp.empty(n, dtype=cp.float64)
+    best_w = cp.empty(n, dtype=_COMP_DT[dt])
     best_j = cp.empty(n, dtype=cp.int32)
-    comp_min_key = cp.empty(n, dtype=cp.uint64)
+    comp_min_key = cp.empty(n, dtype=_KEY_DT[dt])
     comp_win = cp.empty(n, dtype=cp.int32)
     root_parent = cp.empty(n, dtype=cp.int32)
     mst_u = cp.empty(n - 1, dtype=cp.int32)
@@ -169,7 +291,7 @@ def boruvka_mst_gpu(D):
 
     tpb = 256
     grid1d = (n + tpb - 1) // tpb
-    U64_MAX = cp.uint64(0xFFFFFFFFFFFFFFFF)
+    U64_MAX = cp.dtype(_KEY_DT[dt]).type(_KEY_MAX[dt])
     I32_MAX = np.int32(0x7FFFFFFF)
     # A single round's hook forest has depth < n, and each pointer-jump halves
     # it, so ceil(log2 n)+2 sync-free jumps always flatten to roots.
