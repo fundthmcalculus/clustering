@@ -29,6 +29,8 @@ dev = [
     "matplotlib",
     "pytest",
     "black",
+    "flake8",
+    "Flake8-pyproject",
     "scipy"
 ]
 
@@ -60,4 +62,13 @@ markers = [
     "benchmark: performance benchmark with wall-clock timing assertions (deselected by default)",
 ]
 addopts = "-m 'not benchmark'"
+
+# Lint: flake8 (via Flake8-pyproject), settings copied from the `optimizers` repo.
+# max-line-length is 120 while Black formats to 88, so E501 only trips on lines
+# Black cannot split. E203 is ignored because Black and pycodestyle disagree on
+# whitespace before slice colons.
+[tool.flake8]
+max-line-length = 120
+exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv,experiments"
+extend-ignore = ["E203"]
 

@@ -1,6 +1,6 @@
 import heapq
 from dataclasses import dataclass, field
-from typing import Union, List, Any
+from typing import Union
 
 from numba import njit, prange
 import numpy as np
@@ -13,9 +13,11 @@ def compute_ivat(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the improved VAT (IVAT) for the provided dissimilarity (distance) matrix
-    :param matrix_of_pairwise_distance: dissimilarity matrix, typically an L2-norm matrix, it must be symmetric and positive semi-definite
+    :param matrix_of_pairwise_distance: dissimilarity matrix, typically an
+        L2-norm matrix, it must be symmetric and positive semi-definite
     :param inplace: whether to perform the computation in-place on the input matrix
-    :return: tuple of the IVAT matrix, the VAT matrix, the sequence of IVAT indices, and the sequence of permutation (VAT) indices
+    :return: tuple of the IVAT matrix, the VAT matrix, the sequence of IVAT
+        indices, and the sequence of permutation (VAT) indices
     """
     d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance, inplace=inplace
@@ -47,7 +49,8 @@ def compute_vat(
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes the visualization assessment of cluster tendency (VAT) for the provided dissimilarity (distance) matrix
-    :param matrix_of_pairwise_distance: dissimilarity matrix, typically an L2-norm matrix, it must be symmetric and positive semi-definite
+    :param matrix_of_pairwise_distance: dissimilarity matrix, typically an
+        L2-norm matrix, it must be symmetric and positive semi-definite
     :param inplace: whether to perform the computation in-place on the input matrix
     :return: tuple of the permuted distance (VAT) matrix and the permutation (VAT) sequence
     """
@@ -80,7 +83,8 @@ def compute_ordered_dis_njit_merge(
         progress_bar.set(0)
 
     if inplace:
-        # Due to loop-walking, we cannot use the parallel operations since we cannot know a-priori which loops are different.
+        # Due to loop-walking, we cannot use the parallel operations since we
+        # cannot know a-priori which loops are different.
         for ij in range(n):
             shuffle_ordered_column(n, ij, ordered_matrix, p, visited)
             if progress_bar is not None:
