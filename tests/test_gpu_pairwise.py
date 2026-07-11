@@ -3,6 +3,7 @@
 Skipped entirely when no CUDA device / CuPy is available, so the suite still
 passes on CPU-only machines.
 """
+
 import numpy as np
 import pytest
 
