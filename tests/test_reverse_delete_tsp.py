@@ -62,6 +62,20 @@ def test_m2_survivor_is_connected_min_degree_two() -> None:
     assert len(rd.edges_of(adj)) < n * (n - 1) // 2
 
 
+def test_duality_weight_is_the_invariant_under_ties() -> None:
+    """On a graph with many tied distances the MST is non-unique, so edge-set
+    equality is not guaranteed — but total MST *weight* always is. Assert the
+    robust invariant (weight), not the fragile one (edge set)."""
+    grid = np.array([[x, y] for x in range(5) for y in range(5)], dtype=np.float32)
+    D = rd.distance_matrix(grid)
+    rd_edges = rd.edge_set(rd.reverse_delete(D, min_degree=1)[0])
+    kruskal = rd.kruskal_mst_edges(D)
+    assert len(rd_edges) == len(grid) - 1
+    assert rd.total_weight(D, rd_edges) == pytest.approx(
+        rd.total_weight(D, kruskal), rel=1e-5
+    )
+
+
 def test_two_opt_never_lengthens() -> None:
     D = _small_D(20, seed=7)
     nn = rd.nearest_neighbour_tour(D)
