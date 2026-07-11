@@ -19,6 +19,7 @@ gpu.is_available() and fall back to the CPU VAT (pcvat.compute_vat_c) otherwise.
 from __future__ import annotations
 
 import heapq
+import warnings
 
 import numpy as np
 from numba import njit
@@ -27,21 +28,31 @@ from . import gpu as _gpu
 
 _cp = _gpu._cp
 
-_BORUVKA_SRC = r"""
+# The Borůvka kernels are templated over three type tokens so the identical
+# algorithm runs at f64/f32/f16 storage (the n x n matrix is the memory
+# footprint, and the per-round scan is bandwidth-bound, so narrower storage is
+# both smaller and ~2x faster per step). TREAL is the stored element type; TCOMP
+# is the compare/reduce type (float for f16/f32, double for f64 — f16 is widened
+# on load, so no 16-bit atomics); TKEY is the monotonic bit-cast of a
+# non-negative TCOMP weight (u32 for float, u64 for double), on which atomicMin
+# gives the true min. TLOAD widens a stored TREAL to TCOMP; TASKEY is the
+# TCOMP->TKEY bit-cast intrinsic.
+_BORUVKA_TEMPLATE = r"""
 #include <math_constants.h>
+TEXTRAHDR
 extern "C" {
 
-__global__ void bv_min_out_edge(const double* __restrict__ D, const int* __restrict__ comp,
-                                int n, double* __restrict__ best_w, int* __restrict__ best_j) {
+__global__ void bv_min_out_edge(const TREAL* __restrict__ D, const int* __restrict__ comp,
+                                int n, TCOMP* __restrict__ best_w, int* __restrict__ best_j) {
     int i = blockIdx.x;                 // one block per row (coalesced scan)
     if (i >= n) return;
     int ci = comp[i];
-    const double* row = D + (size_t)i * n;
-    double lb = CUDART_INF; int lj = -1;
+    const TREAL* row = D + (size_t)i * n;
+    TCOMP lb = TINF; int lj = -1;
     for (int j = threadIdx.x; j < n; j += blockDim.x) {
-        if (comp[j] != ci) { double d = row[j]; if (d < lb) { lb = d; lj = j; } }
+        if (comp[j] != ci) { TCOMP d = TLOAD(row[j]); if (d < lb) { lb = d; lj = j; } }
     }
-    __shared__ double sw[256];
+    __shared__ TCOMP sw[256];
     __shared__ int sj[256];
     sw[threadIdx.x] = lb; sj[threadIdx.x] = lj;
     __syncthreads();
@@ -55,21 +66,21 @@ __global__ void bv_min_out_edge(const double* __restrict__ D, const int* __restr
     if (threadIdx.x == 0) { best_w[i] = sw[0]; best_j[i] = sj[0]; }
 }
 
-__global__ void bv_reduce_minw(const double* __restrict__ best_w, const int* __restrict__ comp,
-                               int n, unsigned long long* __restrict__ comp_min_key) {
+__global__ void bv_reduce_minw(const TCOMP* __restrict__ best_w, const int* __restrict__ comp,
+                               int n, TKEY* __restrict__ comp_min_key) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    // non-negative doubles are monotonic as u64 bit patterns
-    unsigned long long k = (unsigned long long)__double_as_longlong(best_w[i]);
+    // non-negative TCOMP weights are monotonic as TKEY bit patterns
+    TKEY k = (TKEY)TASKEY(best_w[i]);
     atomicMin(&comp_min_key[comp[i]], k);
 }
 
-__global__ void bv_pick_vertex(const double* __restrict__ best_w, const int* __restrict__ comp,
-                               int n, const unsigned long long* __restrict__ comp_min_key,
+__global__ void bv_pick_vertex(const TCOMP* __restrict__ best_w, const int* __restrict__ comp,
+                               int n, const TKEY* __restrict__ comp_min_key,
                                int* __restrict__ comp_win) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    unsigned long long k = (unsigned long long)__double_as_longlong(best_w[i]);
+    TKEY k = (TKEY)TASKEY(best_w[i]);
     if (k == comp_min_key[comp[i]]) atomicMin(&comp_win[comp[i]], i);
 }
 
@@ -107,20 +118,63 @@ __global__ void bv_jump(int* __restrict__ comp, int n) {
 }  // extern C
 """
 
-_MOD = None
+# storage-dtype -> (TREAL, TCOMP, TKEY, TLOAD, TASKEY, TINF, TEXTRAHDR)
+_MST_SUBST = {
+    "float64": dict(
+        TREAL="double",
+        TCOMP="double",
+        TKEY="unsigned long long",
+        TLOAD="",
+        TASKEY="__double_as_longlong",
+        TINF="CUDART_INF",
+        TEXTRAHDR="",
+    ),
+    "float32": dict(
+        TREAL="float",
+        TCOMP="float",
+        TKEY="unsigned int",
+        TLOAD="",
+        TASKEY="__float_as_uint",
+        TINF="CUDART_INF_F",
+        TEXTRAHDR="",
+    ),
+    "float16": dict(
+        TREAL="__half",
+        TCOMP="float",
+        TKEY="unsigned int",
+        TLOAD="__half2float",
+        TASKEY="__float_as_uint",
+        TINF="CUDART_INF_F",
+        TEXTRAHDR="#include <cuda_fp16.h>",
+    ),
+}
+_COMP_DT = {"float64": "float64", "float32": "float32", "float16": "float32"}
+_KEY_DT = {"float64": "uint64", "float32": "uint32", "float16": "uint32"}
+_KEY_MAX = {"float64": 0xFFFFFFFFFFFFFFFF, "float32": 0xFFFFFFFF, "float16": 0xFFFFFFFF}
+
+_MST_MODS: dict = {}
 
 
-def _module():
-    global _MOD
-    if _MOD is None:
-        _MOD = _cp.RawModule(code=_BORUVKA_SRC, options=("--std=c++14",))
-    return _MOD
+def _mst_module(dtype_name):
+    if dtype_name not in _MST_MODS:
+        src = _BORUVKA_TEMPLATE
+        for tok, val in _MST_SUBST[dtype_name].items():
+            src = src.replace(tok, val)
+        _MST_MODS[dtype_name] = _cp.RawModule(code=src, options=("--std=c++14",))
+    return _MST_MODS[dtype_name]
 
 
 def boruvka_mst_device(Dg):
-    """Exact MST of a device-resident dense symmetric dissimilarity matrix
-    (float64 CuPy array). Returns device int32 arrays (mst_u, mst_v)."""
-    mod = _module()
+    """Exact MST of a device-resident dense symmetric dissimilarity matrix.
+
+    ``Dg`` is a CuPy array in float16/float32/float64 (its stored dtype is
+    honoured — it is the n x n memory footprint; f16 is widened to f32 for
+    comparison). Returns device int32 arrays ``(mst_u, mst_v)``.
+    """
+    dt = _cp.dtype(getattr(Dg, "dtype", _cp.float64)).name
+    if dt not in _MST_SUBST:
+        dt = "float64"
+    mod = _mst_module(dt)
     scan = mod.get_function("bv_min_out_edge")
     redw = mod.get_function("bv_reduce_minw")
     pick = mod.get_function("bv_pick_vertex")
@@ -128,12 +182,12 @@ def boruvka_mst_device(Dg):
     relabel = mod.get_function("bv_relabel")
     jump = mod.get_function("bv_jump")
 
-    Dg = _cp.ascontiguousarray(Dg, dtype=_cp.float64)
+    Dg = _cp.ascontiguousarray(Dg, dtype=dt)
     n = Dg.shape[0]
     comp = _cp.arange(n, dtype=_cp.int32)
-    best_w = _cp.empty(n, dtype=_cp.float64)
+    best_w = _cp.empty(n, dtype=_COMP_DT[dt])
     best_j = _cp.empty(n, dtype=_cp.int32)
-    comp_min_key = _cp.empty(n, dtype=_cp.uint64)
+    comp_min_key = _cp.empty(n, dtype=_KEY_DT[dt])
     comp_win = _cp.empty(n, dtype=_cp.int32)
     root_parent = _cp.empty(n, dtype=_cp.int32)
     mst_u = _cp.empty(max(1, n - 1), dtype=_cp.int32)
@@ -142,13 +196,13 @@ def boruvka_mst_device(Dg):
 
     tpb = 256
     grid = (n + tpb - 1) // tpb
-    U64_MAX = _cp.uint64(0xFFFFFFFFFFFFFFFF)
+    key_max = _cp.dtype(_KEY_DT[dt]).type(_KEY_MAX[dt])
     I32_MAX = np.int32(0x7FFFFFFF)
     n_jumps = int(np.ceil(np.log2(max(2, n)))) + 2
     max_rounds = 2 * int(np.ceil(np.log2(max(2, n)))) + 3
 
     for _ in range(max_rounds):
-        comp_min_key.fill(U64_MAX)
+        comp_min_key.fill(key_max)
         comp_win.fill(I32_MAX)
         scan((n,), (tpb,), (Dg, comp, np.int32(n), best_w, best_j))
         redw((grid,), (tpb,), (best_w, comp, np.int32(n), comp_min_key))
@@ -195,7 +249,7 @@ def _order_from_mst(mst_u, mst_v, weights, n, src):
     return order, parent
 
 
-def vat_gpu(X, high_precision: bool = True, return_distances: bool = False):
+def vat_gpu(X, high_precision: bool = True, return_distances: bool = False, dtype=None):
     """Compute the exact VAT ordering fully on the GPU.
 
     Distances and the MST are built on the device (the n x n matrix stays
@@ -205,6 +259,10 @@ def vat_gpu(X, high_precision: bool = True, return_distances: bool = False):
     ----------
     X : (n, d) float32/float64 array of coordinates.
     return_distances : if True, also return the resident CuPy distance matrix.
+    dtype : matrix storage precision (``None`` keeps the input dtype;
+        ``float16``/``float32``/``float64`` force it). Narrower storage is
+        smaller and faster; the VAT ordering is exact at f32/f64 and near-exact
+        at f16.
 
     Returns
     -------
@@ -215,7 +273,7 @@ def vat_gpu(X, high_precision: bool = True, return_distances: bool = False):
     """
     if not _gpu.is_available():
         raise RuntimeError("CuPy/CUDA device not available")
-    Dg = _gpu.pairwise_distances_device(X, high_precision=high_precision)
+    Dg = _gpu.pairwise_distances_device(X, high_precision=high_precision, dtype=dtype)
     n = Dg.shape[0]
     mu, mv = boruvka_mst_device(Dg)
     # gather the n-1 edge weights on-device, then bring only O(n) data to host
@@ -233,8 +291,9 @@ def vat_gpu(X, high_precision: bool = True, return_distances: bool = False):
 
 @njit(cache=True)
 def _ivat_from_vat_ordered(V):
-    """In-place minimax iVAT recurrence on an already-VAT-ordered matrix V.
-    Mirrors pcvat's _compute_ivat_kernel (lower triangle then back-copy)."""
+    """In-place minimax iVAT recurrence on an already-VAT-ordered matrix V
+    (host/numba fallback). Mirrors pcvat's _compute_ivat_kernel (lower triangle
+    then back-copy)."""
     n = V.shape[0]
     for r in range(1, n):
         jj = 0
@@ -255,23 +314,171 @@ def _ivat_from_vat_ordered(V):
     return V
 
 
-def ivat_gpu(X, high_precision: bool = True):
-    """Compute the IVAT matrix and VAT ordering using the on-device front-end.
+# On-device iVAT: gather + parallel row-pivot, serial-in-r max propagation,
+# symmetrise. The recurrence looks strictly serial, but each row's pivot
+# (h_r = min_{c<r} V[r,c], jj_r = argmin) reads only the *original* reordered
+# distances (earlier rows never overwrite row r before it is processed), so all
+# (h_r, jj_r) compute in one parallel pass; only the max-propagation keeps the
+# serial-in-r dependency. TVOUT is the image type; D is read through TREAL/TLOAD.
+_IVAT_TEMPLATE = r"""
+#include <math_constants.h>
+TEXTRAHDR
+extern "C" {
 
-    Distances and the exact MST are built on the GPU (matrix resident); the
-    ordering is derived on-device. The iVAT minimax recurrence itself is still
-    serial and runs on the host (moving it on-device is future work), so the
-    resident matrix is copied to the host once, reordered, and transformed.
+__global__ void iv_gather_rowmin(const TREAL* __restrict__ D, const int* __restrict__ order,
+                                 int n, TVOUT* __restrict__ V,
+                                 TVOUT* __restrict__ hrow, int* __restrict__ jrow) {
+    int r = blockIdx.x;
+    if (r >= n) return;
+    const TREAL* Drow = D + (size_t)order[r] * n;
+    TVOUT lb = (TVOUT)CUDART_INF; int lj = 0;
+    for (int c = threadIdx.x; c <= r; c += blockDim.x) {
+        TVOUT v = (TVOUT)TLOAD(Drow[order[c]]);
+        V[(size_t)r * n + c] = v;
+        if (c < r && v < lb) { lb = v; lj = c; }
+    }
+    __shared__ TVOUT sw[256];
+    __shared__ int sj[256];
+    sw[threadIdx.x] = lb; sj[threadIdx.x] = lj;
+    __syncthreads();
+    for (int s = blockDim.x >> 1; s > 0; s >>= 1) {
+        if (threadIdx.x < s && sw[threadIdx.x + s] < sw[threadIdx.x]) {
+            sw[threadIdx.x] = sw[threadIdx.x + s];
+            sj[threadIdx.x] = sj[threadIdx.x + s];
+        }
+        __syncthreads();
+    }
+    if (threadIdx.x == 0) { hrow[r] = sw[0]; jrow[r] = sj[0]; }
+}
 
-    Returns (ivat_matrix, order) — ivat_matrix is bit-identical to
-    ``compute_ivat_c`` and ``order`` is the exact VAT permutation.
+__global__ void iv_row(TVOUT* __restrict__ V, const TVOUT* __restrict__ hrow,
+                       const int* __restrict__ jrow, int n, int r) {
+    int c = blockIdx.x * blockDim.x + threadIdx.x;
+    if (c >= r) return;
+    TVOUT hr = hrow[r];
+    int jr = jrow[r];
+    if (c == jr) { V[(size_t)r * n + c] = hr; return; }
+    int a = jr > c ? jr : c;
+    int b = jr > c ? c : jr;
+    TVOUT cur = V[(size_t)a * n + b];
+    V[(size_t)r * n + c] = hr > cur ? hr : cur;
+}
+
+__global__ void iv_symmetrize(TVOUT* __restrict__ V, int n) {
+    int c = blockIdx.x * blockDim.x + threadIdx.x;
+    int r = blockIdx.y * blockDim.y + threadIdx.y;
+    if (r < n && c < n && c > r) V[(size_t)r * n + c] = V[(size_t)c * n + r];
+}
+
+}  // extern C
+"""
+
+_VOUT_C = {"float64": "double", "float32": "float"}
+_IVAT_MODS: dict = {}
+
+
+def _ivat_module(d_dtype, v_dtype):
+    key = (d_dtype, v_dtype)
+    if key not in _IVAT_MODS:
+        src = _IVAT_TEMPLATE
+        src = src.replace("TREAL", _MST_SUBST[d_dtype]["TREAL"])
+        src = src.replace("TLOAD", _MST_SUBST[d_dtype]["TLOAD"])
+        src = src.replace("TEXTRAHDR", _MST_SUBST[d_dtype]["TEXTRAHDR"])
+        src = src.replace("TVOUT", _VOUT_C[v_dtype])
+        _IVAT_MODS[key] = _cp.RawModule(code=src, options=("--std=c++14",))
+    return _IVAT_MODS[key]
+
+
+def ivat_image_device(Dg, order, v_dtype="float64"):
+    """On-device iVAT image from a device matrix and a VAT order.
+
+    The reorder-gather, minimax recurrence and symmetrisation all run on the GPU
+    (no host copy of the n x n matrix). ``v_dtype='float64'`` is bit-identical to
+    the CPU engine. Returns a device (CuPy) array.
+    """
+    d_dtype = _cp.dtype(getattr(Dg, "dtype", _cp.float64)).name
+    if d_dtype not in _MST_SUBST:
+        d_dtype = "float64"
+    Dg = _cp.ascontiguousarray(_cp.asarray(Dg, dtype=d_dtype))
+    n = Dg.shape[0]
+    order_g = _cp.asarray(order, dtype=_cp.int32)
+    mod = _ivat_module(d_dtype, v_dtype)
+    k_gather = mod.get_function("iv_gather_rowmin")
+    k_row = mod.get_function("iv_row")
+    k_sym = mod.get_function("iv_symmetrize")
+
+    V = _cp.empty((n, n), dtype=v_dtype)
+    hrow = _cp.empty(n, dtype=v_dtype)
+    jrow = _cp.empty(n, dtype=_cp.int32)
+    tpb = 256
+    k_gather((n,), (tpb,), (Dg, order_g, np.int32(n), V, hrow, jrow))
+    for r in range(1, n):
+        grid = (r + tpb - 1) // tpb
+        k_row((grid,), (tpb,), (V, hrow, jrow, np.int32(n), np.int32(r)))
+    tb = 16
+    k_sym(
+        ((n + tb - 1) // tb, (n + tb - 1) // tb),
+        (tb, tb),
+        (V, np.int32(n)),
+    )
+    return V
+
+
+def _resolve_vat_dtype(dtype) -> str:
+    """GPU-VAT precision policy -> storage dtype name.
+
+    float32 (default) and float16 (opt-in) are used as requested; float64 is
+    downgraded to float32 with a warning so the caller knows the precision was
+    changed on the fly (the CPU backend is the exact-float64 path).
+    """
+    name = np.dtype(dtype).name
+    if name == "float64":
+        warnings.warn(
+            "GPU VAT backend computes in float32; the requested float64 was "
+            "converted to float32 on the fly. Use backend/on_device off (the CPU "
+            "engine) for exact float64.",
+            stacklevel=3,
+        )
+        return "float32"
+    if name in ("float16", "float32"):
+        return name
+    raise TypeError(f"dtype must be float16/float32/float64, got {name}")
+
+
+def ivat_gpu(X, high_precision: bool = True, dtype=None, device_recurrence=True):
+    """Compute the IVAT matrix and VAT ordering fully on the GPU.
+
+    Distances, the exact MST, the ordering, and (by default) the iVAT minimax
+    recurrence all run on the device with the n x n matrix resident — closing the
+    loop end-to-end, so nothing but the O(n) order and the final image return to
+    the host.
+
+    ``dtype`` selects the matrix storage precision: ``None`` (default) keeps the
+    input dtype (float32/float64) — **bit-identical to ``compute_ivat_c``**;
+    ``float16``/``float32`` shrink the resident matrix (f16 near-exact). This is
+    a faithful low-level primitive: it does not apply the f32-default policy —
+    that lives in :class:`IVATMeans`. ``device_recurrence=False`` falls back to
+    the host numba recurrence (copies the matrix back once) for parity/debugging.
+
+    Returns (ivat_matrix, order) — a host image and the exact VAT permutation.
     """
     if not _gpu.is_available():
         raise RuntimeError("CuPy/CUDA device not available")
-    order, parent, Dg = vat_gpu(X, high_precision=high_precision, return_distances=True)
-    D_host = _cp.asnumpy(Dg)  # host copy needed for the serial CPU recurrence
+    order, parent, Dg = vat_gpu(
+        X, high_precision=high_precision, return_distances=True, dtype=dtype
+    )
+    store = _cp.dtype(Dg.dtype).name
+    if device_recurrence:
+        # f64 storage -> f64 image (bit-exact); f32/f16 storage -> f32 image
+        v_dtype = "float64" if store == "float64" else "float32"
+        V = ivat_image_device(Dg, order, v_dtype=v_dtype)
+        ivat = _cp.asnumpy(V)
+        del Dg, V
+        _cp.get_default_memory_pool().free_all_blocks()
+        return ivat, order
+    D_host = _cp.asnumpy(Dg)  # host copy for the serial CPU recurrence
     del Dg
     _cp.get_default_memory_pool().free_all_blocks()
-    V = np.ascontiguousarray(D_host[np.ix_(order, order)])
+    V = np.ascontiguousarray(D_host[np.ix_(order, order)].astype(np.float64))
     ivat = _ivat_from_vat_ordered(V)
     return ivat, order

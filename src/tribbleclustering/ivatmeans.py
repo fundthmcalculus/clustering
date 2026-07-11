@@ -30,6 +30,7 @@ class IVATMeans:
         random_state: Optional[int] = None,
         distance_backend: str = "auto",
         on_device: bool = False,
+        dtype: str = "float32",
     ):
         self.n_clusters = n_clusters
         self.random_state = random_state
@@ -40,15 +41,19 @@ class IVATMeans:
         #   "gpu"  — force GPU (errors if no device);
         #   "cpu"  — force the CPU kernel.
         self.distance_backend = distance_backend
-        # on_device: run the whole VAT front-end (distances + exact Boruvka MST +
-        # ordering) on the GPU with the dissimilarity matrix kept resident, then
-        # finish the serial iVAT recurrence on the host (see gpu_vat.ivat_gpu).
-        # Output is bit-identical to the CPU path. Opt-in: the front-end is
-        # ~5-6x faster, but the iVAT recurrence still needs the matrix on the
-        # host, so the one-time device->host copy of the n x n matrix can offset
-        # the gain for the *full* fit — benchmark for your n. Requires the matrix
-        # to fit VRAM.
+        # on_device: run the WHOLE VAT pipeline (distances + exact Boruvka MST +
+        # ordering + iVAT recurrence) on the GPU with the dissimilarity matrix
+        # kept resident — nothing but the O(n) order and the final image return
+        # to the host (see gpu_vat.ivat_gpu). Opt-in; requires the matrix to fit
+        # VRAM. At dtype="float32" the result matches the CPU path.
         self.on_device = on_device
+        # dtype: storage precision of the resident matrix on the on_device path.
+        #   "float32" (default) — matches the CPU result, half the memory;
+        #   "float16"           — max scale, near-exact (a few near-tie flips);
+        #   "float64"           — downgraded to float32 with a warning (use the
+        #                         CPU path for exact float64). Ignored when the
+        #                         on_device path is not taken.
+        self.dtype = dtype
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
         self._ivat_result: Optional[IvatMeansResult] = None
@@ -106,9 +111,12 @@ class IVATMeans:
             np.random.seed(self.random_state)
 
         if self._use_on_device(X):
-            # Distances + exact Boruvka MST + ordering on the GPU (matrix
-            # resident); serial iVAT recurrence finished on the host.
-            ivat_matrix, vat_order = _gpu_vat.ivat_gpu(X)
+            # Whole VAT pipeline on the GPU (distances + exact Boruvka MST +
+            # ordering + iVAT recurrence), matrix resident; only the O(n) order
+            # and the final image return to the host. Apply the GPU-VAT dtype
+            # policy here (f32 default, f16 opt-in, f64 -> f32 with a warning).
+            store_dtype = _gpu_vat._resolve_vat_dtype(self.dtype)
+            ivat_matrix, vat_order = _gpu_vat.ivat_gpu(X, dtype=store_dtype)
         else:
             distances = self._compute_distances(X)
             # `distances` is a throwaway intermediate, so let IVAT consume it in
