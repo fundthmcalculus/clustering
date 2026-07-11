@@ -187,6 +187,47 @@ consolidated treatment and exact citations).
 
 ---
 
+## 5. Performance / systems (the integration story)
+*See `docs/performance-novelty.md`. These are the fast-VAT/iVAT lines the integrated
+engine unifies and must be benchmarked against.*
+
+### [Fast-VAT] Avinash & Lachheb (2025) — **concurrent CPU-JIT competitor**
+MSR Avinash and I. Lachheb, "Fast-VAT: Accelerating Cluster Tendency Visualization
+using Cython and Numba," arXiv:2507.15904, 2025.
+- Reimplements **VAT** (not iVAT) in Python with **Numba JIT + Cython**, up to **50×**
+  over a baseline; validates against DBSCAN/k-means. No parallel/SIMD, no in-place
+  memory reduction, no iVAT, no clustering front-end. **Cite and differentiate.**
+  PDF: `docs/sources/Avinash_Lachheb_2025_FastVAT_Cython_Numba.pdf`.
+
+### [eVAT] Meng & Yuan (2018) — parallel GPU VAT
+T. Meng and B. Yuan, "Parallel edge-based visual assessment of cluster tendency on
+GPU," *International Journal of Data Science and Analytics*, 2018.
+doi:10.1007/s41060-018-0100-7.
+- Edge-based VAT (eVAT) reproducing efiVAT output, parallelized on **NVIDIA CUDA**.
+  The parallel-VAT prior art; requires a GPU and is not memory- or
+  arbitrary-dissimilarity-focused.
+
+### [scalableVAT-2024] *Information Sciences* (2024) — sub-quadratic-memory exact VAT
+"Time and memory scalable algorithms for clustering tendency assessment of big data,"
+*Information Sciences*, 2024, PII S0020025524002378.
+- Proposes **kdT-VAT / TkdT-VAT / BB-VAT**: reduce the EMST-edge search space with a
+  **k-d tree** to avoid building the full n×n matrix → sub-quadratic memory, **exact**.
+  **Requires Euclidean coordinates** (no tree without them) and degrades in high
+  dimensions — the boundary of your arbitrary-dissimilarity regime. **Authors/exact
+  title to verify** (Elsevier page paywalled; likely Rathore/Kumar et al.).
+
+### [InPlacePerm] Cate & Twigg (1977); Catanzaro et al. (2014) — in-situ permutation
+E. G. Cate and D. W. Twigg, "Algorithm 513: Analysis of In-Situ Transposition,"
+*ACM Trans. Mathematical Software*, vol. 3, no. 1, pp. 104–110, 1977.
+doi:10.1145/355719.355729. — and —
+B. Catanzaro, A. Keller, and M. Garland, "A Decomposition for In-place Matrix
+Transposition," *Proc. PPoPP*, 2014, pp. 193–206. doi:10.1145/2555243.2555253.
+- Classical basis for the **cycle-following in-place permutation** in
+  `pvat.shuffle_ordered_column`. Cite so the technique is credited; the novelty is its
+  *application to VAT reordering* for the ~2× memory reduction, not the technique.
+
+---
+
 ## Notes on verification
 - All DOIs/venues above were cross-checked against dblp / publisher records during
   the review. **Before final thesis submission, re-verify page numbers and the
