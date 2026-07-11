@@ -188,6 +188,7 @@ def _bench(fn, n, dtype, repeats=3):
     return min(times) * 1000  # ms
 
 
+@pytest.mark.ci_slow
 def test_performance(capsys):
     """Print timing for VAT and IVAT across matrix sizes."""
     sizes = [100, 300, 500, 1000]

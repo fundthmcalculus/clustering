@@ -137,6 +137,14 @@ ratchet mypy strictness one module at a time).
   assertions that are unreliable on shared CI, so they are marked `benchmark`
   and **deselected by default** (`addopts = "-m 'not benchmark'"`).
 - Run perf benchmarks explicitly: `pytest -m benchmark`.
+- **CI-fast mode** (`tests/conftest.py`) trims the suite on shared runners. It
+  is auto-enabled on GitHub Actions (`GITHUB_ACTIONS`) / generic CI (`CI`), or
+  forced anywhere with `pytest --ci-fast`. In this mode: tests marked
+  `@pytest.mark.ci_slow` (scaling/plotting benchmarks with no correctness
+  assertion) are skipped, and the `ci_scale(full, fast)` fixture returns the
+  smaller size so heavy correctness tests run on reduced inputs. Everything
+  runs full-size locally. This cuts the default CI test step from ~50s to ~5s;
+  run the complete suite locally with a plain `pytest` (no flag, outside CI).
 - Tests requiring the compiled extension guard with
   `@pytest.mark.skipif(not CYTHON_AVAILABLE, ...)`.
 - Some tests/demos pull real datasets via `ucimlrepo` and can allocate tens of

@@ -2,6 +2,7 @@ import time
 from typing import Any
 
 import numpy as np
+import pytest
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numpy import ndarray
@@ -229,6 +230,7 @@ def plot_voronoi(all_cities, centroids):
         pass
 
 
+@pytest.mark.ci_slow
 def test_multi_dim_pairwise_dist_perf():
     results = []
     # Do 1 pairwise distances to reduce nogil/numba randomness
