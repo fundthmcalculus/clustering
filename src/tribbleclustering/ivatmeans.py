@@ -51,7 +51,7 @@ class IVATMeans:
         self.on_device = on_device
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
-        self._ivat_result = None
+        self._ivat_result: Optional[IvatMeansResult] = None
 
     def _use_on_device(self, X: ndarray) -> bool:
         if not self.on_device or not _gpu.is_available():
@@ -116,12 +116,14 @@ class IVATMeans:
             # memory on large inputs (the dominant cost of fitting).
             ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=True)
 
-        self._ivat_result = get_ivat_levels(
+        ivat_result = get_ivat_levels(
             X, ivat_matrix, vat_order, n_levels=1, n_clusters=self.n_clusters
         )
+        # n_levels=1 always yields a single result, never a list.
+        assert isinstance(ivat_result, IvatMeansResult)
+        self._ivat_result = ivat_result
 
-        result: IvatMeansResult = self._ivat_result
-        self.cluster_centers_ = result.initial_centroids
+        self.cluster_centers_ = ivat_result.initial_centroids
         self.labels_ = self._assign_clusters(X)
 
         return self
@@ -172,7 +174,7 @@ class IVATMeans:
 
             distances = np.linalg.norm(
                 X_batch[:, np.newaxis, :] - self.cluster_centers_[np.newaxis, :, :],
-                axis=2
+                axis=2,
             )
             labels[start:end] = np.argmin(distances, axis=1)
 
@@ -202,6 +204,7 @@ class IVATMeans:
             Cluster labels for each sample in X.
         """
         self.fit(X, y, sample_weight)
+        assert self.labels_ is not None  # set by fit()
         return self.labels_
 
     def _assign_clusters(self, X: ndarray) -> ndarray:
