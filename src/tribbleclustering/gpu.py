@@ -17,6 +17,7 @@ which would break the exact-VAT guarantee.
 Everything degrades gracefully: if CuPy or a CUDA device is unavailable,
 ``is_available()`` returns False and callers fall back to the CPU path.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -188,9 +189,17 @@ def pairwise_distances_gpu(
         tile_dev = _cp.empty((R, n), dtype=dtype)
         blocks = (tile_elems + threads - 1) // threads
         kern(
-            (blocks,), (threads,),
-            (X_dev, np.int32(n), np.int32(d), np.int32(R),
-             np.int32(a), np.int64(tile_elems), tile_dev),
+            (blocks,),
+            (threads,),
+            (
+                X_dev,
+                np.int32(n),
+                np.int32(d),
+                np.int32(R),
+                np.int32(a),
+                np.int64(tile_elems),
+                tile_dev,
+            ),
         )
         # Zero this tile's diagonal contribution (rows a..b) exactly, matching
         # the CPU kernel's zero diagonal (sqrt of a tiny residual could be ~1e-7
@@ -216,13 +225,16 @@ def gpu_pairwise_beneficial(data: np.ndarray) -> bool:
     data = np.asarray(data)
     if data.ndim != 2:
         return False
-    return (is_available()
-            and data.dtype == np.float32
-            and data.shape[1] >= _GPU_DIM_CROSSOVER)
+    return (
+        is_available()
+        and data.dtype == np.float32
+        and data.shape[1] >= _GPU_DIM_CROSSOVER
+    )
 
 
-def pairwise_distances(data: np.ndarray, backend: str = "auto",
-                       high_precision: bool = True) -> np.ndarray:
+def pairwise_distances(
+    data: np.ndarray, backend: str = "auto", high_precision: bool = True
+) -> np.ndarray:
     """Dense Euclidean pairwise-distance matrix with backend selection.
 
     backend='auto' (default) uses the GPU only where it is expected to win on
@@ -274,6 +286,7 @@ def fuzzy_c_means_gpu(
     """
     if not is_available():
         from .fcm import fuzzy_c_means
+
         return fuzzy_c_means(x, n, m=m, indices=indices, initial_guess=initial_guess)
 
     x = np.asarray(x)
@@ -288,14 +301,18 @@ def fuzzy_c_means_gpu(
     elif initial_guess is not None:
         if initial_guess.shape != (n, d):
             raise ValueError(
-                f"initial_guess must have shape ({n}, {d}), got {initial_guess.shape}")
+                f"initial_guess must have shape ({n}, {d}), got {initial_guess.shape}"
+            )
         C = _cp.asarray(np.ascontiguousarray(initial_guess, dtype=dtype))
     else:
         idx = np.random.choice(n_samples, size=n * 2, replace=False)
-        C = _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype)).reshape(
-            n, 2, d).mean(axis=1)
+        C = (
+            _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype))
+            .reshape(n, 2, d)
+            .mean(axis=1)
+        )
 
-    q = 1.0 / (m - 1.0)          # membership exponent on squared distance
+    q = 1.0 / (m - 1.0)  # membership exponent on squared distance
     sqx = _cp.sum(Xd * Xd, axis=1)  # (n_samples,), constant across iterations
 
     def _membership(C):
@@ -317,7 +334,7 @@ def fuzzy_c_means_gpu(
 
     for _ in range(max_iter):
         U = _membership(C)
-        Um = U ** m                              # (n_samples, n)
+        Um = U**m  # (n_samples, n)
         C_new = (Um.T @ Xd) / _cp.sum(Um, axis=0)[:, None]
         if bool(_cp.all(_cp.abs(C_new - C) <= (1e-8 + tol * _cp.abs(C)))):
             C = C_new
