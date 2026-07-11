@@ -32,6 +32,51 @@ cdef void _compute_distances_32(
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cdef void _compute_distances_unrolled_32(
+    const float[:, ::1] x,
+    const float[:, ::1] c,
+    float[:, ::1] distances
+) noexcept nogil:
+    """SIMD-friendly unrolled distance computation (float32).
+
+    Process 4 features per loop iteration to enable instruction-level
+    parallelism and allow the compiler to auto-vectorize.
+    """
+    cdef int n_samples = x.shape[0]
+    cdef int n_clusters = c.shape[0]
+    cdef int n_features = x.shape[1]
+    cdef int i, j, k, k_end
+    cdef float d, diff0, diff1, diff2, diff3
+
+    k_end = (n_features // 4) * 4
+
+    for i in range(n_samples):
+        for j in range(n_clusters):
+            d = 0.0
+
+            # Unrolled loop: process 4 features per iteration
+            for k in range(0, k_end, 4):
+                diff0 = x[i, k+0] - c[j, k+0]
+                diff1 = x[i, k+1] - c[j, k+1]
+                diff2 = x[i, k+2] - c[j, k+2]
+                diff3 = x[i, k+3] - c[j, k+3]
+
+                d += diff0 * diff0
+                d += diff1 * diff1
+                d += diff2 * diff2
+                d += diff3 * diff3
+
+            # Handle remainder (if n_features not multiple of 4)
+            for k in range(k_end, n_features):
+                diff0 = x[i, k] - c[j, k]
+                d += diff0 * diff0
+
+            distances[i, j] = sqrt(d)
+
+
+@cython.cdivision(True)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cdef void _compute_distances_64(
     const double[:, ::1] x,
     const double[:, ::1] c,
@@ -49,6 +94,51 @@ cdef void _compute_distances_64(
             for k in range(n_features):
                 diff = x[i, k] - c[j, k]
                 d += diff * diff
+            distances[i, j] = sqrt(d)
+
+
+@cython.cdivision(True)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void _compute_distances_unrolled_64(
+    const double[:, ::1] x,
+    const double[:, ::1] c,
+    double[:, ::1] distances
+) noexcept nogil:
+    """SIMD-friendly unrolled distance computation (float64).
+
+    Process 4 features per loop iteration to enable instruction-level
+    parallelism and allow the compiler to auto-vectorize.
+    """
+    cdef int n_samples = x.shape[0]
+    cdef int n_clusters = c.shape[0]
+    cdef int n_features = x.shape[1]
+    cdef int i, j, k, k_end
+    cdef double d, diff0, diff1, diff2, diff3
+
+    k_end = (n_features // 4) * 4
+
+    for i in range(n_samples):
+        for j in range(n_clusters):
+            d = 0.0
+
+            # Unrolled loop: process 4 features per iteration
+            for k in range(0, k_end, 4):
+                diff0 = x[i, k+0] - c[j, k+0]
+                diff1 = x[i, k+1] - c[j, k+1]
+                diff2 = x[i, k+2] - c[j, k+2]
+                diff3 = x[i, k+3] - c[j, k+3]
+
+                d += diff0 * diff0
+                d += diff1 * diff1
+                d += diff2 * diff2
+                d += diff3 * diff3
+
+            # Handle remainder (if n_features not multiple of 4)
+            for k in range(k_end, n_features):
+                diff0 = x[i, k] - c[j, k]
+                d += diff0 * diff0
+
             distances[i, j] = sqrt(d)
 
 
@@ -286,7 +376,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
     for iteration in range(100):
         # Only recompute distances if centers moved significantly
         if recompute_distances:
-            _compute_distances_32(x, c, distances)
+            _compute_distances_unrolled_32(x, c, distances)
 
         _compute_weights_32(distances, m, w_ij)
 
@@ -316,7 +406,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    _compute_distances_32(x, c, distances)
+    _compute_distances_unrolled_32(x, c, distances)
     _compute_weights_32(distances, m, w_ij)
 
     return np.asarray(c), np.asarray(w_ij)
@@ -384,7 +474,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
     for iteration in range(100):
         # Only recompute distances if centers moved significantly
         if recompute_distances:
-            _compute_distances_64(x, c, distances)
+            _compute_distances_unrolled_64(x, c, distances)
 
         _compute_weights_64(distances, m, w_ij)
 
@@ -414,7 +504,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    _compute_distances_64(x, c, distances)
+    _compute_distances_unrolled_64(x, c, distances)
     _compute_weights_64(distances, m, w_ij)
 
     return np.asarray(c), np.asarray(w_ij)
