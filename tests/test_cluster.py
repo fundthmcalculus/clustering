@@ -96,7 +96,13 @@ def test_merge_ivat():
     all_cities = all_cities[scramble_order]
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
 
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # compute_ivat returns 3 values: IVAT matrix, argmin sequence, VAT order
+    ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
+
+    # Compute VAT matrix separately
+    from tribbleclustering.pvat import compute_vat
+    vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
+
     plot_vat_ivat(ivat_mst, vat_mst)
 
 
@@ -168,7 +174,11 @@ def test_heirarchy_ivat_means():
 
     # Compute pairwise distances and iVAT
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # compute_ivat returns 3 values: IVAT matrix, argmin sequence, VAT order
+    ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # Compute VAT matrix separately
+    from tribbleclustering.pvat import compute_vat
+    vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     # Get cluster information from iVAT
     res = get_ivat_levels(all_cities, ivat_mst, vat_order, n_levels=3)
@@ -339,7 +349,11 @@ def test_fuzzy_c_means():
     start_ivat = time.time()
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
     # Compute the IVAT
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # compute_ivat returns 3 values: IVAT matrix, argmin sequence, VAT order
+    ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # Compute VAT matrix separately
+    from tribbleclustering.pvat import compute_vat
+    vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
     res = get_ivat_levels(all_cities, ivat_mst, vat_order)
 
     # Time the single FCM call
@@ -526,7 +540,11 @@ def test_ivat_hierarchy_logic():
 
     all_cities = np.vstack([cluster1, cluster2])
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # compute_ivat returns 3 values: IVAT matrix, argmin sequence, VAT order
+    ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # Compute VAT matrix separately
+    from tribbleclustering.pvat import compute_vat
+    vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     # We want 2 levels: level 1 should have 2 clusters, level 2 should have 4 clusters
     root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=2)
@@ -645,7 +663,11 @@ def test_visualize_hierarchy():
     all_cities = all_cities[np.random.permutation(len(all_cities))]
 
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # compute_ivat returns 3 values: IVAT matrix, argmin sequence, VAT order
+    ivat_mst, argmin_seq, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # Compute VAT matrix separately
+    from tribbleclustering.pvat import compute_vat
+    vat_mst, _ = compute_vat(matrix_of_pairwise_distance)
 
     # Get hierarchy (3 levels)
     root = get_ivat_hierarchy(all_cities, ivat_mst, vat_order, n_levels=3)

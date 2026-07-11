@@ -149,3 +149,8 @@ cython_debug/
 /src/tribbleclustering/cfcm.c
 /src/tribbleclustering/pcvat.c
 /.claude/settings.local.json
+/**/*.gif
+/**/*.png
+
+# Collected prior-art PDFs (bibliography is tracked, sources are not)
+/docs/sources/
