@@ -150,6 +150,7 @@ class TestCorrectness:
 class TestPerformance:
     """Benchmark the C extension vs the numba reference and scipy."""
 
+    @pytest.mark.ci_slow
     def test_scaling_behavior(self):
         """Compare pairwise_distances (numba), pairwise_distances_c (C/OpenMP)
         and scipy pdist across matrix sizes.
