@@ -248,6 +248,140 @@ graph over an arbitrary dissimilarity matrix kept GPU-resident**.
 
 ---
 
+## 6. VAT ↔ TSP, seriation, and clustered TSP
+*Prior art for the `experiments/vat_tsp*.py` thread; see `docs/vat-tsp-prior-art.md`
+for the full novelty/gaps/benchmarks analysis. PDFs are **not** committed — this
+session's egress policy blocks scholarly hosts (arXiv/IEEE/Springer/Elsevier
+403); entries verified via DOI + metadata. OA-PDF links are noted for retrieval
+in an unrestricted environment.*
+
+### Seriation-as-TSP lineage
+- **[Lenstra1974]** J. K. Lenstra, "Clustering a Data Array and the Traveling-
+  Salesman Problem," *Operations Research* 22(2):413–414, 1974.
+  doi:10.1287/opre.22.2.413. — origin of seriation ≡ TSP.
+- **[HubertBaker1978]** L. J. Hubert & F. B. Baker, "Applications of Combinatorial
+  Programming to Data Analysis: The Traveling Salesman and Related Problems,"
+  *Psychometrika* 43(1):81–91, 1978. doi:10.1007/BF02294091. (OA-PDF via Cambridge
+  Core.)
+- **[ClimerZhang2006]** S. Climer & W. Zhang, "Rearrangement Clustering: Pitfalls,
+  Remedies, and Applications," *J. Machine Learning Research* 7:919–943, 2006.
+  Open access: jmlr.org/papers/volume7/climer06a. — dummy-city open-path reduction.
+- **[Hahsler2008]** M. Hahsler, K. Hornik & C. Buchta, "Getting Things in Order:
+  An Introduction to the R Package seriation," *J. Statistical Software*
+  25(3):1–34, 2008. doi:10.18637/jss.v025.i03. Open access.
+- **[Liiv2010]** I. Liiv, "Seriation and Matrix Reordering Methods: An Historical
+  Overview," *Statistical Analysis and Data Mining* 3(2):70–91, 2010.
+  doi:10.1002/sam.10071.
+- **[Behrisch2016]** M. Behrisch et al., "Matrix Reordering Methods for Table and
+  Network Visualization," *Computer Graphics Forum* 35(3):693–716, 2016.
+  doi:10.1111/cgf.12935. (OA-PDF on HAL: hal-01326759.)
+- **[WilkinsonFriendly2009]** L. Wilkinson & M. Friendly, "The History of the
+  Cluster Heat Map," *The American Statistician* 63(2):179–184, 2009.
+  doi:10.1198/tas.2009.0033. (OA-PDF: datavis.ca.)
+
+### TSP solvers, local search, constructions, benchmarks
+- **[LK73]** S. Lin & B. W. Kernighan, "An Effective Heuristic Algorithm for the
+  TSP," *Operations Research* 21(2):498–516, 1973. doi:10.1287/opre.21.2.498.
+  (OA-PDF: cs.princeton.edu/~bwk.)
+- **[Croes58]** G. A. Croes, "A Method for Solving Traveling-Salesman Problems,"
+  *Operations Research* 6(6):791–812, 1958. doi:10.1287/opre.6.6.791. (2-opt.)
+- **[Lin65]** S. Lin, "Computer Solutions of the TSP," *Bell System Tech. J.*
+  44(10):2245–2269, 1965. doi:10.1002/j.1538-7305.1965.tb04146.x. (3-opt.)
+- **[Or76]** I. Or, PhD thesis, Northwestern Univ., 1976. (Or-opt; thesis.)
+- **[Hel00]** K. Helsgaun, "An Effective Implementation of the Lin-Kernighan TSP
+  Heuristic," *EJOR* 126(1):106–130, 2000. doi:10.1016/S0377-2217(99)00284-2.
+  (LKH; OA author copy: akira.ruc.dk/~keld/research/LKH/.)
+- **[Hel09]** K. Helsgaun, "General k-opt Submoves for the Lin–Kernighan TSP
+  Heuristic," *Math. Prog. Computation* 1(2–3):119–163, 2009.
+  doi:10.1007/s12532-009-0004-6. (LKH-2.)
+- **[RSL77]** D. J. Rosenkrantz, R. E. Stearns & P. M. Lewis II, "An Analysis of
+  Several Heuristics for the TSP," *SIAM J. Computing* 6(3):563–581, 1977.
+  doi:10.1137/0206041. (NN bound; MST double-tree 2-approx.)
+- **[DeinekoTiskin2007]** V. Deineko & A. Tiskin, "Fast Minimum-Weight Double-Tree
+  Shortcutting for Metric TSP," *WEA 2007*. doi:10.1007/978-3-540-72845-0_11.
+  (OA-PDF: arXiv:0710.0318.)
+- **[Chr76]** N. Christofides, "Worst-Case Analysis of a New Heuristic for the
+  TSP," Tech. Report 388, CMU GSIA, 1976 (reprinted *Oper. Res. Forum* 3:20, 2022,
+  doi:10.1007/s43069-021-00101-z). (3/2-approx.)
+- **[Bentley92]** J. L. Bentley, "Fast Algorithms for Geometric TSP," *ORSA J.
+  Computing* 4(4):387–411, 1992. doi:10.1287/ijoc.4.4.387. (NN/greedy/2-opt/Or-opt
+  engineering + %-excess data.)
+- **[PB89]** L. K. Platzman & J. J. Bartholdi III, "Spacefilling Curves and the
+  Planar TSP," *JACM* 36(4):719–737, 1989. doi:10.1145/76359.76361; and
+  **[BartholdiPlatzman1982]** *Oper. Res. Lett.* 1(4):121–125.
+  doi:10.1016/0167-6377(82)90012-8.
+- **[TH19]** É. D. Taillard & K. Helsgaun, "POPMUSIC for the TSP," *EJOR*
+  272(2):420–429, 2019. doi:10.1016/j.ejor.2018.06.039. (Initial tour + candidates
+  for LKH; the modern warm-start reference.)
+- **[Taillard2022]** É. D. Taillard, "A linearithmic heuristic for the TSP," *EJOR*
+  297(2):442–450, 2022. doi:10.1016/j.ejor.2021.05.034.
+- **[CS03]** W. Cook & P. Seymour, "Tour Merging via Branch-Decomposition,"
+  *INFORMS J. Computing* 15(3):233–248, 2003. doi:10.1287/ijoc.15.3.233.16078.
+- **[HK70]** M. Held & R. M. Karp, "The Traveling-Salesman Problem and Minimum
+  Spanning Trees," *Operations Research* 18(6):1138–1162, 1970.
+  doi:10.1287/opre.18.6.1138. (Held–Karp / 1-tree bound.)
+- **[Rein91]** G. Reinelt, "TSPLIB — A TSP Library," *ORSA J. Computing*
+  3(4):376–384, 1991. doi:10.1287/ijoc.3.4.376.
+- **[JM97]** D. S. Johnson & L. A. McGeoch, "The TSP: A Case Study in Local
+  Optimization," in *Local Search in Combinatorial Optimization*, 1997, pp.
+  215–310. — greedy>NN as a 2-opt start; construction ≠ warm-start; LKH is
+  start-insensitive. **[JM02]** the DIMACS-8 companion analysis (Kluwer, 2002,
+  doi:10.1007/0-306-48213-4_9).
+
+### ACO and pheromone warm-starts
+- **[AntSystem96]** M. Dorigo, V. Maniezzo, A. Colorni, "Ant System," *IEEE Trans.
+  SMC-B* 26(1):29–41, 1996. doi:10.1109/3477.484436.
+- **[ACS97]** M. Dorigo & L. M. Gambardella, "Ant Colony System," *IEEE Trans.
+  Evol. Comput.* 1(1):53–66, 1997. doi:10.1109/4235.585892. — τ₀ scaled by the NN
+  tour (heuristic-informed initial pheromone).
+- **[MMAS00]** T. Stützle & H. H. Hoos, "MAX–MIN Ant System," *FGCS*
+  16(8):889–914, 2000. doi:10.1016/S0167-739X(00)00043-1.
+- **[DaiJi2009]** Q. Dai, J. Ji, C. Liu, "An effective initialization strategy of
+  pheromone for ant colony optimization," *Proc. BIC-TA 2009* (IEEE doc 5338067).
+  **[unverified DOI]** — **MST-seeded pheromone**; closest prior art to the VAT/MST
+  hot start.
+- **[Stodola22]** P. Stodola et al., "Adaptive ACO with node clustering for the
+  TSP," *Swarm & Evol. Comput.* 70:101056, 2022. doi:10.1016/j.swevo.2022.101056.
+- **[Anytime14]** M. López-Ibáñez & T. Stützle, "Automatically improving the
+  anytime behaviour of optimisation algorithms," *EJOR* 235(3):569–582, 2014.
+  doi:10.1016/j.ejor.2013.10.043. (SQT / anytime evaluation methodology.)
+
+### Clustered / divide-and-conquer TSP
+- **[Chisman1975]** J. A. Chisman, "The clustered traveling salesman problem,"
+  *Computers & Oper. Res.* 2(2):115–119, 1975. doi:10.1016/0305-0548(75)90015-5.
+  (Origin of CTSP; visit each cluster contiguously.)
+- **[GuttmannBeck2000]** N. Guttmann-Beck, R. Hassin, S. Khuller, B. Raghavachari,
+  "Approximation Algorithms with Bounded Performance Guarantees for the CTSP,"
+  *Algorithmica* 28(4):422–437, 2000. doi:10.1007/s004530010045. — **closest prior
+  art to the block-to-block stitch** (cluster order + entry/exit endpoints +
+  fixed-endpoint Hamiltonian paths; ratio 2.75).
+- **[AnilyBramelHertz1999]** S. Anily, J. Bramel, A. Hertz, "A 5/3-approximation
+  for the clustered TSP tour and path problems," *Oper. Res. Lett.* 24(1–2):29–35,
+  1999. doi:10.1016/S0167-6377(98)00046-7.
+- **[Ding2007]** C. Ding, Y. Cheng, M. He, "Two-Level Genetic Algorithm for CTSP
+  with Application in Large-Scale TSPs," *Tsinghua Sci. & Tech.* 12(4):459–465,
+  2007. doi:10.1016/S1007-0214(07)70068-8. — CTSP as divide-and-conquer for large
+  plain TSP; closest on intent.
+- **[Karp1977]** R. M. Karp, "Probabilistic Analysis of Partitioning Algorithms
+  for the TSP in the Plane," *Math. Oper. Res.* 2(3):209–224, 1977.
+  doi:10.1287/moor.2.3.209.
+- **[FisherJaikumar1981]** M. L. Fisher & R. Jaikumar, "A generalized assignment
+  heuristic for vehicle routing," *Networks* 11(2):109–124, 1981.
+  doi:10.1002/net.3230110205; **[GillettMiller1974]** "sweep," *Oper. Res.*
+  22(2):340–349, doi:10.1287/opre.22.2.340. (Cluster-first-route-second origins.)
+- **[CTSPviaTSP2022]** Y. Lu, J.-K. Hao, Q. Wu, "Solving the CTSP via TSP methods,"
+  *PeerJ Computer Science* 8:e972, 2022. doi:10.7717/peerj-cs.972. (OA;
+  arXiv:2007.05254.)
+- Neural divide-and-conquer TSP (scale frontier): **Learning-to-Delegate**
+  (NeurIPS 2021), **H-TSP** (AAAI 2023, doi:10.1609/aaai.v37i8.26120,
+  arXiv:2304.09395), **GLOP** (AAAI 2024, doi:10.1609/aaai.v38i18.30009,
+  arXiv:2312.08224).
+- Background: single-linkage ≡ MST minus the k−1 heaviest edges (a VAT cut is an
+  MST partition); cf. Gagolewski et al., "Clustering with MSTs," *J. Classification*
+  2024, doi:10.1007/s00357-024-09483-1.
+
+---
+
 ## Notes on verification
 - All DOIs/venues above were cross-checked against dblp / publisher records during
   the review. **Before final thesis submission, re-verify page numbers and the
@@ -257,3 +391,11 @@ graph over an arbitrary dissimilarity matrix kept GPU-resident**.
 - PDFs retrieved: Havens & Bezdek 2012, Wang et al. 2010 (SpecVAT/partitioning),
   Rathore et al. 2020 (ConiVAT). Others are behind paywalls (IEEE/Springer/JSTOR)
   and were verified via metadata only.
+- **§6 (VAT↔TSP) PDFs were not retrieved:** the review session's egress policy
+  denied all scholarly hosts (arXiv/IEEE/Springer/Elsevier → 403). All §6 entries
+  are verified by DOI + search/abstract metadata; **[unverified DOI]** marks the
+  few (IEEE conference papers) whose DOI could not be confirmed behind the 403 —
+  re-verify Dai-Ji 2009 and the neural-solver page/DOIs before thesis submission.
+  Open-access items (Climer-Zhang, Hahsler, LK73, LKH author copy, Behrisch/HAL,
+  CTSPviaTSP/PeerJ, H-TSP/GLOP arXiv) can be fetched into `docs/papers/` from an
+  unrestricted environment.
