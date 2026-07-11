@@ -202,3 +202,93 @@ the FCM coupling and the fast exact pipeline as your own.
 The novelty you suspected is present but narrow. Pin it down with the clusiVAT and
 FCM-seeding comparisons above, own the single-linkage connection, and lead with the
 exact-fast-iVAT systems results.
+
+---
+
+## 8. GPU on-device Borůvka VAT front-end — novelty & prior art
+
+**Date:** 2026-07-11. Added after building `tribbleclustering.gpu_vat.vat_gpu`
+(fully on-device: GPU distances kept resident → device-side Borůvka MST →
+exact VAT ordering; `experiments/boruvka_gpu.py`, `experiments/BORUVKA_VAT_FINDINGS.md`,
+`benchmarks/gpu_vat.md`).
+
+### Verdict — incremental / systems, **not** conceptually first
+
+The headline "exact GPU VAT/iVAT reproducing the serial ordering" is **already
+taken by eVAT** (Meng & Yuan 2018). Parallel GPU Borůvka MST is also a mature
+area (Vineet et al. 2009; cuGraph; ArborX). **Do not claim "first GPU VAT."**
+What appears genuinely unoccupied is the *specific intersection*:
+
+> **exact** ∧ operates on the **full dense/complete graph** of an n×n matrix ∧
+> **arbitrary precomputed dissimilarity** (no coordinates) ∧ dense matrix
+> **resident on-device end-to-end** ∧ explicit **device-side Borůvka**.
+
+Every close competitor drops at least one of those. So this is a defensible but
+**narrow systems/engineering** contribution, not a new algorithm.
+
+### Closest prior art
+
+- **eVAT — "Parallel edge-based visual assessment of cluster tendency on GPU,"**
+  Meng & Yuan, 2018, *Int. J. Data Science and Analytics* 6(4):287–295.
+  https://doi.org/10.1007/s41060-018-0100-7 — **exact, GPU/CUDA, edge-based**;
+  replicates efiVAT output. **Strongest overlap — must be cited and, ideally,
+  benchmarked head-to-head.** Unverified from the paywalled text: whether eVAT
+  internally uses Borůvka or keeps the matrix GPU-resident.
+- **Fast Minimum Spanning Tree for Large Graphs on the GPU,** Vineet, Harish,
+  Patidar, Narayanan, 2009, *HPG '09*. https://doi.org/10.1145/1572769.1572796 —
+  canonical recursive GPU-Borůvka, but **sparse edge-list** graphs (reports
+  30–50×). Cite as the GPU-Borůvka basis.
+- **Fast/memory-efficient MST on the GPU,** Rostrup, Srivastava, Singhal, 2013,
+  *IJCSE* 8(1). https://doi.org/10.1504/IJCSE.2013.052115 — GPU Borůvka, sparse.
+- **cuGraph MST (RAPIDS)** — Borůvka, exact, **sparse CSR**.
+  https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.tree.minimum_spanning_tree.minimum_spanning_tree.html
+  — reviewer will ask "why not feed a dense graph to cuGraph?" (answer:
+  avoid materialising O(n²) CSR edges / host round-trip; use the resident matrix).
+- **ArborX single-tree EMST on GPUs,** Prokopenko, Sao, Lebrun-Grandié, 2022,
+  *ICPP '22*. https://doi.org/10.1145/3545008.3546185 · arXiv:2207.00514 —
+  exact but **Euclidean/coordinate** (kd-tree/BVH), N/A for arbitrary dissimilarity.
+- **cuSLINK: single-linkage on the GPU,** Nolet et al., 2023, *ECML PKDD*.
+  arXiv:2306.16354 — end-to-end GPU single-linkage but **kNN-sparsified →
+  approximate**. Establishes MST↔single-linkage-on-GPU while avoiding the dense matrix.
+- **kNN-Borůvka-GPU,** Arefin, Riveros et al., 2012, *ICA3PP* (LNCS 7439).
+  https://doi.org/10.1007/978-3-642-31125-3_6 — MST from a kNN graph →
+  **approximate** for a complete graph.
+- **BB-VAT / kdT-VAT / TkdT-VAT,** *Information Sciences* 660:120222, 2024.
+  https://doi.org/10.1016/j.ins.2024.120222 — exact VAT EMST, sub-quadratic
+  memory, but **Euclidean-only and CPU** (kd-tree). Beats us on memory; we win on
+  arbitrary dissimilarity + GPU.
+- **Fast-VAT,** Avinash & Lachheb, 2025, arXiv:2507.15904 — exact, Prim, full
+  O(n²) matrix, **CPU only**; lists GPU as future work (and apparently missed eVAT).
+- **Sampling family (approximate):** bigVAT (Huband et al. 2005,
+  https://doi.org/10.1016/j.patcog.2005.03.018), sVAT (Hathaway et al. 2006),
+  clusiVAT (Kumar et al. 2013) — trade exactness for scale (opposite of our claim).
+- **Survey:** Kumar & Bezdek, 2020, *IEEE SMC Magazine* 6(2):10–48.
+  https://doi.org/10.1109/MSMC.2019.2961163.
+- Reference GPU-Borůvka implementation: https://github.com/jiachengpan/cudaMST
+
+### Honesty flags (fix before any publication claim)
+
+1. **eVAT pre-empts the headline** — reframe as the dense-matrix-resident,
+   arbitrary-dissimilarity, explicit-Borůvka variant; benchmark against eVAT or
+   state the precise delta. Never "first GPU VAT."
+2. **Unverified "pVAT."** Searches surfaced a "pVAT" described almost identically
+   (serial Prim → GPU Borůvka → same VAT image), but **no locatable primary
+   source** — likely search-engine conflation. **Verify before relying on the
+   novelty**; if a real pVAT exists it is near-identical prior art.
+3. **~5–6.6× is modest** next to sparse GPU-Borůvka's 30–50×. Be explicit it is
+   the *dense, arbitrary-dissimilarity* regime and report the **full-pipeline**
+   curve (the O(n²) distance build can dominate the MST step at large n).
+4. **Memory ceiling:** a device-resident n×n matrix is O(n²) — caps n≈38k (f64)
+   on 12 GB; sub-quadratic methods (BB-/kdT-VAT) beat us on memory but need
+   coordinates. State the regime honestly.
+5. **The Borůvka kernels are standard** (coalesced min-edge scan, per-component
+   atomicMin, pointer-jumping union-find, mutual-cycle resolution) — frame as
+   sound engineering, not algorithmic invention.
+
+### The measured, defensible claim
+
+An **exact**, single-commodity-GPU VAT front-end that keeps an **arbitrary**
+dense dissimilarity matrix **resident on-device** and builds the VAT ordering via
+a **device-side Borůvka MST**, bit-identical to serial VAT, at **~5–6.6× the
+CPU front-end** (distances+MST+order) with the speedup growing over n up to the
+VRAM ceiling. Position against eVAT (§ above) and resolve the pVAT question first.

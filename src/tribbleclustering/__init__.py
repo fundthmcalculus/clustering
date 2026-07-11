@@ -17,3 +17,4 @@ from .ivatmeans import IVATMeans
 from .fuzzycmeans import FuzzyCMeans
 
 from . import gpu
+from . import gpu_vat

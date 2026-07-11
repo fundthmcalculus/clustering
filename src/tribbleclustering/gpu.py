@@ -88,6 +88,38 @@ def _kernel(dtype, high_precision: bool):
     return _KERNELS[key]
 
 
+def pairwise_distances_device(data, high_precision: bool = True):
+    """Dense Euclidean distance matrix computed on the GPU and returned as a
+    **device-resident** CuPy array (no host copy).
+
+    This is the entry point for a fully on-device pipeline (e.g. GPU Borůvka
+    VAT): the O(n^2) matrix never crosses PCIe. Requires the n x n matrix to fit
+    in VRAM. Same accuracy contract as pairwise_distances_gpu.
+    """
+    if not is_available():
+        raise RuntimeError("CuPy/CUDA device not available")
+    data = np.asarray(data)
+    if data.dtype not in (np.float32, np.float64):
+        raise TypeError(f"Expected float32 or float64, got {data.dtype}")
+    n, d = data.shape
+    dtype = data.dtype
+    hp = high_precision or dtype == np.float64
+    X_dev = _cp.asarray(np.ascontiguousarray(data))
+    out = _cp.empty((n, n), dtype=dtype)
+    if n == 0:
+        return out
+    kern = _kernel(dtype, hp)
+    tile_elems = n * n
+    threads = 256
+    blocks = (tile_elems + threads - 1) // threads
+    kern((blocks,), (threads,),
+         (X_dev, np.int32(n), np.int32(d), np.int32(n),
+          np.int32(0), np.int64(tile_elems), out))
+    # self-distances are exactly 0 (zero diffs); nothing to fix.
+    del X_dev
+    return out
+
+
 def _tile_rows_for_budget(n: int, itemsize: int, budget_bytes: int) -> int:
     """Largest row-tile height R such that two R x n device buffers (the tile
     plus headroom for the copy/allocation) fit the budget. At least 1 row."""
