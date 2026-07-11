@@ -32,7 +32,7 @@ The fix for the block-decomposition seam artifact
 
 Exact → naive N=8 (seams) → stitched N=8 (clean, ≈ exact):
 
-![stitched](figures/stitched_vat_quality.png)
+![stitched](../figures/stitched_vat_quality.png)
 
 ## Quality — recovers exact clustering (n=4000, k=10; ideal runs=10, ARI=1.0)
 

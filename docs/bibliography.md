@@ -3,7 +3,8 @@
 Curated references for the novelty review of `tribble-clustering`. Every entry
 below is a **real, verifiable publication**; DOIs / stable URLs are given so they
 can be checked against the source of record. Open-access PDFs that could be
-retrieved are cached in `docs/sources/` (git-ignored; do not commit).
+retrieved are committed under `docs/papers/`; any other retrieved PDFs are
+cached in `docs/sources/` (git-ignored; do not commit).
 
 The entries are grouped by the role they play in the novelty analysis. See
 `docs/novelty-review.md` for how each maps onto the code.
@@ -40,7 +41,7 @@ Engineering*, vol. 24, no. 5, pp. 813–822, May 2012. doi:10.1109/TKDE.2011.33.
   `pcvat._compute_ivat_kernel_*`:
   `D'[r,c] = max(D*[r,j], D'[j,c])` where `j = argmin_{k<r} D*[r,k]`.
   Reduces iVAT from O(n³) to O(n²). **Cite this for the iVAT recursion itself.**
-  PDF: `docs/sources/Havens_Bezdek_2012_iVAT_efficient.pdf`.
+  PDF: `docs/papers/Havens_Bezdek_2012_iVAT_efficient.pdf`.
 
 ### [SpecVAT/partition] Wang, Leckie, Bezdek & Ramamohanarao / Bezdek et al. (2010) — VAT-based data partitioning
 L. Wang, C. Leckie, K. Ramamohanarao, and J. Bezdek, "Automatically Determining
@@ -51,7 +52,7 @@ doi:10.1109/TKDE.2009.135.
 - **Relevance:** Goes beyond *tendency* to actually **extract a partition** from the
   reordered matrix and estimate `k` automatically (SpecVAT / spectral embedding +
   VAT). Direct prior art for "VAT/iVAT as a clustering (not just visualization)
-  tool." PDF: `docs/sources/Wang_2010_SpecVAT_DataPartitioning_TKDE.pdf`.
+  tool." PDF: `docs/papers/Wang_2010_SpecVAT_DataPartitioning_TKDE.pdf`.
 
 ### [clusiVAT-conf] Kumar, Palaniswami, Rajasegarar, Leckie, Bezdek & Havens (2013)
 D. Kumar, M. Palaniswami, S. Rajasegarar, C. Leckie, J. C. Bezdek, and T. C.
@@ -85,7 +86,7 @@ Clustering with Partial Background Knowledge," arXiv:2008.09570, 2020.
 - **Relevance:** Constraint-guided iVAT that builds a *minimum-transitive*
   dissimilarity and addresses VAT/iVAT sensitivity to noise and "bridge" points — a
   known failure mode that also affects `IVATMeans`. PDF:
-  `docs/sources/Rathore_2020_ConiVAT.pdf`.
+  `docs/papers/Rathore_2020_ConiVAT.pdf`.
 
 ### [bigVAT / sVAT] Hathaway, Bezdek & Huband (2006); Hathaway et al. (2006)
 R. J. Hathaway, J. C. Bezdek, and J. M. Huband, "Scalable visual assessment of

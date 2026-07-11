@@ -16,7 +16,7 @@ Confirmed: the Borůvka-derived VAT order matches serial Prim's on every tested
 size (`order_match = 1.0000`), and the iVAT images are bit-identical
 (`max |serial − Borůvka| = 0.0`).
 
-![quality](figures/boruvka_vat_quality.png)
+![quality](../figures/boruvka_vat_quality.png)
 
 ## CPU Borůvka — a modest, eroding win
 
@@ -56,7 +56,7 @@ MST build time (ms), and speedup of the device-resident GPU vs serial Prim:
 | 16000 | 222.3 | 191.5 | **42.7** | 316.7 | 5.2× |
 | 32000 | 901.5 | 914.6 | **180.6** | 1938.2 | 5.0× |
 
-![scaling](figures/boruvka_vat_scaling.png)
+![scaling](../figures/boruvka_vat_scaling.png)
 
 The device-resident GPU Borůvka is a **solid ~5× win that does NOT erode with n**
 (the GPU has the memory bandwidth for the repeated O(n²) scans that O(n²·log n)
