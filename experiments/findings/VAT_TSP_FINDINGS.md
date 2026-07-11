@@ -109,6 +109,14 @@ as the refinement baseline; and a non-metric `D` study, where the double-tree
 *bound* no longer holds but VAT is still a valid, usually-good starting tour worth
 characterizing empirically.
 
+> **Follow-up done — see `VAT_TSP_WARMSTART_FINDINGS.md`.** All of the above
+> (open-path formulation, real construction baselines incl. Or-opt local search,
+> harder/non-blob instances that open a final-tour gap, and the non-metric study)
+> are built in `experiments/vat_tsp_warmstart.py`. Result: VAT/MST is a
+> competitive, structure-adaptive, *free* warm start — it beats nearest-neighbour
+> and the MST double-tree, trails only greedy-edge, and stays robust into the
+> non-metric regime. LKH and multi-seed error bars remain open.
+
 ## References
 
 - **[Prim]** R. C. Prim, "Shortest connection networks and some generalizations,"
