@@ -1,5 +1,12 @@
 # Bounded-run modified Prim construction (chain m, then switch branch)
 
+> **CORRECTED by `VAT_TSP_MPRIM_SWEEP_FINDINGS.md`.** The interior sweet spot at
+> m≈24–64 below was **single-start basin noise**. Averaged over 8 starts there is
+> no dependable interior optimum: large m ≈ nearest-neighbour is best, VAT (m=0) is
+> worst, and the bounded run-cap does **not** reliably beat plain NN. Read the
+> sweep findings for the corrected conclusion; the m=0-is-worst result holds.
+
+
 Idea (yours): a modified Prim's greedy that extends the current chain for up to
 **m** moves, then forcibly switches to another branch — an A*/beam-like
 "commit for m steps, then re-evaluate globally." Concretely:
