@@ -62,18 +62,21 @@ FIG_DIR = Path(__file__).parent / "figures"
 
 
 @njit(cache=True)
-def _d(coords, a, b):
+def _d(coords, a, b, ceil=False):
     dx = coords[a, 0] - coords[b, 0]
     dy = coords[a, 1] - coords[b, 1]
-    return np.floor((dx * dx + dy * dy) ** 0.5 + 0.5)  # TSPLIB EUC_2D nint
+    r = (dx * dx + dy * dy) ** 0.5
+    if ceil:
+        return np.ceil(r)  # TSPLIB CEIL_2D
+    return np.floor(r + 0.5)  # TSPLIB EUC_2D nint
 
 
 @njit(cache=True)
-def tour_len(tour, coords):
+def tour_len(tour, coords, ceil=False):
     n = tour.shape[0]
     s = 0.0
     for k in range(n):
-        s += _d(coords, tour[k], tour[(k + 1) % n])
+        s += _d(coords, tour[k], tour[(k + 1) % n], ceil)
     return s
 
 
@@ -81,9 +84,9 @@ def tour_len(tour, coords):
 # 1. LK-style local search: full neighbour 2-opt + Or-opt(1,2,3)
 # ---------------------------------------------------------------------------
 @njit(cache=True)
-def lk_search(tour, coords, knn, max_pass=80):
+def lk_search(tour, coords, knn, ceil=False, max_pass=80):
     """Neighbour-list 2-opt (both directions) + Or-opt(1,2,3), first improvement,
-    to convergence. Distances are the TSPLIB nint euclidean (matches LKH)."""
+    to convergence. Distances are TSPLIB nint euclidean (or ceil for CEIL_2D)."""
     n = tour.shape[0]
     pos = np.empty(n, np.int64)
     for i in range(n):
@@ -112,10 +115,10 @@ def lk_search(tour, coords, knn, max_pass=80):
                 if pn == q and qn == p:
                     continue
                 gain = (
-                    _d(coords, tour[p], tour[pn])
-                    + _d(coords, tour[q], tour[qn])
-                    - _d(coords, tour[p], tour[q])
-                    - _d(coords, tour[pn], tour[qn])
+                    _d(coords, tour[p], tour[pn], ceil)
+                    + _d(coords, tour[q], tour[qn], ceil)
+                    - _d(coords, tour[p], tour[q], ceil)
+                    - _d(coords, tour[pn], tour[qn], ceil)
                 )
                 if gain > bg:
                     bg = gain
@@ -145,7 +148,9 @@ def lk_search(tour, coords, knn, max_pass=80):
                 if pr == s1 or nx == s0:
                     break  # segment wraps the whole tour
                 remove_gain = (
-                    _d(coords, pr, s0) + _d(coords, s1, nx) - _d(coords, pr, nx)
+                    _d(coords, pr, s0, ceil)
+                    + _d(coords, s1, nx, ceil)
+                    - _d(coords, pr, nx, ceil)
                 )
                 if remove_gain <= 1e-9:
                     continue
@@ -165,7 +170,9 @@ def lk_search(tour, coords, knn, max_pass=80):
                     if cn == s0:
                         continue
                     add_cost = (
-                        _d(coords, c, s0) + _d(coords, s1, cn) - _d(coords, c, cn)
+                        _d(coords, c, s0, ceil)
+                        + _d(coords, s1, cn, ceil)
+                        - _d(coords, c, cn, ceil)
                     )
                     if remove_gain - add_cost > 1e-7:
                         seg = np.empty(L, np.int64)
@@ -369,6 +376,78 @@ def dual_vat_tour(D, coords, seed_mode="min"):
     for r1 in (p1, p1[::-1]):
         for r2 in (p2, p2[::-1]):
             cost = D[r1[-1], r2[0]] + D[r2[-1], r1[0]]
+            if cost < best_cost:
+                best_cost = cost
+                best_tour = np.concatenate([r1, r2])
+    return np.ascontiguousarray(best_tour), label, i0, j0
+
+
+# ---------------------------------------------------------------------------
+# GPU dual-VAT build: dual-source Prim on the resident matrix (no host O(n^2))
+# ---------------------------------------------------------------------------
+def _choose_seeds_device(Dg, mode):
+    """Seeds computed on the device (avoids a host copy of the n x n matrix)."""
+    n = Dg.shape[0]
+    if mode == "min":
+        flat = int(cp.argmin(cp.where(Dg <= 0, cp.inf, Dg)))
+    elif mode == "max":
+        flat = int(cp.argmax(Dg))
+    else:
+        raise ValueError(f"device seeds support 'min'/'max', got {mode!r}")
+    return flat // n, flat % n
+
+
+def dual_vat_device(Dg, i0, j0):
+    """Dual-source Prim grown on the GPU: `best0/best1` (each vertex's distance to
+    the two fronts) and `label` stay on the device; every round is cupy min /
+    argmin / masked relax over the resident matrix. Only the winning index (one
+    scalar) crosses to the host per round. Returns (label_host, aorder0, aorder1)
+    where the assignment orders are the per-cluster VAT paths."""
+    n = Dg.shape[0]
+    INF = cp.float32(np.inf)
+    # explicit copies: Dg[i0] is a view — writing best0 must NOT alias Dg's row.
+    best0 = cp.ascontiguousarray(Dg[i0]).astype(cp.float32).copy()
+    best1 = cp.ascontiguousarray(Dg[j0]).astype(cp.float32).copy()
+    label = cp.full(n, -1, cp.int8)
+    label[i0] = 0
+    label[j0] = 1
+    best0[i0] = INF
+    best0[j0] = INF
+    best1[i0] = INF
+    best1[j0] = INF
+    a0 = [i0]
+    a1 = [j0]
+    for _ in range(n - 2):
+        cand = cp.minimum(best0, best1)
+        c = int(cp.argmin(cand))  # one scalar to host per round
+        side = 0 if float(best0[c]) <= float(best1[c]) else 1
+        label[c] = side
+        best0[c] = INF
+        best1[c] = INF
+        dc = Dg[c].astype(cp.float32)
+        if side == 0:
+            m = (dc < best0) & (label < 0)
+            best0[m] = dc[m]
+            a0.append(c)
+        else:
+            m = (dc < best1) & (label < 0)
+            best1[m] = dc[m]
+            a1.append(c)
+    return cp.asnumpy(label), np.array(a0, np.int64), np.array(a1, np.int64)
+
+
+def dual_vat_tour_device(Dg, seed_mode="min"):
+    """GPU dual-VAT tour: build the two VAT paths on the device, then the optimal
+    conjunction (4 orientations) using only the 4 endpoint distances."""
+    i0, j0 = _choose_seeds_device(Dg, seed_mode)
+    label, p1, p2 = dual_vat_device(Dg, i0, j0)
+    ep = cp.asarray([p1[0], p1[-1], p2[0], p2[-1]], dtype=cp.int64)
+    De = cp.asnumpy(Dg[cp.ix_(ep, ep)].astype(cp.float64))  # 4x4 endpoint dists
+    # indices: 0=p1 start, 1=p1 end, 2=p2 start, 3=p2 end
+    best_tour, best_cost = None, np.inf
+    for r1, s1, e1 in ((p1, 0, 1), (p1[::-1], 1, 0)):
+        for r2, s2, e2 in ((p2, 2, 3), (p2[::-1], 3, 2)):
+            cost = De[e1, s2] + De[e2, s1]  # r1_end->r2_start, r2_end->r1_start
             if cost < best_cost:
                 best_cost = cost
                 best_tour = np.concatenate([r1, r2])
