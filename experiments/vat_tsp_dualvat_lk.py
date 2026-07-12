@@ -8,7 +8,8 @@ Two experiments requested on top of the recursive-IVAT TSP thread:
    length 1-3), with the sorted-neighbour gain criterion, run to convergence.
 
 2. **Dual-VAT.** A two-source construction:
-     2.1 pick the largest-dissimilarity pair (i, j);
+     2.1 pick a seed edge (default: the smallest **non-zero** dissimilarity pair;
+         ``seed_mode='max'`` for the largest);
      2.2 seed cluster 1 at i (pq-1) and cluster 2 at j (pq-2);
      2.3 grow both single-linkage (Prim) trees at once, each city joining
          whichever front reaches it first — a dual-source MST partition into two
@@ -19,6 +20,9 @@ Two experiments requested on top of the recursive-IVAT TSP thread:
          single closed tour.
    The dual-VAT tour is then offered as a TSP suggestion and polished with the LK
    step. We also plot the two-cluster assignment (the "clustering image").
+
+Data: repeatable TSPLIB reference instances (nearest-size EUC_2D via
+``vat_tsp_tsplib.nearest_euc_instance``), not random points.
 
 Run:  python -m experiments.vat_tsp_dualvat_lk
 """
@@ -37,13 +41,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from tribbleclustering import gpu  # noqa: E402
-from experiments.vat_tsp_tsplib import knn_device  # noqa: E402
-from experiments.vat_tsp_recursive import (
-    clustered_instance,
-    lkh_reference,
-)  # noqa: E402
+from experiments.vat_tsp_tsplib import (  # noqa: E402
+    knn_device,
+    nearest_euc_instance,
+    optimal_length,
+)
 from experiments.vat_tsp_reslice import gpu_two_opt  # noqa: E402
-from experiments.vat_tsp_warmstart import nn_order  # noqa: E402
 
 try:
     import elkai  # type: ignore
@@ -202,15 +205,23 @@ def lk_search(tour, coords, knn, max_pass=80):
 # ---------------------------------------------------------------------------
 # 2. Dual-VAT: dual-source Prim partition -> two MST paths -> optimal join
 # ---------------------------------------------------------------------------
-def dual_vat(D):
-    """Dual-source Prim from the two ends of the global-max edge.
+def dual_vat(D, seed_mode="min"):
+    """Dual-source Prim from the two ends of a seed edge.
 
-    Returns (label, aorder1, aorder2, i0, j0): the 2-cluster assignment and, per
-    cluster, the *assignment order* — the single-linkage (Prim) insertion order,
-    i.e. the VAT order of that cluster (a good open path), seed first."""
+    ``seed_mode='min'`` seeds at the endpoints of the smallest non-zero
+    dissimilarity (two nearly-coincident points); ``'max'`` uses the largest
+    dissimilarity (the classic well-separated pair). Returns
+    (label, aorder1, aorder2, i0, j0): the 2-cluster assignment and, per cluster,
+    the *assignment order* — the single-linkage (Prim) insertion order, i.e. the
+    VAT order of that cluster (a good open path), seed first."""
     n = D.shape[0]
-    flat = int(np.argmax(D))
-    i0, j0 = flat // n, flat % n  # the largest-dissimilarity pair (2.1)
+    if seed_mode == "min":
+        Dm = D.astype(np.float64).copy()
+        Dm[Dm <= 0] = np.inf  # ignore the zero diagonal and any duplicate points
+        flat = int(np.argmin(Dm))  # smallest non-zero dissimilarity pair (2.1)
+    else:
+        flat = int(np.argmax(D))  # largest-dissimilarity pair
+    i0, j0 = flat // n, flat % n
 
     INF = np.inf
     label = np.full(n, -1, np.int64)  # 0 -> cluster 1 (seed i0), 1 -> cluster 2 (j0)
@@ -249,10 +260,10 @@ def dual_vat(D):
     )
 
 
-def dual_vat_tour(D):
+def dual_vat_tour(D, seed_mode="min"):
     """Build the dual-VAT tour: the two clusters' VAT paths joined by the optimal
     conjunction (exhaustive over endpoint pairings + orientations)."""
-    label, p1, p2, i0, j0 = dual_vat(D)
+    label, p1, p2, i0, j0 = dual_vat(D, seed_mode=seed_mode)
     # optimal conjunction (2.4): join two open paths into a closed tour. Enumerate
     # the 4 orientations (each path forward/reversed); the two junction edges are
     # (p1 end -> p2 start) and (p2 end -> p1 start). Pick the cheapest.
@@ -269,125 +280,124 @@ def dual_vat_tour(D):
 # ---------------------------------------------------------------------------
 # Run + figure
 # ---------------------------------------------------------------------------
-def run(n=1000, seeds=(1, 2, 3)):
-    print(f"LK step + dual-VAT tour (n={n}, {len(seeds)} seeds)")
-    print("=" * 46)
-    print(f"GPU: {gpu.is_available()}   LKH (elkai): {_HAS_LKH}\n")
+def run(n=1000):
+    name, coords, dim = nearest_euc_instance(n)
+    opt = optimal_length(name)
+    ref = float(opt) if opt else 1.0
+    print(f"Dual-VAT seed study on TSPLIB {name} (dim {dim}, nearest EUC_2D to n={n})")
+    print("=" * 66)
     print(
-        f"  {'seed':>4s} {'|C1|':>5s} {'dualVAT raw':>12s} {'+neighborLK':>12s} "
-        f"{'+full2opt':>10s} {'NN+neighLK':>11s} {'NN+full2opt':>12s}"
+        f"GPU: {gpu.is_available()}   published optimum = {ref:.0f} "
+        "(reference — no LKH)\n"
     )
-    agg = {k: [] for k in ("dv", "dv_lk", "dv_2opt", "nn_lk", "nn_2opt")}
-    plot = None
-    for si, seed in enumerate(seeds):
-        coords = clustered_instance(n, k=12, seed=seed)
-        Dg = gpu.pairwise_distances_device(coords, dtype="float64")
-        D = cp.asnumpy(Dg)
-        knn = knn_device(Dg, 16)
-        ref = lkh_reference(coords) or 1.0
+    Dg = gpu.pairwise_distances_device(coords, dtype="float64")
+    D = cp.asnumpy(Dg)
+    knn = knn_device(Dg, 16)
 
-        def pct(t):
-            return 100.0 * (tour_len(np.ascontiguousarray(t), coords) - ref) / ref
+    def pct(t):
+        return 100.0 * (tour_len(np.ascontiguousarray(t), coords) - ref) / ref
 
-        dv_tour, label, i0, j0 = dual_vat_tour(D)
+    # time-to-near-optimal: how fast dual-VAT + polish reaches the published opt
+    print(
+        f"  {'seed edge':>10s} {'|C1|':>5s} {'|C2|':>5s} {'raw':>7s} "
+        f"{'+neighLK':>9s} {'t_LK':>7s} {'+full2opt':>10s} {'t_2opt':>8s}"
+    )
+    out = {}
+    for mode in ("min", "max"):
+        t0 = time.perf_counter()
+        dv_tour, label, i0, j0 = dual_vat_tour(D, seed_mode=mode)
+        t_build = time.perf_counter() - t0
+        t0 = time.perf_counter()
         dv_lk = lk_search(dv_tour.copy(), coords, knn)
+        t_lk = time.perf_counter() - t0
+        t0 = time.perf_counter()
         dv_2opt, _ = gpu_two_opt(dv_tour.copy(), Dg)
-        nn = np.ascontiguousarray(nn_order(D, i0)).astype(np.int64)
-        nn_lk = lk_search(nn.copy(), coords, knn)
-        nn_2opt, _ = gpu_two_opt(nn.copy(), Dg)
-        vals = dict(
-            dv=pct(dv_tour),
-            dv_lk=pct(dv_lk),
-            dv_2opt=pct(dv_2opt),
-            nn_lk=pct(nn_lk),
-            nn_2opt=pct(nn_2opt),
+        t_2opt = time.perf_counter() - t0
+        out[mode] = dict(
+            label=label,
+            i0=i0,
+            j0=j0,
+            tour=dv_tour,
+            tour2=dv_2opt,
+            raw=pct(dv_tour),
+            lk=pct(dv_lk),
+            opt=pct(dv_2opt),
+            c1=int((label == 0).sum()),
+            c2=int((label == 1).sum()),
+            t_lk=t_build + t_lk,
+            t_2opt=t_build + t_2opt,
         )
-        for k in agg:
-            agg[k].append(vals[k])
+        r = out[mode]
+        lbl = "min-nonzero" if mode == "min" else "max"
         print(
-            f"  {seed:4d} {int((label==0).sum()):5d} {vals['dv']:11.0f}% "
-            f"{vals['dv_lk']:11.1f}% {vals['dv_2opt']:9.1f}% {vals['nn_lk']:10.1f}% "
-            f"{vals['nn_2opt']:11.1f}%"
+            f"  {lbl:>10s} {r['c1']:5d} {r['c2']:5d} {r['raw']:6.0f}% "
+            f"{r['lk']:8.1f}% {r['t_lk']:6.2f}s {r['opt']:9.1f}% {r['t_2opt']:7.2f}s"
         )
-        if si == 0:
-            plot = dict(
-                coords=coords,
-                label=label,
-                i0=i0,
-                j0=j0,
-                dv_tour=dv_tour,
-                dv_2opt=dv_2opt,
-                p=vals,
-            )
-        del Dg
-        cp.get_default_memory_pool().free_all_blocks()
-    print("\n  mean over seeds:")
-    for k, name in [
-        ("dv", "dual-VAT raw"),
-        ("dv_lk", "dual-VAT + neighbour-LK"),
-        ("dv_2opt", "dual-VAT + full 2-opt"),
-        ("nn_lk", "NN + neighbour-LK"),
-        ("nn_2opt", "NN + full 2-opt"),
-    ]:
-        print(f"    {name:26s} {np.mean(agg[k]):+6.1f}% over LKH")
-    plot["mean"] = {k: float(np.mean(agg[k])) for k in agg}
-    return plot
+    out["coords"] = coords
+    out["name"] = name
+    out["ref"] = ref
+    return out
+
+
+def _plot_clustering(ax, coords, r, title):
+    c1 = coords[r["label"] == 0]
+    c2 = coords[r["label"] == 1]
+    ax.plot(c1[:, 0], c1[:, 1], ".", color="tab:blue", ms=3, label="cluster 1")
+    ax.plot(c2[:, 0], c2[:, 1], ".", color="tab:red", ms=3, label="cluster 2")
+    ax.plot(*coords[r["i0"]], "*", color="navy", ms=15)
+    ax.plot(*coords[r["j0"]], "*", color="darkred", ms=15)
+    ax.plot(
+        [coords[r["i0"], 0], coords[r["j0"], 0]],
+        [coords[r["i0"], 1], coords[r["j0"], 1]],
+        "k--",
+        lw=0.8,
+    )
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(title, fontsize=10)
+    ax.legend(fontsize=7, loc="best")
 
 
 def figure(res):
-    coords, label = res["coords"], res["label"]
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5.2))
-
-    # A: the dual-VAT clustering image (two-source partition)
-    ax = axes[0]
-    c1 = coords[label == 0]
-    c2 = coords[label == 1]
-    ax.plot(c1[:, 0], c1[:, 1], ".", color="tab:blue", ms=3, label="cluster 1 (pq-1)")
-    ax.plot(c2[:, 0], c2[:, 1], ".", color="tab:red", ms=3, label="cluster 2 (pq-2)")
-    ax.plot(*coords[res["i0"]], "*", color="navy", ms=16, label="seed i0")
-    ax.plot(*coords[res["j0"]], "*", color="darkred", ms=16, label="seed j0")
-    ax.plot(
-        [coords[res["i0"], 0], coords[res["j0"], 0]],
-        [coords[res["i0"], 1], coords[res["j0"], 1]],
-        "k--",
-        lw=0.8,
-        label="max-dissim edge",
+    coords = res["coords"]
+    fig, axes = plt.subplots(2, 2, figsize=(11, 11))
+    _plot_clustering(
+        axes[0, 0],
+        coords,
+        res["min"],
+        f"A. dual-VAT clustering, MIN-nonzero seed\n(seeds nearly coincident, "
+        f"|C1|={res['min']['c1']} |C2|={res['min']['c2']})",
     )
-    ax.set_aspect("equal")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_title("A. dual-VAT clustering (dual-source Prim)")
-    ax.legend(fontsize=7, loc="upper right")
+    _plot_clustering(
+        axes[0, 1],
+        coords,
+        res["max"],
+        f"B. dual-VAT clustering, MAX seed\n(seeds far apart, "
+        f"|C1|={res['max']['c1']} |C2|={res['max']['c2']})",
+    )
 
-    # B: the dual-VAT raw tour (two MST paths + optimal join)
-    ax = axes[1]
-    t = np.append(res["dv_tour"], res["dv_tour"][0])
-    ax.plot(coords[t, 0], coords[t, 1], "-", color="0.5", lw=0.6)
-    ax.plot(coords[:, 0], coords[:, 1], ".", color="k", ms=1.5)
-    ax.set_aspect("equal")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_title(f"B. dual-VAT raw tour {res['p']['dv']:+.0f}% over LKH")
-
-    # C: after the full 2-opt polish
-    ax = axes[2]
-    t = np.append(res["dv_2opt"], res["dv_2opt"][0])
-    ax.plot(coords[t, 0], coords[t, 1], "-", color="tab:green", lw=0.6)
-    ax.plot(coords[:, 0], coords[:, 1], ".", color="k", ms=1.5)
-    ax.set_aspect("equal")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_title(f"C. dual-VAT + full 2-opt {res['p']['dv_2opt']:+.1f}% over LKH")
+    for ax, mode, ttl in (
+        (axes[1, 0], "min", "C. MIN-seed dual-VAT + full 2-opt"),
+        (axes[1, 1], "max", "D. MAX-seed dual-VAT + full 2-opt"),
+    ):
+        t = np.append(res[mode]["tour2"], res[mode]["tour2"][0])
+        ax.plot(coords[t, 0], coords[t, 1], "-", color="tab:green", lw=0.5)
+        ax.plot(coords[:, 0], coords[:, 1], ".", color="k", ms=1.2)
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(f"{ttl} {res[mode]['opt']:+.1f}% over optimum", fontsize=10)
 
     fig.suptitle(
-        "Dual-VAT construction (two-source Prim partition -> two MST paths -> "
-        "optimal join), n=1000; polished to near-LKH",
+        f"Dual-VAT seed comparison on TSPLIB {res['name']}: minimal-non-zero-edge "
+        f"vs maximal-edge seeding",
         fontsize=12,
     )
     fig.tight_layout()
     FIG_DIR.mkdir(exist_ok=True)
-    path = FIG_DIR / "vat_tsp_dualvat_lk.png"
-    fig.savefig(path, dpi=120)
+    path = FIG_DIR / "vat_tsp_dualvat_seed.png"
+    fig.savefig(path, dpi=110)
     plt.close(fig)
     return path
 
