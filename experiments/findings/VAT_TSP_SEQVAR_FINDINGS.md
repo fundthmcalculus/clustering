@@ -60,6 +60,12 @@ kroA200 detail: median per-city index spread across starts = **150 of 200**.
    smoothly as tau sweeps 0.2→0.8 (panel c); tau = 0.5 is a safe middle. Coverage
    is also nearly n-independent (panel a).
 
+> **Follow-up caveat (see `VAT_TSP_2OPT_BENCH_FINDINGS.md`).** Using the seams as
+> a **hard** restriction on 2-opt (freeze the runs, only seam cities initiate) is a
+> *net loss* at scale — full 2-opt is both faster end-to-end and far better,
+> because the naive closed VAT tour needs global repair the restriction forbids.
+> The consensus is valuable as a **soft prior** (below), not a hard freeze.
+
 ## The hot-start prior (hand-off to ACO/GA)
 
 The co-adjacency matrix `C` is saved to
