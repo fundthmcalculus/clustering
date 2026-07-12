@@ -206,7 +206,8 @@ def lk_search(tour, coords, knn, max_pass=80):
 # 2. Dual-VAT: dual-source Prim partition -> two MST paths -> optimal join
 # ---------------------------------------------------------------------------
 def _mst_edges(D):
-    """Single-linkage (Prim) MST edges as (weight, u, v)."""
+    """Single-linkage (Prim) MST edges as (weight, parent, child), in add order
+    (parent always precedes child)."""
     n = D.shape[0]
     in_tree = np.zeros(n, bool)
     in_tree[0] = True
@@ -221,6 +222,36 @@ def _mst_edges(D):
         d[upd] = D[j][upd]
         par[upd] = j
     return edges
+
+
+def _knn_sum(D, k=10):
+    """Sum of each point's k smallest distances — small = dense neighbourhood."""
+    part = np.partition(D, k + 1, axis=1)[:, : k + 1]
+    return np.sort(part, axis=1)[:, 1 : k + 1].sum(axis=1)
+
+
+def _balanced_mst_cut(D):
+    """Endpoints of the MST edge whose removal best balances the two subtrees,
+    weighted by edge length (balanced *and* at a sparse boundary)."""
+    n = D.shape[0]
+    edges = _mst_edges(D)
+    parent = np.full(n, -1, np.int64)
+    weight = np.zeros(n)
+    add_order = []
+    for w, p, c in edges:
+        parent[c] = p
+        weight[c] = w
+        add_order.append(c)
+    size = np.ones(n, np.int64)
+    for c in reversed(add_order):  # child before parent -> sizes complete on use
+        size[parent[c]] += size[c]
+    best, bc = -1.0, add_order[0]
+    for c in add_order:
+        bal = min(size[c], n - size[c])  # balance of the split at edge (parent,c)
+        score = bal * weight[c]  # favour balanced AND long (sparse) cuts
+        if score > best:
+            best, bc = score, c
+    return int(parent[bc]), int(bc)
 
 
 def choose_seeds(D, coords, mode, seed=0):
@@ -253,6 +284,19 @@ def choose_seeds(D, coords, mode, seed=0):
         np.fill_diagonal(A, np.inf)
         flat = int(np.argmin(A))
         return flat // n, flat % n
+    if mode == "dpeak_far":
+        # densest point + the point farthest from it (literal density-peak seed)
+        dens = _knn_sum(D)
+        i0 = int(np.argmin(dens))
+        return i0, int(np.argmax(D[i0]))
+    if mode == "two_dpeaks":
+        # densest point + the densest point in a well-separated region
+        dens = _knn_sum(D)
+        i0 = int(np.argmin(dens))
+        score = D[i0] / (dens + 1e-9)  # far from i0 AND dense (small dens)
+        return i0, int(np.argmax(score))
+    if mode == "balanced_mst":
+        return _balanced_mst_cut(D)
     if mode == "mst_gap":
         w, u, v = max(_mst_edges(D), key=lambda e: e[0])
         return u, v
@@ -352,7 +396,17 @@ def run(n=1000):
         return 100.0 * (tour_len(np.ascontiguousarray(t), coords) - ref) / ref
 
     # time-to-near-optimal: how fast dual-VAT + polish reaches the published opt
-    modes = ("min", "max", "mean", "mst_gap", "pca", "random")
+    modes = (
+        "min",
+        "max",
+        "mean",
+        "mst_gap",
+        "pca",
+        "random",
+        "dpeak_far",
+        "two_dpeaks",
+        "balanced_mst",
+    )
     labels = {
         "min": "min-nonzero",
         "max": "max-edge",
@@ -360,6 +414,9 @@ def run(n=1000):
         "mst_gap": "MST-gap",
         "pca": "PCA-axis",
         "random": "random",
+        "dpeak_far": "dpeak+far",
+        "two_dpeaks": "two-dpeaks",
+        "balanced_mst": "balanced-MST",
     }
     print(
         f"  {'init':>11s} {'|C1|':>5s} {'|C2|':>5s} {'raw':>7s} "

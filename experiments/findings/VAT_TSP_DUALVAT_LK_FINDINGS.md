@@ -11,30 +11,39 @@ repeatable TSPLIB instance nearest n=1000 (**pr1002**, dim 1002;
 submodule's `solutions` file (`optimal_length`) — no LKH; we care about *time to
 near-optimal*.
 
-| init | \|C1\| | \|C2\| | raw | + neighbour-LK (time) | + full 2-opt (time) |
-|------|------|------|------|-----------------------|---------------------|
-| min-non-zero edge | 74 | 928 | +92% | +6.3% (0.46 s) | +7.8% (0.06 s) |
-| max edge | 6 | 996 | +102% | +7.3% (0.01 s) | +7.1% (0.03 s) |
-| **mean-distance pair** | 1000 | 2 | +96% | +8.6% (0.02 s) | +7.5% (0.04 s) |
-| longest-MST-edge | 6 | 996 | +94% | +7.7% (0.02 s) | +7.9% (0.03 s) |
-| PCA principal axis | 6 | 996 | +102% | **+5.9%** (0.01 s) | +7.1% (0.03 s) |
-| random pair | 332 | 670 | +102% | +6.6% (0.01 s) | +7.1% (0.03 s) |
+Two families of initialisation. **Edge-distance rules** (min/max/mean edge,
+MST-gap) pick a *pair by their distance*; **placement rules** put the two seeds
+in *different dense regions*.
 
-- **Initialisation barely affects the final tour.** After polishing, every seed
-  lands within a tight **+5.9% to +8.6% over the optimum** (bar chart nearly
-  flat) — the dual-VAT construction + local search converges to the same quality
-  regardless of where the two fronts start. Best: PCA-axis (+5.9%) and
-  min-non-zero (+6.3%) with the neighbour-LK. All in **under half a second**.
-- **The 2-way partition is degenerate on a connected cloud — balance is set by
-  seed *centrality*, not seed *separation*.** The mean-distance pair was tried to
-  keep the two fronts from meeting too soon; instead it gave the **most**
-  lopsided split (**1000/2**) — whichever seed sits nearer the dense bulk sweeps
-  it (winner-take-most), so a mid-range separation doesn't help. Most seeds give
-  a tiny pocket + "the rest" (6/996 for max/MST-gap/PCA, 74/928 for min, 1000/2
-  for mean); only the **random** pair happened to drop one seed in each half →
-  a balanced 332/670. Partition balance is a property of the *data + seed
-  placement*, not something these seed rules guarantee (on well-separated blobs
-  the split is clean — see below).
+| init | family | \|C1\| | \|C2\| | + neighbour-LK | + full 2-opt |
+|------|--------|------|------|----------------|--------------|
+| min-non-zero edge | edge | 74 | 928 | +6.3% | +7.8% |
+| max edge | edge | 6 | 996 | +7.3% | +7.1% |
+| mean-distance pair | edge | 1000 | 2 | +8.6% | +7.5% |
+| longest-MST-edge | edge | 6 | 996 | +7.7% | +7.9% |
+| PCA principal axis | placement | 6 | 996 | **+5.9%** | +7.1% |
+| random pair | baseline | 332 | 670 | +6.6% | +7.1% |
+| density-peak + farthest | placement | 670 | 332 | +7.7% | +7.6% |
+| two density peaks | placement | 670 | 332 | **+5.7%** | +7.5% |
+| balanced-MST cut | placement | 338 | 664 | +8.5% | +8.6% |
+
+(all built + polished in **under half a second**; reference = published optimum.)
+
+- **Balance comes from seed *placement*, not seed *distance*.** Every
+  edge-distance rule gave a degenerate split on this connected cloud — a tiny
+  pocket + "the rest" (6/996; 74/928; and mean-distance the *worst* at 1000/2).
+  Balance is governed by which seed sits nearer the dense bulk (winner-take-most),
+  so a mid-range gap does **not** delay the merge. The **placement** rules —
+  seeding two different dense regions (density-peak + farthest, two density
+  peaks) or cutting the MST for balance — give clean, spatially-coherent **~2:1
+  bipartitions (670/332, 338/664)**: a left/right or vertical split of pr1002.
+  (`two_dpeaks` and `dpeak_far` even land the seeds in opposite halves.)
+- **…but the final tour is unaffected.** Every initialisation — balanced or
+  degenerate — polishes to a tight **+5.7% to +8.6% over the optimum**. Best:
+  two-density-peaks (+5.7%) and PCA (+5.9%) with the neighbour-LK. So seed choice
+  matters for the **clustering interpretation** (use a placement rule for a
+  meaningful balanced 2-way split) but is a wash for **tour quality** — the
+  construction + local search converge regardless.
 - **The neighbour-list LK works well on this real instance** (~6-8%), unlike on
   the blob tours below (+22%): pr1002's fairly uniform layout has few long "jump"
   edges, so the neighbour-list moves suffice. Repeatable reference data gives the
