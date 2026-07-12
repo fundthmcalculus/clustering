@@ -40,6 +40,12 @@ dev = [
 gpu = [
     "cupy-cuda12x>=13.0",
 ]
+# Optional deps for the TSP research experiments only (experiments/vat_tsp*.py).
+# elkai provides the Lin-Kernighan-Helsgaun (LKH) baseline; the experiments guard
+# the import and fall back to "best of our methods" if it is absent.
+experiments = [
+    "elkai>=2.0",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/fundthmcalculus/clustering"
