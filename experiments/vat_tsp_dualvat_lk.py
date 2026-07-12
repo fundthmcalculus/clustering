@@ -210,6 +210,117 @@ def lk_search(tour, coords, knn, ceil=False, max_pass=80):
 
 
 # ---------------------------------------------------------------------------
+# 1b. Variable-depth Lin-Kernighan (sequential reverse-suffix gain chain)
+# ---------------------------------------------------------------------------
+@njit(cache=True)
+def _reverse_suffix(w, pos, j):
+    """Reverse w[j+1 .. n-1] and keep pos in sync (a 2-opt on the closed tour:
+    removes edges (w[j],w[j+1]) & (w[n-1],w[0]), adds (w[j],w[n-1]) & (w[j+1],w[0]))."""
+    n = w.shape[0]
+    lo, hi = j + 1, n - 1
+    while lo < hi:
+        a, b = w[lo], w[hi]
+        w[lo], w[hi] = b, a
+        pos[a], pos[b] = hi, lo
+        lo += 1
+        hi -= 1
+
+
+@njit(cache=True)
+def _lk_city(w, pos, coords, knn, ceil, max_depth, orig, cuts):
+    """One variable-depth LK move anchored at w[0]. Builds a chain of reverse
+    -suffix 2-opt steps (each adds edge (free-end -> a near neighbour) with
+    positive step gain), tracking the exact cumulative length change, then keeps
+    the prefix of the chain with the best improvement. Returns True if applied."""
+    n = w.shape[0]
+    K = knn.shape[1]
+    for i in range(n):
+        orig[i] = w[i]
+    ncut = 0
+    cumdelta = 0.0
+    best_improve = 0.0
+    best_level = 0
+    gain = 0.0  # cumulative LK gain (sum of broken-edge - added-y-edge)
+    for _level in range(max_depth):
+        last = w[n - 1]
+        anchor = w[0]
+        close = _d(coords, last, anchor, ceil)  # edge being broken this step
+        chosen_j = -1
+        add_c = 0.0
+        for tt in range(K):
+            c = knn[last, tt]
+            j = pos[c]
+            if j <= 0 or j >= n - 2:  # exclude anchor, the free end, and its neighbour
+                continue
+            add = _d(coords, last, c, ceil)
+            # LK criterion: cumulative gain must stay positive (allows a step that
+            # is not individually improving to set up a larger gain later).
+            if gain + close - add <= 1e-9:  # neighbours sorted asc -> can break
+                break
+            chosen_j = j
+            add_c = add
+            break
+        if chosen_j < 0:
+            break
+        j = chosen_j
+        gain += close - add_c
+        wj, wj1, wl, w0 = w[j], w[j + 1], w[n - 1], w[0]
+        delta = (_d(coords, wj, wl, ceil) + _d(coords, wj1, w0, ceil)) - (
+            _d(coords, wj, wj1, ceil) + _d(coords, wl, w0, ceil)
+        )
+        _reverse_suffix(w, pos, j)
+        cuts[ncut] = j
+        ncut += 1
+        cumdelta += delta
+        if -cumdelta > best_improve:
+            best_improve = -cumdelta
+            best_level = ncut
+    if best_improve > 1e-7:  # rebuild the best-improving prefix from the snapshot
+        for i in range(n):
+            w[i] = orig[i]
+            pos[orig[i]] = i
+        for lvl in range(best_level):
+            _reverse_suffix(w, pos, cuts[lvl])
+        return True
+    for i in range(n):  # no improvement -> restore
+        w[i] = orig[i]
+        pos[orig[i]] = i
+    return False
+
+
+@njit(cache=True)
+def lk_search_vd(tour, coords, knn, ceil=False, max_depth=6, max_pass=40):
+    """Variable-depth Lin-Kernighan local search. Each city is anchored in turn
+    (rotated to index 0 — a closed tour is rotation-invariant) and a sequential
+    reverse-suffix gain chain of depth up to ``max_depth`` is explored, keeping
+    the best-improving prefix. Distances are TSPLIB nint (or ceil). O(n * depth)
+    per city per pass."""
+    n = tour.shape[0]
+    w = tour.copy()
+    pos = np.empty(n, np.int64)
+    for i in range(n):
+        pos[w[i]] = i
+    orig = np.empty(n, np.int64)
+    buf = np.empty(n, np.int64)
+    cuts = np.empty(max_depth, np.int64)
+    for _ in range(max_pass):
+        improved = False
+        for c1 in range(n):
+            p1 = pos[c1]
+            if p1 != 0:  # rotate so c1 is at index 0
+                for i in range(n):
+                    buf[i] = w[(p1 + i) % n]
+                for i in range(n):
+                    w[i] = buf[i]
+                    pos[buf[i]] = i
+            if _lk_city(w, pos, coords, knn, ceil, max_depth, orig, cuts):
+                improved = True
+        if not improved:
+            break
+    return w
+
+
+# ---------------------------------------------------------------------------
 # 2. Dual-VAT: dual-source Prim partition -> two MST paths -> optimal join
 # ---------------------------------------------------------------------------
 def _mst_edges(D):
