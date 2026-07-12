@@ -31,10 +31,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 from tribbleclustering import gpu  # noqa: E402
 from experiments.vat_tsp_tsplib import (  # noqa: E402
     knn_device,
-    nearest_euc_instance,
+    nearest_coord_instance,
     optimal_length,
 )
-from experiments.vat_tsp_dualvat_lk import dual_vat_tour, lk_search, tour_len  # noqa
+from experiments.vat_tsp_dualvat_lk import (  # noqa: E402
+    dual_vat_tour_device,
+    lk_search,
+    tour_len,
+)
 
 if gpu.is_available():
     import cupy as cp
@@ -43,42 +47,45 @@ FIG_DIR = Path(__file__).parent / "figures"
 
 
 def run(targets=(50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)):
-    print("Dual-VAT + LK performance report (fp32, reference = published optimum)")
-    print("=" * 72)
+    print("Dual-VAT (GPU build) + LK performance report (fp32, ref = optimum)")
+    print("=" * 74)
     print(f"GPU: {gpu.is_available()}\n")
-    # resolve each target to its nearest EUC_2D instance, de-duplicated
+    # resolve each target to its nearest coordinate instance, de-duplicated
     seen = {}
     for tgt in targets:
-        name, coords, dim = nearest_euc_instance(tgt)
-        seen.setdefault(name, (coords, dim))
+        name, coords, dim, ewt = nearest_coord_instance(tgt)
+        seen.setdefault(name, (coords, dim, ewt))
     instances = sorted(seen.items(), key=lambda kv: kv[1][1])  # by dimension
 
     print(
-        f"  {'instance':>10s} {'n':>6s} {'opt':>10s} {'raw %':>8s} "
+        f"  {'instance':>10s} {'n':>6s} {'ewt':>7s} {'opt':>11s} {'raw %':>7s} "
         f"{'final %':>8s} {'build s':>8s} {'polish s':>9s} {'total s':>8s}"
     )
     rows = []
-    for name, (coords, dim) in instances:
+    for name, (coords, dim, ewt) in instances:
         opt = optimal_length(name)
         ref = float(opt) if opt else 1.0
+        ceil = ewt == "CEIL_2D"
         Dg = gpu.pairwise_distances_device(coords, dtype="float32")
         knn = knn_device(Dg, 10)
-        D = cp.asnumpy(Dg)  # fp32 host matrix for the dual-VAT growth
 
+        cp.cuda.Stream.null.synchronize()
         t0 = time.perf_counter()
-        raw, _label, _i, _j = dual_vat_tour(D, coords, seed_mode="min")
+        raw, _label, _i, _j = dual_vat_tour_device(Dg, seed_mode="min")
+        cp.cuda.Stream.null.synchronize()
         t_build = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        final = lk_search(raw.copy(), coords, knn)
+        final = lk_search(raw.copy(), coords, knn, ceil)
         t_polish = time.perf_counter() - t0
 
-        raw_pct = 100.0 * (tour_len(raw, coords) - ref) / ref
-        fin_pct = 100.0 * (tour_len(final, coords) - ref) / ref
+        raw_pct = 100.0 * (tour_len(raw, coords, ceil) - ref) / ref
+        fin_pct = 100.0 * (tour_len(final, coords, ceil) - ref) / ref
         rows.append(
             dict(
                 name=name,
                 n=dim,
+                ewt=ewt,
                 raw=raw_pct,
                 final=fin_pct,
                 t_build=t_build,
@@ -87,8 +94,9 @@ def run(targets=(50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)):
             )
         )
         print(
-            f"  {name:>10s} {dim:6d} {ref:10.0f} {raw_pct:7.0f}% {fin_pct:7.1f}% "
-            f"{t_build:8.2f} {t_polish:9.2f} {t_build + t_polish:8.2f}"
+            f"  {name:>10s} {dim:6d} {ewt:>7s} {ref:11.0f} {raw_pct:6.0f}% "
+            f"{fin_pct:7.1f}% {t_build:8.2f} {t_polish:9.2f} "
+            f"{t_build + t_polish:8.2f}"
         )
         del Dg
         cp.get_default_memory_pool().free_all_blocks()
@@ -143,8 +151,8 @@ def figure(rows):
     ax2.legend(fontsize=8)
 
     fig.suptitle(
-        "Dual-VAT + LK TSP performance on TSPLIB (EUC_2D, fp32): quality & time, "
-        "n = 51 → 18512",
+        "Dual-VAT (GPU build) + LK TSP performance on TSPLIB (fp32): quality & "
+        f"time, n = {min(ns)} → {max(ns)}",
         fontsize=12,
     )
     fig.tight_layout()

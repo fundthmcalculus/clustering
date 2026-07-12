@@ -120,15 +120,19 @@ def optimal_length(name):
     Use this as the reference instead of running LKH — instant and exact."""
     global _SOLUTIONS
     if _SOLUTIONS is None:
+        import re
+
         _SOLUTIONS = {}
         sol = TSPLIB / "solutions"
         if sol.exists():
             for line in open(sol, errors="ignore"):
                 if ":" in line:
                     nm, val = line.split(":", 1)
-                    digits = "".join(ch for ch in val if ch.isdigit())
-                    if digits:
-                        _SOLUTIONS[nm.strip()] = int(digits)
+                    m = re.search(
+                        r"\d+", val
+                    )  # first integer only (ignore "(CEIL_2D)")
+                    if m:
+                        _SOLUTIONS[nm.strip()] = int(m.group())
     return _SOLUTIONS.get(name)
 
 
@@ -162,6 +166,38 @@ def nearest_euc_instance(n):
     name = min(inst, key=lambda k: (abs(inst[k] - n), inst[k]))
     coords, _ = parse_tsplib(name)
     return name, coords, inst[name]
+
+
+def list_coord_instances():
+    """{name: (dim, ewt)} for EUC_2D and CEIL_2D instances (coordinate + a plain
+    rounding rule). CEIL_2D reaches the large end (pla33810/pla85900) that EUC_2D
+    lacks."""
+    import re
+
+    out = {}
+    for path in sorted(TSPLIB.glob("*.tsp")):
+        dim = ewt = None
+        with open(path, errors="ignore") as fh:
+            for line in fh:
+                u = line.upper()
+                if u.startswith("DIMENSION"):
+                    dim = int(re.findall(r"\d+", line)[-1])
+                elif u.startswith("EDGE_WEIGHT_TYPE"):
+                    ewt = line.split(":")[-1].strip()
+                elif "SECTION" in u:
+                    break
+        if ewt in ("EUC_2D", "CEIL_2D") and dim:
+            out[path.stem] = (dim, ewt)
+    return out
+
+
+def nearest_coord_instance(n):
+    """Nearest-size EUC_2D-or-CEIL_2D instance to n. Returns (name, coords, dim,
+    ewt). Prefer EUC_2D on ties; CEIL_2D (pla*) covers the 34k-86k range."""
+    inst = list_coord_instances()
+    name = min(inst, key=lambda k: (abs(inst[k][0] - n), inst[k][1] != "EUC_2D"))
+    coords, ewt = parse_tsplib(name)
+    return name, coords, inst[name][0], ewt
 
 
 def _round_fn(ewt):

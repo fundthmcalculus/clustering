@@ -1,63 +1,73 @@
 # Dual-VAT + LK TSP — performance report (quality & time, fp32)
 
 Sweep 50 → 50000 target cities on the GB10, **fp32**, distances resident on the
-device. Method: **dual-VAT construction (min-non-zero seed) → neighbour-list LK
-polish** (2-opt + Or-opt, candidates from the resident-matrix kNN). Reference =
-the **published TSPLIB optimum** (from the submodule `solutions` file — no LKH).
-Repeatable data: each target resolves to its nearest-size **EUC_2D** instance.
-Source: `experiments/vat_tsp_perf_report.py`.
-
-> The largest EUC_2D instance is **d18512** (18,512 cities), so the 20000 and
-> 50000 targets both resolve to it — euclidean TSPLIB has nothing near 50k, so
-> the euclidean sweep tops out at ~18.5k.
+device. Method: **GPU dual-VAT build (dual-source Prim on the resident matrix) →
+neighbour-list LK polish** (2-opt + Or-opt, candidates from the resident-matrix
+kNN). Reference = the **published TSPLIB optimum** (`solutions` file — no LKH).
+Each target resolves to its nearest-size coordinate instance (EUC_2D, plus
+CEIL_2D `pla*` for the large end). Source: `experiments/vat_tsp_perf_report.py`.
 
 ## Results
 
-| instance | n | optimum | raw % | **final %** | build s | polish s | **total s** |
-|----------|------|---------|-------|-------------|---------|----------|-------------|
-| eil51 | 51 | 426 | +84% | +7.5% | 0.00 | 0.06\* | 0.06 |
-| kroA100 | 100 | 21 282 | +59% | **+2.0%** | 0.00 | 0.00 | 0.00 |
-| kroA200 | 200 | 29 368 | +75% | +5.7% | 0.00 | 0.00 | 0.00 |
-| d493 | 493 | 35 002 | +107% | +6.0% | 0.00 | 0.00 | 0.00 |
-| pr1002 | 1 002 | 259 045 | +92% | +7.0% | 0.02 | 0.00 | 0.02 |
-| d2103 | 2 103 | 80 450 | +71% | +13.3% | 0.06 | 0.01 | 0.07 |
-| fnl4461 | 4 461 | 182 566 | +240% | +4.9% | 0.26 | 0.07 | 0.33 |
-| rl11849 | 11 849 | 923 288 | +231% | +20.0% | 1.73 | 0.29 | 2.02 |
-| d18512 | 18 512 | 645 238 | +462% | +13.1% | 4.07 | 1.02 | **5.09** |
+| instance | n | ewt | optimum | raw % | **final %** | build s | polish s | **total s** |
+|----------|------|------|---------|-------|-------------|---------|----------|-------------|
+| eil51 | 51 | EUC | 426 | +84% | +7.5% | 0.03 | 0.06\* | 0.09 |
+| kroA100 | 100 | EUC | 21 282 | +59% | **+2.0%** | 0.01 | 0.00 | 0.01 |
+| kroA200 | 200 | EUC | 29 368 | +75% | +5.7% | 0.02 | 0.00 | 0.02 |
+| d493 | 493 | EUC | 35 002 | +107% | +6.0% | 0.06 | 0.00 | 0.06 |
+| dsj1000 | 1 000 | CEIL | 18 660 188 | +148% | +10.4% | 0.14 | 0.00 | 0.14 |
+| d2103 | 2 103 | EUC | 80 450 | +71% | +13.3% | 0.30 | 0.01 | 0.30 |
+| fnl4461 | 4 461 | EUC | 182 566 | +240% | +4.9% | 0.63 | 0.07 | 0.70 |
+| rl11849 | 11 849 | EUC | 923 288 | +231% | +20.0% | 1.69 | 0.30 | 1.99 |
+| d18512 | 18 512 | EUC | 645 238 | +462% | +13.1% | 2.65 | 1.03 | 3.68 |
+| **pla33810** | **33 810** | CEIL | 66 048 945 | +244% | +27.4% | 5.06 | 1.78 | **6.84** |
 
 \* first call includes numba JIT compilation (one-time).
 
 ![report](../figures/vat_tsp_perf_report.png)
 
+## GPU dual-VAT build (the change)
+
+The dual-source Prim growth now runs on the device (cupy over the resident fp32
+matrix): `best0/best1` (each vertex's distance to the two fronts) and the labels
+stay on the GPU, every round is min / argmin / masked-relax, and only the winning
+index crosses to the host per round. Effects:
+
+- **Removes the host O(n²) wall.** The earlier host build was 4.07 s at n=18 512
+  (plus a full n×n host copy); the GPU build is **2.65 s** there (~1.5×) and needs
+  no host matrix. This is what lets the sweep **reach n = 33 810 (pla33810)** —
+  the nearest coordinate instance to the 50k target — in **6.84 s total**.
+- Below ~15k the GPU build is not faster than host (per-round sync + kernel
+  launch overhead dominates), but those sizes are already sub-second.
+- (Verified: the GPU build's partition is identical to the host build for the
+  same seeds; a subtle view-aliasing bug — `Dg[i0]` is a view, so the front
+  arrays must be copied before mutation — was fixed.)
+
 ## Quality
 
-- The LK polish takes the raw dual-VAT tour (**+59% … +462%** over optimum) down
-  to **+2.0% … +20.0%** — a fast approximate solver, not an LKH-close one.
-- Quality is **instance-dependent, not monotone in n**: structured instances
-  polish well (kroA100 +2.0%, fnl4461 +4.9%), while hard near-uniform ones are
-  worse (d2103 +13.3%, rl11849 +20.0%, d18512 +13.1%). This tracks the
-  neighbour-list LK's known weakness on tours with long "jump" edges — the
-  quality ceiling here is the **local search**, not the construction.
+- The LK polish takes the raw dual-VAT tour (+59 … +462% over optimum) to **+2.0
+  … +27.4%** — a fast approximate solver.
+- **Instance-dependent, not monotone in n**: structured instances polish well
+  (kroA100 +2.0%, fnl4461 +4.9%), hard near-uniform / VLSI ones worse (rl11849
+  +20%, pla33810 +27.4%). The **neighbour-list LK is the quality ceiling**, not
+  the construction — its fixed candidate list can't repair the long "jump" edges
+  on hard tours.
 
 ## Time (fp32, GB10)
 
-- **Total ≤ 5.1 s to n = 18 512**; sub-second through n ≈ 5000.
-- Dominated by the **dual-VAT build**, an O(n²) host single-linkage growth
-  (4.07 s at 18.5k). The **LK polish** is cheaper and scales ~O(n·k) (kNN on the
-  resident fp32 matrix + neighbour-list moves): ≤ 1.02 s at 18.5k.
-- fp32 halves the resident matrix and the host copy vs f64 at no measured quality
-  cost on these instances.
+- **Total ≤ 6.84 s to n = 33 810**; sub-second through n ≈ 5000.
+- Both stages scale ~O(n²) here (the build's dual-Prim rounds and the polish's
+  kNN + 2-opt); build dominates. fp32 halves the resident matrix vs f64 at no
+  measured quality cost.
 
-## Limits / levers
+## Limits / levers remaining
 
-- **Reaching true 50k** needs either a CEIL_2D `pla*` instance (34k–86k) or,
-  better, a **GPU dual-VAT build** — the host O(n²) single-linkage growth is the
-  wall-clock bottleneck; the sequential dual-Prim can run on the resident matrix
-  with cupy to push past ~18k.
-- **Beating ~5-20%** needs a stronger scalable local search — a true
-  variable-depth sequential LK move (gain chain beyond the fixed neighbour list),
-  which is the outstanding lever from the LK-step study.
+- **Beyond ~34k**: pla85900 (86k) is the only larger coordinate instance; the
+  build handles it but the Or-opt array-splice in the polish is O(n) per move and
+  gets slow — a linked-list Or-opt would fix that.
+- **Beating ~5-27%**: a true variable-depth sequential LK (gain chain beyond the
+  fixed neighbour list) is the outstanding quality lever.
 
 ## Files
-- `experiments/vat_tsp_perf_report.py`
-- `experiments/figures/vat_tsp_perf_report.png`
+- `experiments/vat_tsp_perf_report.py`, `experiments/figures/vat_tsp_perf_report.png`.
+- GPU build: `vat_tsp_dualvat_lk.dual_vat_device` / `dual_vat_tour_device`.
