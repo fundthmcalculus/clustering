@@ -6,6 +6,11 @@ open, and what must happen before the academic paper. Companions:
 `white-paper.md` (the claim + evidence), `performance-report.md` (all numbers +
 graphs), `docs/novelty-review.md` / `docs/bibliography.md` (prior art).
 
+> **DGX / dual-VAT / uncrossing stream:** see
+> `VAT_TSP_DGX_THREAD_SUMMARY.md` for the consolidated index + narrative of the
+> GPU VAT, dual-VAT construction, joins, LK, and uncrossing-pre-pass work, and
+> `docs/vat-tsp-session2-novelty.md` for its (negative) novelty verdict.
+
 ---
 
 ## 0. The defensible claim (carry this forward verbatim)
