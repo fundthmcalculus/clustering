@@ -111,6 +111,59 @@ def parse_tsplib(name):
     return np.ascontiguousarray(np.array(coords, dtype=np.float64)), ewt
 
 
+_SOLUTIONS = None
+
+
+def optimal_length(name):
+    """Published optimal tour length for a TSPLIB instance, from the submodule's
+    ``solutions`` file (format ``name : value``). Returns None if not listed.
+    Use this as the reference instead of running LKH — instant and exact."""
+    global _SOLUTIONS
+    if _SOLUTIONS is None:
+        _SOLUTIONS = {}
+        sol = TSPLIB / "solutions"
+        if sol.exists():
+            for line in open(sol, errors="ignore"):
+                if ":" in line:
+                    nm, val = line.split(":", 1)
+                    digits = "".join(ch for ch in val if ch.isdigit())
+                    if digits:
+                        _SOLUTIONS[nm.strip()] = int(digits)
+    return _SOLUTIONS.get(name)
+
+
+def list_euc_instances():
+    """{name: dimension} for every EUC_2D TSPLIB instance in the submodule."""
+    import re
+
+    out = {}
+    for path in sorted(TSPLIB.glob("*.tsp")):
+        dim = None
+        ewt = None
+        with open(path, errors="ignore") as fh:
+            for line in fh:
+                u = line.upper()
+                if u.startswith("DIMENSION"):
+                    dim = int(re.findall(r"\d+", line)[-1])
+                elif u.startswith("EDGE_WEIGHT_TYPE"):
+                    ewt = line.split(":")[-1].strip()
+                elif "SECTION" in u:
+                    break
+        if ewt == "EUC_2D" and dim:
+            out[path.stem] = dim
+    return out
+
+
+def nearest_euc_instance(n):
+    """Pick the EUC_2D TSPLIB instance whose city count is nearest to n (ties ->
+    smaller). Returns (name, coords, dim) — repeatable reference data in lieu of
+    random points."""
+    inst = list_euc_instances()
+    name = min(inst, key=lambda k: (abs(inst[k] - n), inst[k]))
+    coords, _ = parse_tsplib(name)
+    return name, coords, inst[name]
+
+
 def _round_fn(ewt):
     """TSPLIB integer distance rounding for a given edge-weight type."""
     if ewt == "CEIL_2D":
