@@ -436,14 +436,11 @@ def dual_vat_device(Dg, i0, j0):
     return cp.asnumpy(label), np.array(a0, np.int64), np.array(a1, np.int64)
 
 
-def dual_vat_tour_device(Dg, seed_mode="min"):
-    """GPU dual-VAT tour: build the two VAT paths on the device, then the optimal
-    conjunction (4 orientations) using only the 4 endpoint distances."""
-    i0, j0 = _choose_seeds_device(Dg, seed_mode)
-    label, p1, p2 = dual_vat_device(Dg, i0, j0)
+def join_endpoint(Dg, p1, p2):
+    """Endpoint join: connect the two VAT paths at their 2x2 endpoints, best of
+    the 4 orientations (the two junction edges use only the path ends)."""
     ep = cp.asarray([p1[0], p1[-1], p2[0], p2[-1]], dtype=cp.int64)
-    De = cp.asnumpy(Dg[cp.ix_(ep, ep)].astype(cp.float64))  # 4x4 endpoint dists
-    # indices: 0=p1 start, 1=p1 end, 2=p2 start, 3=p2 end
+    De = cp.asnumpy(Dg[cp.ix_(ep, ep)].astype(cp.float64))  # 0=p1s 1=p1e 2=p2s 3=p2e
     best_tour, best_cost = None, np.inf
     for r1, s1, e1 in ((p1, 0, 1), (p1[::-1], 1, 0)):
         for r2, s2, e2 in ((p2, 2, 3), (p2[::-1], 3, 2)):
@@ -451,7 +448,50 @@ def dual_vat_tour_device(Dg, seed_mode="min"):
             if cost < best_cost:
                 best_cost = cost
                 best_tour = np.concatenate([r1, r2])
-    return np.ascontiguousarray(best_tour), label, i0, j0
+    return np.ascontiguousarray(best_tour)
+
+
+def join_nxm_device(Dg, p1, p2):
+    """GPU N x M cycle-merge join ("close the loop"). Close each cluster path into
+    a sub-cycle, then pick the best 2-opt-across move over ALL N x M cross edge
+    pairs: remove one edge from each cycle and reconnect crosswise (two patterns).
+    The full N x M delta is evaluated on the device; only the winning (i, j) and
+    pattern cross to the host. Merges the two cycles into one closed tour."""
+    P1 = cp.asarray(p1, dtype=cp.int64)
+    P2 = cp.asarray(p2, dtype=cp.int64)
+    N, M = P1.shape[0], P2.shape[0]
+    # cross distances D[p1[i], p2[j]]  (N x M) and the two cycles' edge weights
+    Dc = Dg[cp.ix_(P1, P2)].astype(cp.float32)
+    w1 = Dg[P1, cp.roll(P1, -1)].astype(cp.float32)  # cycle-1 edge (i -> i+1)
+    w2 = Dg[P2, cp.roll(P2, -1)].astype(cp.float32)  # cycle-2 edge (j -> j+1)
+    base = w1[:, None] + w2[None, :]
+    Dc_ii = cp.roll(cp.roll(Dc, -1, axis=0), -1, axis=1)  # D[p1[i+1], p2[j+1]]
+    Dc_j1 = cp.roll(Dc, -1, axis=1)  # D[p1[i],   p2[j+1]]
+    Dc_i1 = cp.roll(Dc, -1, axis=0)  # D[p1[i+1], p2[j]]
+    deltaA = (Dc + Dc_ii) - base  # add (u,v)+(u',v')
+    deltaB = (Dc_j1 + Dc_i1) - base  # add (u,v')+(u',v)
+    fa = int(cp.argmin(deltaA))
+    fb = int(cp.argmin(deltaB))
+    if float(deltaA.ravel()[fa]) <= float(deltaB.ravel()[fb]):
+        i, j, pattern = fa // M, fa % M, "A"
+    else:
+        i, j, pattern = fb // M, fb % M, "B"
+    rp1 = np.roll(p1, -(i + 1))  # open path u'..u  (u'=p1[i+1], u=p1[i])
+    rp2 = np.roll(p2, -(j + 1))  # open path v'..v
+    if pattern == "A":  # (u,v)+(u',v'): p1-path then reversed p2-path
+        tour = np.concatenate([rp1, rp2[::-1]])
+    else:  # (u,v')+(u',v): p1-path then p2-path
+        tour = np.concatenate([rp1, rp2])
+    return np.ascontiguousarray(tour)
+
+
+def dual_vat_tour_device(Dg, seed_mode="min", join="endpoint"):
+    """GPU dual-VAT tour: build the two VAT paths on the device, then join them
+    ('endpoint' = 4-orientation endpoint join; 'nxm' = the N x M cycle-merge)."""
+    i0, j0 = _choose_seeds_device(Dg, seed_mode)
+    label, p1, p2 = dual_vat_device(Dg, i0, j0)
+    joiner = join_nxm_device if join == "nxm" else join_endpoint
+    return joiner(Dg, p1, p2), label, i0, j0
 
 
 # ---------------------------------------------------------------------------
