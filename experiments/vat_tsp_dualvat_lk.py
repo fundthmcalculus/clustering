@@ -232,6 +232,9 @@ def choose_seeds(D, coords, mode, seed=0):
                2-way split — removing it separates the two components);
     'pca'      the extreme points along the 1st principal axis (balanced,
                geometric);
+    'mean'     a pair whose distance is closest to the *mean* pairwise distance
+               — far enough apart that the two fronts grow independently before
+               meeting (not min: instant competition; not max: one sweeps all);
     'random'   a random pair (baseline).
     """
     n = D.shape[0]
@@ -242,6 +245,13 @@ def choose_seeds(D, coords, mode, seed=0):
         return flat // n, flat % n
     if mode == "max":
         flat = int(np.argmax(D))
+        return flat // n, flat % n
+    if mode == "mean":
+        Dm = D.astype(np.float64)
+        mean_d = Dm.sum() / (n * n - n)  # mean off-diagonal (diagonal is 0)
+        A = np.abs(Dm - mean_d)
+        np.fill_diagonal(A, np.inf)
+        flat = int(np.argmin(A))
         return flat // n, flat % n
     if mode == "mst_gap":
         w, u, v = max(_mst_edges(D), key=lambda e: e[0])
@@ -342,10 +352,11 @@ def run(n=1000):
         return 100.0 * (tour_len(np.ascontiguousarray(t), coords) - ref) / ref
 
     # time-to-near-optimal: how fast dual-VAT + polish reaches the published opt
-    modes = ("min", "max", "mst_gap", "pca", "random")
+    modes = ("min", "max", "mean", "mst_gap", "pca", "random")
     labels = {
         "min": "min-nonzero",
         "max": "max-edge",
+        "mean": "mean-dist",
         "mst_gap": "MST-gap",
         "pca": "PCA-axis",
         "random": "random",
@@ -415,10 +426,12 @@ def _plot_clustering(ax, coords, r, title):
 def figure(res):
     coords = res["coords"]
     modes, labels = res["modes"], res["labels"]
-    fig, axes = plt.subplots(2, 3, figsize=(16.5, 10.5))
-    # top row + first two of bottom: the 5 clustering images
-    slots = [axes[0, 0], axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1]]
-    for ax, mode in zip(slots, modes):
+    ncol = 4
+    npanel = len(modes) + 1  # clusterings + one bar chart
+    nrow = (npanel + ncol - 1) // ncol
+    fig, axes = plt.subplots(nrow, ncol, figsize=(5.4 * ncol, 5.2 * nrow))
+    flat = axes.ravel()
+    for ax, mode in zip(flat, modes):
         r = res[mode]
         _plot_clustering(
             ax,
@@ -427,8 +440,8 @@ def figure(res):
             f"{labels[mode]} init  |C1|={r['c1']} |C2|={r['c2']}\n"
             f"raw {r['raw']:+.0f}% → +2opt {r['opt']:+.1f}% over opt",
         )
-    # last panel: quality bar chart (raw / +neighLK / +full2opt per init)
-    ax = axes[1, 2]
+    # quality bar chart (raw / +neighLK / +full2opt per init)
+    ax = flat[len(modes)]
     x = np.arange(len(modes))
     w = 0.27
     ax.bar(x - w, [res[m]["raw"] for m in modes], w, label="raw", color="0.6")
@@ -445,6 +458,9 @@ def figure(res):
     ax.set_title("quality by initialisation")
     ax.legend(fontsize=8)
     ax.grid(True, axis="y", alpha=0.3)
+
+    for extra in flat[len(modes) + 1 :]:  # blank any unused grid slots
+        extra.axis("off")
 
     fig.suptitle(
         f"Dual-VAT initialisation study on TSPLIB {res['name']} "

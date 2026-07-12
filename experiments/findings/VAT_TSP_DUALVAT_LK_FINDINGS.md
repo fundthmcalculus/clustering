@@ -5,7 +5,7 @@ Two requested experiments. n=1000, 12 gaussian blobs, mean over 3 seeds, LKH
 
 ## Update — min-non-zero-edge seeding, on TSPLIB reference data (pr1002)
 
-Studied **five initialisation points** for the dual-source fronts, on the
+Studied **six initialisation points** for the dual-source fronts, on the
 repeatable TSPLIB instance nearest n=1000 (**pr1002**, dim 1002;
 `nearest_euc_instance`). Reference = the **published optimum 259045** from the
 submodule's `solutions` file (`optimal_length`) — no LKH; we care about *time to
@@ -13,23 +13,28 @@ near-optimal*.
 
 | init | \|C1\| | \|C2\| | raw | + neighbour-LK (time) | + full 2-opt (time) |
 |------|------|------|------|-----------------------|---------------------|
-| min-non-zero edge | 74 | 928 | +92% | +6.3% (0.44 s) | +7.8% (0.06 s) |
+| min-non-zero edge | 74 | 928 | +92% | +6.3% (0.46 s) | +7.8% (0.06 s) |
 | max edge | 6 | 996 | +102% | +7.3% (0.01 s) | +7.1% (0.03 s) |
+| **mean-distance pair** | 1000 | 2 | +96% | +8.6% (0.02 s) | +7.5% (0.04 s) |
 | longest-MST-edge | 6 | 996 | +94% | +7.7% (0.02 s) | +7.9% (0.03 s) |
-| PCA principal axis | 6 | 996 | +102% | **+5.9%** (0.02 s) | +7.1% (0.03 s) |
+| PCA principal axis | 6 | 996 | +102% | **+5.9%** (0.01 s) | +7.1% (0.03 s) |
 | random pair | 332 | 670 | +102% | +6.6% (0.01 s) | +7.1% (0.03 s) |
 
 - **Initialisation barely affects the final tour.** After polishing, every seed
-  lands within a tight **+5.9% to +7.9% over the optimum** (bar chart nearly
+  lands within a tight **+5.9% to +8.6% over the optimum** (bar chart nearly
   flat) — the dual-VAT construction + local search converges to the same quality
   regardless of where the two fronts start. Best: PCA-axis (+5.9%) and
   min-non-zero (+6.3%) with the neighbour-LK. All in **under half a second**.
-- **The 2-way partition is degenerate on a connected cloud.** pr1002 has no clean
-  bimodal gap, so most seeds give a tiny pocket + "the rest" (6/996 for max,
-  MST-gap and PCA; 74/928 for min). Only the **random** pair happened to land one
-  seed in each half → a balanced 332/670. So partition balance is a property of
-  the *data and seed placement*, not something these seed rules guarantee (on
-  well-separated blobs the split is clean — see below).
+- **The 2-way partition is degenerate on a connected cloud — balance is set by
+  seed *centrality*, not seed *separation*.** The mean-distance pair was tried to
+  keep the two fronts from meeting too soon; instead it gave the **most**
+  lopsided split (**1000/2**) — whichever seed sits nearer the dense bulk sweeps
+  it (winner-take-most), so a mid-range separation doesn't help. Most seeds give
+  a tiny pocket + "the rest" (6/996 for max/MST-gap/PCA, 74/928 for min, 1000/2
+  for mean); only the **random** pair happened to drop one seed in each half →
+  a balanced 332/670. Partition balance is a property of the *data + seed
+  placement*, not something these seed rules guarantee (on well-separated blobs
+  the split is clean — see below).
 - **The neighbour-list LK works well on this real instance** (~6-8%), unlike on
   the blob tours below (+22%): pr1002's fairly uniform layout has few long "jump"
   edges, so the neighbour-list moves suffice. Repeatable reference data gives the
