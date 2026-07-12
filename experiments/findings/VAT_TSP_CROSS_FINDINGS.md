@@ -60,8 +60,59 @@ consistently reach a better final tour — the standout being d2103 (+13.3% →
 +5.8%). It complements, rather than replaces, the neighbour 2-opt: uncross the big
 diagonals, then let 2-opt+Or-opt finish.
 
+## Top-k sweep + Or-opt move set (`vat_tsp_cross_sweep.py`)
+
+Swept the number of longest edges attacked (top-k ∈ {8, 16, 32, 64}) and whether
+an **Or-opt(1) relocation** of the long edge competes with the 2-opt uncrossing
+reversal, across n = 200 … 11 849 (EUC_2D, fp32), measuring final quality (after
+the 2-opt+Or-opt polish), pre-pass time, and move count.
+
+Final quality (% over optimum), Or-opt-on pipeline `raw → uncross(top-k) → 2-opt+Or-opt`:
+
+| instance | n | no uncross | top-8 | top-16 | top-32 | top-64 |
+|----------|------|-----------|-------|--------|--------|--------|
+| kroA200 | 200 | +5.7% | +6.2% | +5.0% | +6.3% | +5.4% |
+| d493 | 493 | +6.0% | +4.8% | +5.5% | +5.6% | +5.4% |
+| pr1002 | 1 002 | +7.0% | +7.5% | +4.9% | +6.1% | +7.1% |
+| d2103 | 2 103 | **+13.3%** | +5.6% | +6.0% | +5.9% | +6.6% |
+| fnl4461 | 4 461 | +4.9% | +5.3% | +5.8% | +5.6% | +5.4% |
+| rl11849 | 11 849 | **+20.0%** | +6.7% | +6.9% | +6.6% | +7.0% |
+
+![sweep](../figures/vat_tsp_cross_sweep.png)
+
+### Findings
+
+- **The dominant effect is robust and top-k-independent: any uncrossing pre-pass
+  rescues the hard instances.** rl11849 **+20.0% → ~7% (a 13-point gain)** and
+  d2103 **+13.3% → ~6%** with *every* top-k. These are exactly the instances where
+  plain 2-opt+Or-opt gets stuck in a bad basin; breaking the long crossings first
+  is what frees it. On the already-easy instances (all others land +5–7%) the
+  pre-pass neither helps nor hurts much.
+- **top-32 does NOT reliably beat top-16 on final quality.** More top-k
+  monotonically removes more crossings in the *raw* uncrossed tour (e.g. rl11849
+  +93→+67% raw over top-8→64) and costs proportionally more time — but the
+  2-opt+Or-opt polish washes that difference out; the final numbers are flat/noisy
+  across k (panel c), and top-64 is sometimes slightly *worse* (n=1002, n=2103).
+  The polish, not the depth of uncrossing, sets the floor.
+- **Or-opt(1) as a competing crossing-repair move is a wash.** At top-32,
+  2-opt-only vs 2-opt+Or-opt are within noise on final quality at every size
+  (panel d). The 2-opt reversal is the move that matters; letting an Or-opt(1)
+  relocation compete occasionally changes the move count but not the outcome.
+- **Cost scales ~linearly in top-k and n.** The pre-pass is 0.02–0.08 s (top-8,
+  small) up to ~3 s (top-64, n≈12k); top-16 stays under ~0.8 s through n≈12k.
+
+### Recommendation (refined)
+
+Use a **top-16, 2-opt-only** uncrossing pre-pass. It captures essentially all of
+the benefit — the full rescue of the hard, stuck instances — at the lowest cost;
+going to top-32/64 or adding Or-opt buys raw-uncross cosmetics that the polish
+erases. The headline stands and strengthens at scale: **the pre-pass turns the
+large hard instance rl11849 from +20% to +7%.**
+
 ## Files
-- `experiments/vat_tsp_cross.py`
+- `experiments/vat_tsp_cross.py` (`crossing_repair` — parameterised top-k + Or-opt;
+  `crossing_2opt` back-compat wrapper; `_crossers_device` GPU orientation test),
+  `experiments/vat_tsp_cross_sweep.py` (the top-k / move-set sweep).
 - `experiments/figures/vat_tsp_cross.png` (quality vs n),
-  `experiments/figures/vat_tsp_cross_tour.png` (d2103 raw → uncrossed → polished).
-- Kernels: `crossing_2opt`, `_crossers_device` (GPU orientation test).
+  `vat_tsp_cross_tour.png` (d2103 raw → uncrossed → polished),
+  `vat_tsp_cross_sweep.png` (top-k sweep: quality & time, 2×2).

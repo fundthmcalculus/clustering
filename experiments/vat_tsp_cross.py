@@ -84,12 +84,47 @@ def _two_opt_delta(tour, coords, i, j, ceil):
     )
 
 
-def crossing_2opt(tour, coords, coords_g, topk=16, max_iter=100000):
-    """Uncrossing 2-opt driven by the top-k longest edges' geometric crossings.
-    One improving uncross move per iteration (longest edge first); stops when none
-    of the top-k longest edges crosses anything. Returns (tour, n_moves)."""
-    tour = np.ascontiguousarray(tour, dtype=np.int64)
+def _oropt1_best(tour, coords, i, js, ceil):
+    """Best Or-opt(1) alternative for the long edge (tour[i]->tour[i+1]): relocate
+    the city b=tour[i+1] into one of the crossing edges (between its endpoints).
+    Removing b breaks the long edge too. Returns (delta, b_city, x_city)."""
+    from experiments.vat_tsp_dualvat_lk import _d
+
     n = len(tour)
+    a = tour[i]
+    b = tour[(i + 1) % n]
+    succ = tour[(i + 2) % n]
+    if succ == a:
+        return 0.0, -1, -1
+    rem = _d(coords, a, succ, ceil) - _d(coords, a, b, ceil) - _d(coords, b, succ, ceil)
+    best_d, best_x = 0.0, -1
+    for j in js:
+        x = tour[j]
+        y = tour[(j + 1) % n]
+        if x in (a, b, succ) or y == b:
+            continue
+        ins = _d(coords, x, b, ceil) + _d(coords, b, y, ceil) - _d(coords, x, y, ceil)
+        d = rem + ins
+        if d < best_d:
+            best_d, best_x = d, int(x)
+    return best_d, int(b), best_x
+
+
+def _apply_oropt1(tour, b, x):
+    """Remove city b and reinsert it directly after city x. Preserves permutation."""
+    base = tour[tour != b]
+    pos = int(np.where(base == x)[0][0])
+    return np.concatenate([base[: pos + 1], [b], base[pos + 1 :]])
+
+
+def crossing_repair(tour, coords, coords_g, topk=16, use_oropt=False, max_iter=100000):
+    """Uncrossing local search driven by the top-k longest edges' geometric
+    crossings. Each iteration scans the top-k longest edges (longest first),
+    applies the single most-improving move that removes one of that edge's
+    crossings, and recomputes; stops when no top-k longest edge has an improving
+    move. With use_oropt, an Or-opt(1) relocation of the long edge competes with
+    the 2-opt reversal. Returns (tour, n_moves)."""
+    tour = np.ascontiguousarray(tour, dtype=np.int64)
     ceil = False  # euclidean-only geometry (EUC_2D)
     moves = 0
     for _ in range(max_iter):
@@ -100,24 +135,42 @@ def crossing_2opt(tour, coords, coords_g, topk=16, max_iter=100000):
         topk_pos = np.argsort(el)[::-1][:topk]
         applied = False
         for i in topk_pos:
-            js = _crossers_device(coords_g, tour_g, int(i))
+            i = int(i)
+            js = _crossers_device(coords_g, tour_g, i)
             if len(js) == 0:
                 continue
-            # among the crossing edges, take the most-improving 2-opt
-            best_d, best_j = 0.0, -1
+            # best uncrossing 2-opt among this edge's crossers
+            best_d, best_j, kind = 0.0, -1, None
             for j in js:
-                d = _two_opt_delta(tour, coords, int(i), int(j), ceil)
+                d = _two_opt_delta(tour, coords, i, int(j), ceil)
                 if d < best_d:
-                    best_d, best_j = d, int(j)
-            if best_j >= 0:
-                p, q = (int(i), best_j) if i < best_j else (best_j, int(i))
+                    best_d, best_j, kind = d, int(j), "2opt"
+            if use_oropt:  # let an Or-opt(1) relocation compete
+                od, ob, ox = _oropt1_best(tour, coords, i, [int(j) for j in js], ceil)
+                if od < best_d and ox >= 0:
+                    best_d, kind = od, "oropt"
+                    or_b, or_x = ob, ox
+            if kind == "2opt":
+                p, q = (i, best_j) if i < best_j else (best_j, i)
                 tour[p + 1 : q + 1] = tour[p + 1 : q + 1][::-1]
                 moves += 1
                 applied = True
                 break  # positions changed -> recompute lengths/crossers
+            elif kind == "oropt":
+                tour = _apply_oropt1(tour, or_b, or_x)
+                moves += 1
+                applied = True
+                break
         if not applied:
             break
     return tour, moves
+
+
+def crossing_2opt(tour, coords, coords_g, topk=16, max_iter=100000):
+    """Back-compat wrapper: 2-opt-only uncrossing over the top-k longest edges."""
+    return crossing_repair(
+        tour, coords, coords_g, topk=topk, use_oropt=False, max_iter=max_iter
+    )
 
 
 def run(targets=(200, 500, 1000, 2000, 5000)):
