@@ -110,20 +110,49 @@ cross-edge 2-opt-across move).
   / tour merging** (Karp subtour merge; Cook–Seymour tour merging, in the prior
   doc). Evaluating all N×M cross pairs is a 2-opt-across-two-cycles brute force.
 - **Two-source Prim as a partition** is a graph-**Voronoi** bisection (region
-  growing from two seeds); no dedicated "two-source Prim for TSP construction" was
-  located, but it is a special case (k=2) of MST-forest / single-linkage
+  growing from two seeds); a special case (k=2) of MST-forest / single-linkage
   partitioning, which is the standard VAT clustering front-end.
 
-**Verdict — compositional/engineering, not novel.** The paradigm is textbook D&C
-CTSP; the specific stitch is Guttmann-Beck (2000); the merge is subtour patching.
-The narrow, honest deltas (same as the prior review's Part-2 conclusion): (a) a
-**VAT/single-linkage cut as the partitioner** for a plain TSP, specialised to
-**k=2 via dual-source Prim**; (b) a fully **GPU-resident** realisation (dual-source
-Prim + N×M merge on the device); (c) the **empirical** characterisation (the
-N×M merge helps hard instances, e.g. rl11849; tour quality is nearly
-seed-independent; placement not distance drives partition balance). Position
-against Guttmann-Beck (2000) and Karp (1977); claim only the composition + GPU
-build + measurements.
+### Is the *partitioner itself* novel? — No.
+
+This is the piece most tempting to claim, so it deserves its own honest verdict.
+**Clustering-based partitioning for divide-and-conquer TSP is a mature, active
+paradigm**, and the VAT/single-linkage cut sits squarely inside it:
+
+- **Cluster-first-route-second for plain TSP is standard** — cluster the nodes →
+  sub-TSP per cluster → reconnect — routinely done with k-means (e.g. Firefly +
+  k-means TSP, IEEE 2019) and, most tellingly, **recursive two-group bisection**:
+  **"Deep clustering of the traveling salesman problem to parallelize its
+  solution," *Computers & Oper. Res.* 2024 (S0305054824000200)** partitions
+  "iteratively by two-group partitioning of every cluster" — conceptually the same
+  move as our dual-source (k=2) split. Also **hyper-tour / cluster-first on sparse
+  heatmap graphs** for large TSP (arXiv:2510.20169, 2025).
+- **MST-based clustering is textbook** (Zahn 1971; divide-and-conquer MST
+  clustering, IEEE TKDE 2009, doi:10.1109/TKDE.2009.37), and the identity
+  **single-linkage ≡ MST minus the heaviest edges** is standard. So "use a
+  single-linkage cut to partition a TSP" is an *instance* of MST-clustering-for-TSP,
+  not a new mechanism.
+- **VAT's cluster structure literally is single-linkage/MST-based.** Substituting
+  "VAT/iVAT" for "single-linkage clustering" is therefore a **relabelling of a
+  known partitioner**, not a new algorithm. The iVAT ordering adds a seriation
+  view but does not change *what the cut produces*.
+
+**Verdict — the partitioner is not novel.** It is a substitution within a crowded
+paradigm. The paradigm is textbook D&C CTSP; the stitch is Guttmann-Beck (2000);
+the merge is subtour patching. What is *unoccupied* is narrow, **compositional and
+engineering** — not algorithmic: (a) naming VAT/iVAT seriation as the front-end (a
+relabelling); (b) the specific **k=2 dual-source-Prim** realisation (a known
+graph-Voronoi bisection primitive); (c) a fully **GPU-resident** build (dual-source
+Prim + N×M merge on the device); (d) the **empirical** characterisation (the N×M
+merge helps hard instances, e.g. rl11849; tour quality is nearly seed-independent;
+placement, not distance, drives partition balance). Position against the 2024 deep
+-clustering bisection, MST-clustering (TKDE 2009), Karp (1977), and Guttmann-Beck
+(2000); claim only the GPU build + measurements, and describe the partitioner as
+applied prior art.
+
+*(This corrects the first draft of this review and `vat-tsp-prior-art.md` §4,
+which framed the "VAT partitioner" as a defensible delta. On a targeted search it
+is thinner than that: a known clustering paradigm with a VAT-flavoured cut.)*
 
 ---
 
@@ -156,7 +185,8 @@ and our findings say so. No claim.
 |---|---|---|
 | Uncrossing pre-pass on top-k longest edges (2-opt/Or-opt) | **not novel** | Flood 1956; **Croes 1958 (2-opt = uncrossing)**; **van Leeuwen–Schoone 1981 (tour-untangling)**; Untangle-ineffectiveness COCOA 2023; Or 1976; Bentley 1992 |
 | Explicit GPU geometric crossing detection driving the moves | engineering micro-delta | GPU 2-opt (2011+); GPU segment-intersection kernels; subsumed by uncrossing-2-opt |
-| Dual-VAT (dual-source Prim → 2 VAT paths → join) | **compositional/engineering** | Karp 1977; **Guttmann-Beck 2000 (endpoint stitch)**; VAT single-linkage cut; DualOpt 2025 (name only) |
+| VAT/single-linkage cut as the TSP **partitioner** | **not novel** (substitution in a crowded paradigm) | **Deep-clustering bisection 2024**; MST-clustering TKDE 2009; Karp 1977; single-linkage ≡ MST-cut |
+| Dual-VAT composition (dual-source Prim → 2 VAT paths → join) | **compositional/engineering** | Karp 1977; **Guttmann-Beck 2000 (endpoint stitch)**; cluster-first-route-second; DualOpt 2025 (name only) |
 | N×M GPU cycle-merge join | not novel | subtour patching / tour merging (Karp; Cook–Seymour) |
 | GPU VAT/iVAT on unified memory | **systems/perf, not algorithmic** | Bezdek–Hathaway 2002; Havens–Bezdek 2012; GPU MST |
 | Variable-depth LK | not novel | Lin–Kernighan 1973; LKH |
@@ -171,16 +201,20 @@ the join, sets the floor).
 
 ## 6. If any of this were to be written up
 
-The *only* publishable framings are the ones the prior review already identified,
-plus one systems paper:
-1. **VAT/single-linkage as a TSP partitioner** (composition), benchmarked against
-   POPMUSIC and space-filling per `docs/vat-tsp-prior-art.md` §7 — cite
-   Guttmann-Beck 2000 and Karp 1977 up front.
-2. **A GPU/unified-memory VAT–iVAT systems paper** — the scaling and
-   transfer-collapse results, positioned as engineering.
-The uncrossing pre-pass, the dual-source merge, and variable-depth LK are **not**
-independently novel and should be described as applied prior art with an empirical
-study, never as contributions.
+Only **one** framing survives a targeted search, and it is a *systems* paper:
+1. **A GPU/unified-memory VAT–iVAT systems paper** — the scaling and
+   transfer-collapse results on the GB10 coherent memory, positioned squarely as
+   engineering over prior-art algorithms.
+
+The **partitioner is not a contribution** — clustering-based (incl. recursive
+-bisection and MST/single-linkage) partitioning for D&C TSP is established
+(deep-clustering 2024; MST-clustering TKDE 2009; Karp 1977). A "VAT/single-linkage
+as a TSP partitioner" paper would need to *beat* POPMUSIC and space-filling
+**and** show the VAT cut beats k-means / recursive-bisection partitioners in an
+ablation — otherwise it is a substitution, not a result. The uncrossing pre-pass,
+the dual-source merge, and variable-depth LK are likewise **not** independently
+novel; describe them as applied prior art with an empirical study, never as
+contributions.
 
 ## References
 New this review (others in `docs/bibliography.md`): Flood 1956
@@ -189,5 +223,8 @@ Leeuwen–Schoone 1981 (WG '81, pp. 87–98; RUU-CS-80-11); Tour-untangling
 ineffectiveness (COCOA 2023, doi:10.1007/978-3-031-49815-2_1) [metadata-only];
 "Performance of efficient variants of the 2-Opt heuristic" (DAM 2025,
 S0166218X2500294X); Or 1976 (thesis); Highly-Parallel GPU TSP
-(doi:10.1007/978-3-642-18466-6_31); DualOpt 2025 (arXiv:2501.08565). PDFs not
-committed (egress blocks scholarly hosts).
+(doi:10.1007/978-3-642-18466-6_31); DualOpt 2025 (arXiv:2501.08565); Deep
+clustering of the TSP (*Comput. Oper. Res.* 2024, S0305054824000200); D&C
+MST-based clustering (IEEE TKDE 2009, doi:10.1109/TKDE.2009.37); hyper-tour
+cluster-first large-scale TSP (arXiv:2510.20169). PDFs not committed (egress
+blocks scholarly hosts).
