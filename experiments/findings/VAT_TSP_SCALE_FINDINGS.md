@@ -40,6 +40,28 @@ sharp edge we found (VAT-insertion-order seams, k-NN quality cap, one-move/pass
 GPU 2-opt). More starts trade linearly more time for a better best (especially at
 smaller n where variance is larger).
 
+## XL: 33k & 86k cities (`vat_tsp_scale_xl.py`)
+
+Pushed to the two big `pla` instances (CEIL_2D). At this size the **O(n²) distance
+matrix is the wall**: f64 is 9 GB at 33 810 but 59 GB at 85 900 (×2 for
+device+host copy → 118 GB, over budget). Fix: keep the matrix in **float32** (only
+the NN construction reads it; 2-opt/3-opt use coords + kNN), so 85 900 peaks at
+~59 GB on the 128 GB unified memory.
+
+| instance | n | raw NN (best) | take-best | starts | matrix | total time |
+|----------|-------|---------------|-----------|--------|--------|------------|
+| pla33810 | 33 810 | +17.1% | **+5.61%** | 4 | 4.6 GB f32 | 5.5 s + 2.7 s build |
+| pla85900 | 85 900 | +14.8% | **+5.02%** | 2 | 29.5 GB f32 | 16.7 s + 15 s build |
+
+- **It scales.** +5.0% at **n=85 900 in ~32 s end-to-end** (15 s matrix+kNN build
+  + 16.7 s for 2 starts of construct+2-opt+3-opt). The neighbour-list operators
+  stay O(n·k); the only super-linear cost is the O(n²) matrix build/NN scan.
+- **Quality holds at ~+5%** across 33k–86k, consistent with the 2k–18k band — the
+  pipeline does not degrade with scale, it just gets memory-bound.
+- **Next wall:** beyond ~100k the dense f32 matrix (>40 GB) forces a matrix-free
+  path — kNN via GPU-tiled-from-coords or a kd-tree, and a spatial (kd-tree/
+  space-filling) NN construction — to drop the O(n²) memory entirely.
+
 ## Canonical solver
 
 This pipeline is now the **default entry point**:
