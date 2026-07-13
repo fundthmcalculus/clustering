@@ -40,7 +40,14 @@ sharp edge we found (VAT-insertion-order seams, k-NN quality cap, one-move/pass
 GPU 2-opt). More starts trade linearly more time for a better best (especially at
 smaller n where variance is larger).
 
+## Canonical solver
+
+This pipeline is now the **default entry point**:
+`experiments/vat_tsp_solve.py::solve_tsp(coords, n_starts=8)` (GPU, NumPy
+fallback) — CLI `python -m experiments.vat_tsp_solve <n> [--starts S] [--plot]`.
+
 ## Files
-- `experiments/vat_tsp_scale.py`
+- `experiments/vat_tsp_scale.py` (scale study), `experiments/vat_tsp_solve.py`
+  (canonical solver).
 - `experiments/figures/vat_tsp_scale_d2103.png`, `_fnl4461.png`, `_d18512.png`,
   `_summary.png`.
