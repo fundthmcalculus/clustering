@@ -9,6 +9,8 @@
   → `experiments/figures/conivat_scaling.png`
 - Compiled-vs-pure benchmark: `experiments/conivat_cython_bench.py`
   → `experiments/figures/conivat_cython_bench.png`
+- Compiled-only perf test to N=20000: `experiments/conivat_cython_scaling.py`
+  → `experiments/figures/conivat_cython_scaling.png`
 - Paper (committed): `docs/papers/Rathore_2020_ConiVAT.pdf`
   (arXiv:2008.09570, IEEE TKDE). Bibliography entry: `docs/bibliography.md` §1.
 
@@ -114,6 +116,41 @@ away as n grows. The speedup ratio dips past n ≈ 3500 only because the compile
 iVAT kernel itself has a super-quadratic step there (OpenMP / in-place-permute
 overhead visible in *both* iVAT_c and ConiVAT equally); improving that is an
 iVAT-kernel concern, orthogonal to ConiVAT.
+
+## Compiled performance at scale (N up to 20000)
+
+`experiments/figures/conivat_cython_scaling.png` — the compiled path on its own
+(no pure-Python comparison), 4 cores, best-of-{3,2}, kernels pre-warmed.
+
+| n | core f64 (ms) | full f64 +MMC (ms) | core f32 (ms) | distances (ms) | iVAT transform (ms) |
+|-------|---------------|--------------------|---------------|----------------|---------------------|
+| 500 | 3.5 | 73.2 | 2.1 | 0.6 | 2.8 |
+| 1000 | 8.8 | 18.9 | 5.7 | 1.8 | 7.0 |
+| 2000 | 49.2 | 120.1 | 34.2 | 14.5 | 34.7 |
+| 4000 | 365 | 291 | 181 | 119 | 246 |
+| 6000 | 733 | 705 | 431 | 287 | 447 |
+| 8000 | 1566 | 1359 | 893 | 594 | 972 |
+| 12000 | 3313 | 3309 | 2524 | 1405 | 1908 |
+| 16000 | 6104 | 6034 | 4280 | 2572 | 3533 |
+| 20000 | 9976 | 9545 | 6975 | 3766 | 6210 |
+
+**Read-out.**
+- **Clean O(n²).** From n = 4000 → 20000 the f64 core grows 365 ms → 9.98 s
+  (27×) against a 25× area increase — essentially quadratic; the small excess
+  is the iVAT in-place permutation. At n = 20000 the whole compiled ConiVAT
+  fits — and completes — in ~10 s on 4 cores.
+- **f32 gives ~1.4× and half the memory.** The f32 core runs 6.98 s vs 9.98 s
+  at n = 20000, on a 1.6 GB matrix instead of 3.2 GB — the opt-in lever for
+  pushing past the memory wall (the roadmap's stated scaling limit for the
+  3-matrix iVAT footprint).
+- **Time split ≈ 38% distances / 62% iVAT transform**, stable across n (both
+  are O(n²)). The transform (VAT MST ordering + minimax recurrence + in-place
+  reorder) is the larger share, so it is where any further kernel optimization
+  should go.
+- **MMC is a fixed cost.** full-f64 (with metric learning) sits on top of the
+  core at small n (tens of ms, and noisy from variable MMC convergence) and is
+  indistinguishable from the core by n ≳ 6000, confirming the metric-learning
+  solve is n-independent.
 
 ## Caveats / next steps
 

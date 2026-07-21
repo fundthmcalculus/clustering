@@ -157,8 +157,7 @@ def _plot(core64, full64, core32, dist64) -> Path:
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(13.5, 5.5))
 
     # Left: total wall time, log-log, with an O(n^2) reference.
-    ax.plot(SIZES, full64, "v-", color="tab:green",
-            label="ConiVAT full, f64 (+MMC)")
+    ax.plot(SIZES, full64, "v-", color="tab:green", label="ConiVAT full, f64 (+MMC)")
     ax.plot(SIZES, core64, "s-", color="tab:blue", label="ConiVAT core, f64")
     ax.plot(SIZES, core32, "o-", color="tab:orange", label="ConiVAT core, f32")
     ref = sizes**2
@@ -178,8 +177,14 @@ def _plot(core64, full64, core32, dist64) -> Path:
     width = 0.4
     x = np.arange(len(SIZES))
     ax2.bar(x, dist / 1e3, width, label="pairwise distances", color="tab:purple")
-    ax2.bar(x, transform / 1e3, width, bottom=dist / 1e3,
-            label="iVAT transform", color="tab:cyan")
+    ax2.bar(
+        x,
+        transform / 1e3,
+        width,
+        bottom=dist / 1e3,
+        label="iVAT transform",
+        color="tab:cyan",
+    )
     ax2.set_xticks(x)
     ax2.set_xticklabels(SIZES, rotation=45, ha="right")
     ax2.set_xlabel("n (samples)")
