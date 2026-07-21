@@ -103,11 +103,10 @@ to ground truth).
   2-D RDI. For visual assessment at large n the existing sampled/divide-and-conquer
   routes (sVAT/clusiVAT, `experiments/dc_vat_scaling.py`) remain the tool.
 
-## Suggested next step (productionization)
+## Status — recorded note, not being pursued
 
-Ship an exact `backend="geometric"` VAT-order path for low/moderate-d Euclidean
-inputs: dual-tree Borůvka EMST (k-d tree; no n² matrix) → PQ-Prim order + cut
-magnitudes → the existing `get_ivat_levels` cut. Keep the dense kernel as the
-fallback for precomputed / high-d dissimilarities. This would let `IVATMeans`
-(and constraint-free `ConiVAT`) cluster hundreds of thousands of points within
-the memory budget that currently caps them near n ≈ 40k.
+Kept as a local note only. Not productionized: the iVAT core is under active
+development directly, so this is left as a reference point rather than a
+roadmap item. (For the record, the exact geometric route would be a dual-tree
+Borůvka EMST → PQ-Prim order + cut magnitudes → `get_ivat_levels`, with the
+dense kernel as fallback — but that is out of scope here.)
