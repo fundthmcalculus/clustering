@@ -31,9 +31,14 @@ Finally VAT ordering of that matrix yields the RDI; cutting the ``k - 1``
 longest MST edges (what :func:`get_ivat_levels` does off the reordered
 diagonal) gives ``k`` single-linkage clusters.
 
-This is a **pure-Python/numpy reference implementation** — it deliberately
-mirrors the pure-Python VAT/iVAT path and does not (yet) have a compiled
-Cython twin.
+Because the heavy O(n^2) core (pairwise distances + the minimax/iVAT transform)
+is shared with iVAT, ConiVAT gets the compiled speedup for free: when the
+Cython/OpenMP ``pcvat`` extension is built, :func:`compute_conivat` routes the
+distance and iVAT stages through ``pcvat.pairwise_distances_c`` /
+``pcvat.compute_ivat_c``; otherwise it falls back to the pure-Python/numba
+:func:`compute_ivat`. The constraint-specific stages (union-find closure, the
+n-independent MMC solve) stay in Python either way — they are not the
+bottleneck. Select the path with ``backend`` ("auto" / "cython" / "python").
 """
 
 from typing import Optional, Sequence
@@ -44,8 +49,35 @@ from numpy import ndarray
 from .pvat import compute_ivat, get_ivat_levels, IvatMeansResult
 from .util import pairwise_distances
 
+# Optional compiled kernels (mirrors the fallback pattern in ivatmeans.py /
+# fuzzycmeans.py): use the Cython/OpenMP path when the extension is built.
+try:
+    from .pcvat import pairwise_distances_c as _pairwise_distances_c
+    from .pcvat import compute_ivat_c as _compute_ivat_c
+
+    _HAS_COMPILED = True
+except ImportError:  # pragma: no cover - depends on build environment
+    _HAS_COMPILED = False
+
 ConstraintPair = tuple[int, int]
 ConstraintList = Sequence[ConstraintPair]
+
+
+def _use_compiled(backend: str) -> bool:
+    """Resolve the ``backend`` selector to a compiled-vs-pure decision."""
+    if backend == "auto":
+        return _HAS_COMPILED
+    if backend == "cython":
+        if not _HAS_COMPILED:
+            raise ImportError(
+                "backend='cython' requested but the compiled pcvat extension is "
+                "not built. Build it with `python setup.py build_ext --inplace` "
+                "or use backend='python'."
+            )
+        return True
+    if backend == "python":
+        return False
+    raise ValueError(f"backend must be 'auto', 'cython', or 'python', got {backend!r}")
 
 
 # --------------------------------------------------------------------------- #
@@ -339,6 +371,7 @@ def compute_conivat(
     metric_learning: bool = True,
     random_state: Optional[int] = None,
     inplace: bool = False,
+    backend: str = "auto",
 ) -> tuple[ndarray, list, ndarray]:
     """Compute the ConiVAT reordered dissimilarity image for ``X``.
 
@@ -367,6 +400,12 @@ def compute_conivat(
     inplace : bool
         Passed through to the iVAT transform (the distance matrix built here
         is a throwaway intermediate, so ``True`` roughly halves peak memory).
+    backend : str
+        Which implementation runs the O(n^2) distance + iVAT core:
+        ``"auto"`` (compiled ``pcvat`` when built, else pure-Python),
+        ``"cython"`` (force compiled; raises if not built), or ``"python"``
+        (force the pure-Python/numba path). The constraint pre-processing and
+        metric learning are pure Python regardless.
 
     Returns
     -------
@@ -399,12 +438,18 @@ def compute_conivat(
         X_t = np.asarray(X, dtype=np.float64)
 
     # Stage 4.3 — build distances, impose "similar" constraints (distance 0),
-    # then apply the path-based minimax (transitive) transform == iVAT.
-    distances = pairwise_distances(np.ascontiguousarray(X_t))
+    # then apply the path-based minimax (transitive) transform == iVAT. The
+    # distance + iVAT core is where ConiVAT spends its time, so it is the part
+    # that benefits from the compiled kernels (constraint work is negligible).
+    compiled = _use_compiled(backend)
+    X_c = np.ascontiguousarray(X_t)
+    distances = _pairwise_distances_c(X_c) if compiled else pairwise_distances(X_c)
     for i, j in ml_expanded:
         distances[i, j] = 0.0
         distances[j, i] = 0.0
 
+    if compiled:
+        return _compute_ivat_c(distances, inplace=inplace)
     return compute_ivat(distances, inplace=inplace)
 
 
@@ -426,6 +471,7 @@ class ConiVAT:
         n_constraints: int = 30,
         metric_learning: bool = True,
         random_state: Optional[int] = None,
+        backend: str = "auto",
     ):
         self.n_clusters = n_clusters
         self.must_link = must_link
@@ -433,6 +479,7 @@ class ConiVAT:
         self.n_constraints = n_constraints
         self.metric_learning = metric_learning
         self.random_state = random_state
+        self.backend = backend
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
         self._ivat_result: Optional[IvatMeansResult] = None
@@ -473,6 +520,7 @@ class ConiVAT:
             metric_learning=self.metric_learning,
             random_state=self.random_state,
             inplace=True,
+            backend=self.backend,
         )
 
         ivat_result = get_ivat_levels(

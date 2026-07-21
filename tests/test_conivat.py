@@ -15,6 +15,13 @@ from tribbleclustering import (
 )
 from tribbleclustering.util import circle_random_clusters
 
+try:
+    from tribbleclustering.pcvat import compute_ivat_c  # noqa: F401
+
+    CYTHON_AVAILABLE = True
+except ImportError:
+    CYTHON_AVAILABLE = False
+
 
 @pytest.fixture
 def blobs():
@@ -112,9 +119,49 @@ class TestComputeConivat:
         X, _ = blobs
         D = pairwise_distances(np.ascontiguousarray(X.astype(np.float64)))
         ivat_matrix, _, ivat_order = compute_ivat(D.copy(), inplace=False)
-        cv_matrix, _, cv_order = compute_conivat(X, metric_learning=False)
+        cv_matrix, _, cv_order = compute_conivat(
+            X, metric_learning=False, backend="python"
+        )
         assert np.allclose(ivat_matrix, cv_matrix)
         assert np.array_equal(ivat_order, cv_order)
+
+    def test_invalid_backend_raises(self, blobs):
+        X, _ = blobs
+        with pytest.raises(ValueError, match="backend must be"):
+            compute_conivat(X, metric_learning=False, backend="nope")
+
+
+@pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
+class TestComputeConivatCython:
+    def test_cython_matches_python(self, blobs):
+        # The compiled and pure paths must stay behaviorally equivalent.
+        X, y = blobs
+        ml, cl = generate_constraints_from_labels(y, 30, random_state=5)
+        py_matrix, _, py_order = compute_conivat(
+            X, must_link=ml, cannot_link=cl, backend="python"
+        )
+        cy_matrix, _, cy_order = compute_conivat(
+            X, must_link=ml, cannot_link=cl, backend="cython"
+        )
+        assert np.allclose(py_matrix, cy_matrix, rtol=1e-5, atol=1e-6)
+        assert np.array_equal(py_order, cy_order)
+
+    def test_cython_reduces_to_compiled_ivat(self, blobs):
+        # With no constraints / no metric learning, compiled ConiVAT == the
+        # optimized compiled iVAT it delegates to.
+        from tribbleclustering.pcvat import (
+            pairwise_distances_c,
+            compute_ivat_c as _civat,
+        )
+
+        X, _ = blobs
+        Xc = np.ascontiguousarray(X.astype(np.float64))
+        iv_matrix, _, iv_order = _civat(pairwise_distances_c(Xc), inplace=False)
+        cv_matrix, _, cv_order = compute_conivat(
+            X, metric_learning=False, backend="cython"
+        )
+        assert np.allclose(iv_matrix, cv_matrix)
+        assert np.array_equal(iv_order, cv_order)
 
     def test_output_shapes(self, blobs):
         X, y = blobs
