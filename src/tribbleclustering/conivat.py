@@ -271,7 +271,7 @@ def learn_metric(
     must_link: ConstraintList,
     cannot_link: ConstraintList,
     *,
-    max_iters: int = 100,
+    max_iters: int = 30,
     learning_rate: float = 0.1,
     tol: float = 1e-4,
     projection_iters: int = 20,
@@ -290,7 +290,12 @@ def learn_metric(
     must_link, cannot_link : sequence of (int, int)
         The (already expanded) "similar" and "dissimilar" pairs.
     max_iters : int
-        Maximum gradient-ascent iterations.
+        Maximum gradient-ascent iterations. Kept deliberately small: the
+        fixed-step projected ascent converges within a handful of iterations on
+        well-conditioned constraint sets (empirically <=~17), but on some sets
+        the objective oscillates rather than meeting ``tol`` and would otherwise
+        run to the cap. Bounding it here keeps the (n-independent) metric-learning
+        cost stable instead of occasionally spiking to the full iteration count.
     learning_rate : float
         Gradient-ascent step size.
     tol : float

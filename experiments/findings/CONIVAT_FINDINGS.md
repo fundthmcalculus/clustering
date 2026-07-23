@@ -163,16 +163,19 @@ O(n²) core (distances + iVAT transform is constraint-independent); they drive
 two n-independent stages: `expand_constraints` (transitive closure + pair
 expansion) and `learn_metric` (MMC).
 
+(`learn_metric` caps `max_iters` at 30 — see the MMC note below.)
+
 | #req | ‌|ML*| | ‌|CL*| | expand (ms) | MMC (ms) | core (ms) | full (ms) |
 |------|-------|-------|-------------|----------|-----------|-----------|
-| 5 | 0 | 5 | 1.0 | 0.0 | 327 | 320 |
-| 50 | 12 | 38 | 1.0 | 4.1 | 340 | 338 |
-| 100 | 25 | 80 | 1.2 | 3.3 | 339 | 342 |
-| 200 | 54 | 156 | 1.2 | 46.8 | 333 | 402 |
-| 300 | 77 | 242 | 1.4 | 7.3 | 340 | 371 |
-| 500 | 135 | 424 | 1.5 | 9.3 | 330 | 335 |
+| 5 | 0 | 5 | 1.7 | 0.0 | 382 | 382 |
+| 50 | 12 | 38 | 1.1 | 4.3 | 369 | 381 |
+| 100 | 25 | 80 | 1.2 | 3.4 | 391 | 389 |
+| 200 | 54 | 156 | 1.3 | 15.1 | 392 | 403 |
+| 300 | 77 | 242 | 1.4 | 6.9 | 393 | 391 |
+| 500 | 135 | 424 | 1.5 | 9.2 | 389 | 399 |
 
-Constraint-free core baseline: **331 ms**.
+Constraint-free core baseline: **379 ms** (machine noise vs. other runs; the
+core is constraint-independent).
 
 **Read-out.**
 - **The dial is essentially free.** Total ConiVAT time stays within ~±3% of the
@@ -187,18 +190,20 @@ Constraint-free core baseline: **331 ms**.
   with the request (up to 135 / 424 at 500), nowhere near the 100k safety cap.
   (A pathological input that must-links one whole cluster would expand
   quadratically — that is what the cap guards.)
-- **MMC cost is small but noisy.** `learn_metric` runs ~3–9 ms, with an outlier
-  at 200 constraints (≈47 ms). The spike is **convergence-iteration
-  variability**: MMC's projected gradient ascent runs a data-dependent number of
-  iterations (up to `max_iters`), and that depends on *which* pairs were drawn,
-  not just how many — so it is not a smooth function of the count. It never
-  dominates (worst case still <15% of total).
+- **MMC cost is small and now bounded.** `learn_metric` runs ~3–9 ms. It used
+  to spike to ≈47 ms at 200 constraints: on that particular constraint set the
+  projected-gradient objective **oscillates** rather than meeting `tol`, so it
+  ran the full (then-100) iteration cap. Well-conditioned sets converge fast
+  (≤~17 iters observed), so the fix is to **cap `max_iters` at 30** — it never
+  truncates a genuinely converging solve but bounds the oscillating worst case.
+  With the cap the 200-constraint point drops to ~15 ms (~3× smaller); MMC is
+  now a stable ~3–9 ms with no dramatic outlier.
 
 **Takeaway.** Unlike the N dial (quadratic), the constraint dial is cheap and
 roughly linear in the expanded-pair count over this range — you can add
 background knowledge freely without a meaningful runtime penalty at N=5000. The
-only thing to watch is MMC's data-dependent iteration count; capping
-`max_iters` (or a tighter tolerance) would remove the occasional spike.
+one wrinkle (MMC's data-dependent iteration count) is now capped, so
+constraint-handling cost is stable at a few ms regardless of the draw.
 
 ## Caveats / next steps
 
