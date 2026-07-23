@@ -11,6 +11,9 @@
   → `experiments/figures/conivat_cython_bench.png`
 - Compiled-only perf test to N=20000: `experiments/conivat_cython_scaling.py`
   → `experiments/figures/conivat_cython_scaling.png`
+- Constraint-dial perf (N=5000, constraints 5→500):
+  `experiments/conivat_constraint_scaling.py`
+  → `experiments/figures/conivat_constraint_scaling.png`
 - Paper (committed): `docs/papers/Rathore_2020_ConiVAT.pdf`
   (arXiv:2008.09570, IEEE TKDE). Bibliography entry: `docs/bibliography.md` §1.
 
@@ -151,6 +154,51 @@ iVAT-kernel concern, orthogonal to ConiVAT.
   core at small n (tens of ms, and noisy from variable MMC convergence) and is
   indistinguishable from the core by n ≳ 6000, confirming the metric-learning
   solve is n-independent.
+
+## The constraint dial (N fixed at 5000, constraints 5 → 500)
+
+`experiments/figures/conivat_constraint_scaling.png` — n held at 5000 (compiled
+backend), sweeping the *number of constraints*. Constraints never touch the
+O(n²) core (distances + iVAT transform is constraint-independent); they drive
+two n-independent stages: `expand_constraints` (transitive closure + pair
+expansion) and `learn_metric` (MMC).
+
+| #req | ‌|ML*| | ‌|CL*| | expand (ms) | MMC (ms) | core (ms) | full (ms) |
+|------|-------|-------|-------------|----------|-----------|-----------|
+| 5 | 0 | 5 | 1.0 | 0.0 | 327 | 320 |
+| 50 | 12 | 38 | 1.0 | 4.1 | 340 | 338 |
+| 100 | 25 | 80 | 1.2 | 3.3 | 339 | 342 |
+| 200 | 54 | 156 | 1.2 | 46.8 | 333 | 402 |
+| 300 | 77 | 242 | 1.4 | 7.3 | 340 | 371 |
+| 500 | 135 | 424 | 1.5 | 9.3 | 330 | 335 |
+
+Constraint-free core baseline: **331 ms**.
+
+**Read-out.**
+- **The dial is essentially free.** Total ConiVAT time stays within ~±3% of the
+  331 ms constraint-free core across the whole 5 → 500 range. At 500 constraints
+  the constraint-handling stages sum to ~11 ms — about **3%** of the run. The
+  O(n²) core dwarfs everything the constraints add.
+- **`expand_constraints` is nearly flat** (1.0 → 1.5 ms). Its cost here is
+  dominated by the O(n) union-find component-grouping pass over all 5000 points,
+  not by the expansion itself — the expanded sets stay small.
+- **Expansion stays linear-ish, no clique blow-up.** Random label-sampled pairs
+  form small union-find components, so |ML*| and |CL*| grow roughly linearly
+  with the request (up to 135 / 424 at 500), nowhere near the 100k safety cap.
+  (A pathological input that must-links one whole cluster would expand
+  quadratically — that is what the cap guards.)
+- **MMC cost is small but noisy.** `learn_metric` runs ~3–9 ms, with an outlier
+  at 200 constraints (≈47 ms). The spike is **convergence-iteration
+  variability**: MMC's projected gradient ascent runs a data-dependent number of
+  iterations (up to `max_iters`), and that depends on *which* pairs were drawn,
+  not just how many — so it is not a smooth function of the count. It never
+  dominates (worst case still <15% of total).
+
+**Takeaway.** Unlike the N dial (quadratic), the constraint dial is cheap and
+roughly linear in the expanded-pair count over this range — you can add
+background knowledge freely without a meaningful runtime penalty at N=5000. The
+only thing to watch is MMC's data-dependent iteration count; capping
+`max_iters` (or a tighter tolerance) would remove the occasional spike.
 
 ## Caveats / next steps
 
