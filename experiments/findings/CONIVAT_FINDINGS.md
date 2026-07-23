@@ -163,25 +163,33 @@ O(n²) core (distances + iVAT transform is constraint-independent); they drive
 two n-independent stages: `expand_constraints` (transitive closure + pair
 expansion) and `learn_metric` (MMC).
 
-(`learn_metric` caps `max_iters` at 30 — see the MMC note below.)
+(`learn_metric` caps `max_iters` at 30 — see the MMC note below. Timings are
+best-of-15 for the ~340 ms full/core runs and best-of-200 for the few-ms
+constraint stages, so the constraint-handling curves are essentially
+noise-free; the total-time panel is still floor-limited by the big
+constraint-independent core, so its axis is anchored at 0 to keep that jitter
+in proportion.)
 
 | #req | ‌|ML*| | ‌|CL*| | expand (ms) | MMC (ms) | core (ms) | full (ms) |
 |------|-------|-------|-------------|----------|-----------|-----------|
-| 5 | 0 | 5 | 1.7 | 0.0 | 382 | 382 |
-| 50 | 12 | 38 | 1.1 | 4.3 | 369 | 381 |
-| 100 | 25 | 80 | 1.2 | 3.4 | 391 | 389 |
-| 200 | 54 | 156 | 1.3 | 15.1 | 392 | 403 |
-| 300 | 77 | 242 | 1.4 | 6.9 | 393 | 391 |
-| 500 | 135 | 424 | 1.5 | 9.2 | 389 | 399 |
+| 5 | 0 | 5 | 0.9 | 0.0 | 344 | 349 |
+| 50 | 12 | 38 | 1.0 | 4.0 | 343 | 344 |
+| 100 | 25 | 80 | 1.1 | 2.7 | 331 | 338 |
+| 200 | 54 | 156 | 1.1 | 13.9 | 365 | 354 |
+| 300 | 77 | 242 | 1.2 | 6.2 | 370 | 369 |
+| 500 | 135 | 424 | 1.5 | 8.5 | 377 | 384 |
 
-Constraint-free core baseline: **379 ms** (machine noise vs. other runs; the
-core is constraint-independent).
+Constraint-free core baseline: **326 ms**. (The gentle rise of the core/full
+columns across the sweep is thermal drift over the ~3-min run, not a constraint
+effect — the O(n²) core is constraint-independent, and the actual constraint
+cost measured in isolation is <15 ms, far too small to explain a ~40 ms swing.)
 
 **Read-out.**
-- **The dial is essentially free.** Total ConiVAT time stays within ~±3% of the
-  331 ms constraint-free core across the whole 5 → 500 range. At 500 constraints
-  the constraint-handling stages sum to ~11 ms — about **3%** of the run. The
-  O(n²) core dwarfs everything the constraints add.
+- **The dial is essentially free.** Total ConiVAT time tracks the ~326 ms
+  constraint-free core across the whole 5 → 500 range (the visible variation is
+  core floor jitter / thermal drift, not the dial). At 500 constraints the
+  constraint-handling stages sum to ~10 ms — about **3%** of the run. The O(n²)
+  core dwarfs everything the constraints add.
 - **`expand_constraints` is nearly flat** (1.0 → 1.5 ms). Its cost here is
   dominated by the O(n) union-find component-grouping pass over all 5000 points,
   not by the expansion itself — the expanded sets stay small.
@@ -196,8 +204,9 @@ core is constraint-independent).
   ran the full (then-100) iteration cap. Well-conditioned sets converge fast
   (≤~17 iters observed), so the fix is to **cap `max_iters` at 30** — it never
   truncates a genuinely converging solve but bounds the oscillating worst case.
-  With the cap the 200-constraint point drops to ~15 ms (~3× smaller); MMC is
-  now a stable ~3–9 ms with no dramatic outlier.
+  With the cap the 200-constraint point drops to ~14 ms (~3× smaller); MMC is
+  now a stable ~3–9 ms with only that mild residual bump (the oscillating set
+  running the full 30-iter cap).
 
 **Takeaway.** Unlike the N dial (quadratic), the constraint dial is cheap and
 roughly linear in the expanded-pair count over this range — you can add

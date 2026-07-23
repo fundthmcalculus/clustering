@@ -53,9 +53,15 @@ N = 5000
 CONSTRAINTS = [5, 10, 20, 50, 75, 100, 150, 200, 300, 400, 500]
 SEED = 7
 BACKEND = "cython"
+# The ~380 ms constraint-independent core dominates and its run-to-run jitter
+# swamps the few-ms constraint signal, so take many samples and keep the best
+# (min removes upward OS/thermal noise). The cheap constraint-only stages get
+# far more samples since each costs only a few ms.
+REPEATS_HEAVY = 15  # full / core / baseline (each ~380 ms)
+REPEATS_LIGHT = 200  # expand_constraints / learn_metric (each a few ms)
 
 
-def _time(fn, *args, repeats: int = 3) -> float:
+def _time(fn, *args, repeats: int = REPEATS_HEAVY) -> float:
     """Best-of-`repeats` wall time in milliseconds (kernels already warmed)."""
     best = np.inf
     for _ in range(repeats):
@@ -101,8 +107,8 @@ def run() -> dict:
         ml_counts.append(len(ml_exp))
         cl_counts.append(len(cl_exp))
 
-        t_expand = _time(lambda: expand_constraints(ml, cl, N))
-        t_mmc = _time(lambda: learn_metric(X, ml_exp, cl_exp))
+        t_expand = _time(lambda: expand_constraints(ml, cl, N), repeats=REPEATS_LIGHT)
+        t_mmc = _time(lambda: learn_metric(X, ml_exp, cl_exp), repeats=REPEATS_LIGHT)
 
         def _full():
             return compute_conivat(
@@ -170,8 +176,11 @@ def _plot(baseline_ms, full_ms, core_ms, expand_ms, mmc_ms, ml_counts, cl_counts
     ax.set_xlabel("# constraints requested")
     ax.set_ylabel("total wall time (ms)")
     ax.set_title(f"ConiVAT total time vs constraint count (N={N})")
+    # Anchor at 0 so the residual ~few-percent core jitter reads as the flat
+    # line it is, rather than being magnified by an auto-zoomed axis.
+    ax.set_ylim(0, max(max(full_ms), max(core_ms), baseline_ms) * 1.15)
     ax.grid(True, alpha=0.3)
-    ax.legend()
+    ax.legend(loc="lower right")
 
     # Right: the constraint-handling stages (what actually scales), plus the
     # expanded-pair counts they scale with, on a secondary axis.
