@@ -11,6 +11,14 @@ graphs), `docs/novelty-review.md` / `docs/bibliography.md` (prior art).
 > GPU VAT, dual-VAT construction, joins, LK, and uncrossing-pre-pass work, and
 > `docs/vat-tsp-session2-novelty.md` for its (negative) novelty verdict.
 
+> **Default TSP solver (use this):** `experiments/vat_tsp_solve.py` —
+> `solve_tsp(coords, n_starts=8)` runs the validated pipeline (multi-start
+> nearest-neighbour → neighbour-list 2-opt* → 3-opt* → take-best), ~+2–4% over
+> optimum from n=2k–18k in seconds (GPU, NumPy fallback). CLI:
+> `python -m experiments.vat_tsp_solve <n> [--starts S] [--plot]`. Evidence &
+> the dead ends it avoids: `VAT_TSP_SCALE_FINDINGS.md`, `VAT_TSP_MPRIM_SWEEP_FINDINGS.md`,
+> `VAT_TSP_KOPT_FINDINGS.md`.
+
 ---
 
 ## 0. The defensible claim (carry this forward verbatim)
