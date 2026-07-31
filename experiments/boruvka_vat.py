@@ -28,6 +28,7 @@ Run:  python -m experiments.boruvka_vat
 from __future__ import annotations
 
 import heapq
+import os
 import time
 from pathlib import Path
 
@@ -325,7 +326,7 @@ def _time_gpu(fn, arg):
 def scaling_figure():
     from experiments.boruvka_gpu import boruvka_mst_gpu
 
-    sizes = [1000, 2000, 4000, 8000, 16000, 32000]
+    sizes = [1000, 2000, 4000, 8000]
     t_prim, t_bnumba, t_gpu_dev, t_gpu_xfer, order_match = [], [], [], [], []
     for n in sizes:
         X = make_blobs(n, 10, 25, seed=7)
@@ -357,7 +358,7 @@ def scaling_figure():
 
     fig, ax = plt.subplots(figsize=(8.5, 5.8))
     ax.plot(sizes, t_prim, "o-", label="serial Prim (C/OpenMP, O(n^2))")
-    ax.plot(sizes, t_bnumba, "s-", label="Boruvka (Numba, 32 cores)")
+    ax.plot(sizes, t_bnumba, "s-", label=f"Boruvka (Numba, {os.cpu_count()} cores)")
     if _HAS_CUPY:
         ax.plot(
             sizes,
