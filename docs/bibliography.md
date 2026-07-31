@@ -80,13 +80,21 @@ doi:10.1109/MSMC.2019.2961163.
   clusiVAT, aVAT, SpecVAT, …). Use it to position this work and to make sure no
   variant already claims the exact contribution.
 
-### [ConiVAT] Rathore, Bezdek, Palaniswami et al. (2020)
-P. Rathore, J. C. Bezdek, et al., "ConiVAT: Cluster Tendency Assessment and
-Clustering with Partial Background Knowledge," arXiv:2008.09570, 2020.
+### [ConiVAT] Rathore, Bezdek, Santi & Ratti (2020)
+P. Rathore, J. C. Bezdek, P. Santi, and C. Ratti, "ConiVAT: Cluster Tendency
+Assessment and Clustering with Partial Background Knowledge," *IEEE Trans.
+Knowledge and Data Engineering*; arXiv:2008.09570, 2020.
+https://arxiv.org/abs/2008.09570
 - **Relevance:** Constraint-guided iVAT that builds a *minimum-transitive*
   dissimilarity and addresses VAT/iVAT sensitivity to noise and "bridge" points — a
   known failure mode that also affects `IVATMeans`. PDF:
   `docs/papers/Rathore_2020_ConiVAT.pdf`.
+- **Implemented here:** `src/tribbleclustering/conivat.py` (`compute_conivat`,
+  `ConiVAT`) — a pure-Python reference that reuses `pvat.compute_ivat` for the
+  minimum-transitive-dissimilarity/minimax transform (the paper notes it *is*
+  the non-recursive iVAT transform). See
+  `experiments/findings/CONIVAT_FINDINGS.md` and the N=50→5000 scale study
+  `experiments/conivat_scaling.py`.
 
 ### [bigVAT / sVAT] Hathaway, Bezdek & Huband (2006); Hathaway et al. (2006)
 R. J. Hathaway, J. C. Bezdek, and J. M. Huband, "Scalable visual assessment of
