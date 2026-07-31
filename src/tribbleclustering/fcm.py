@@ -48,7 +48,8 @@ def fuzzy_c_means(
     :param m: Fuzziness parameter, default 2.0
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
-    :return: Tuple of membership matrix (shape (n_samples, n_clusters)) and cluster centers (shape (n_clusters, n_features))
+    :return: Tuple of membership matrix (shape (n_samples, n_clusters)) and
+        cluster centers (shape (n_clusters, n_features))
     """
     if initial_guess is not None and indices is not None:
         raise ValueError("initial_guess and indices cannot both be provided")

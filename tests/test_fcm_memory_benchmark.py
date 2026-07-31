@@ -10,6 +10,7 @@ import pytest
 
 try:
     from tribbleclustering.cfcm import fuzzy_c_means as fuzzy_c_means_optimized
+
     CYTHON_AVAILABLE = True
 except ImportError:
     CYTHON_AVAILABLE = False
@@ -17,6 +18,7 @@ except ImportError:
 from tribbleclustering.fcm import fuzzy_c_means as fuzzy_c_means_baseline
 
 
+@pytest.mark.benchmark
 @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
 def test_memory_optimization_benchmark():
     """Benchmark distance caching optimization.
@@ -33,10 +35,13 @@ def test_memory_optimization_benchmark():
 
     # Create well-separated clusters for consistent convergence
     cluster_centers = np.random.randn(n_clusters, n_features) * 10
-    x = np.vstack([
-        cluster_centers[i] + np.random.randn(n_samples // n_clusters, n_features) * 0.5
-        for i in range(n_clusters)
-    ]).astype(np.float64)
+    x = np.vstack(
+        [
+            cluster_centers[i]
+            + np.random.randn(n_samples // n_clusters, n_features) * 0.5
+            for i in range(n_clusters)
+        ]
+    ).astype(np.float64)
 
     # Warmup
     fuzzy_c_means_baseline(x, n_clusters, m=2.0)

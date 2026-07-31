@@ -11,6 +11,7 @@ from numpy.testing import assert_allclose
 
 try:
     from tribbleclustering.cfcm import fuzzy_c_means as fuzzy_c_means_optimized
+
     CYTHON_AVAILABLE = True
 except ImportError:
     CYTHON_AVAILABLE = False
@@ -26,15 +27,22 @@ def synthetic_data():
     n_features = 5
     n_clusters = 3
 
-    cluster_centers = np.array([[0.0, 0.0, 0.0, 0.0, 0.0],
-                                [3.0, 3.0, 3.0, 3.0, 3.0],
-                                [0.0, 3.0, 0.0, 3.0, 0.0]])
+    cluster_centers = np.array(
+        [
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [3.0, 3.0, 3.0, 3.0, 3.0],
+            [0.0, 3.0, 0.0, 3.0, 0.0],
+        ]
+    )
 
-    x = np.vstack([
-        cluster_centers[0] + np.random.randn(n_samples // 3, n_features) * 0.5,
-        cluster_centers[1] + np.random.randn(n_samples // 3, n_features) * 0.5,
-        cluster_centers[2] + np.random.randn(n_samples - 2 * (n_samples // 3), n_features) * 0.5,
-    ]).astype(np.float64)
+    x = np.vstack(
+        [
+            cluster_centers[0] + np.random.randn(n_samples // 3, n_features) * 0.5,
+            cluster_centers[1] + np.random.randn(n_samples // 3, n_features) * 0.5,
+            cluster_centers[2]
+            + np.random.randn(n_samples - 2 * (n_samples // 3), n_features) * 0.5,
+        ]
+    ).astype(np.float64)
 
     return x, n_clusters
 
@@ -109,9 +117,7 @@ class TestFCMMemoryOptimization:
         x, n_clusters = synthetic_data
         indices = np.arange(n_clusters * 2)
 
-        c, w = fuzzy_c_means_optimized(
-            x, n_clusters, m=2.0, indices=indices
-        )
+        c, w = fuzzy_c_means_optimized(x, n_clusters, m=2.0, indices=indices)
 
         assert c.shape == (n_clusters, x.shape[1])
         assert w.shape == (x.shape[0], n_clusters)
@@ -131,12 +137,10 @@ class TestFCMMemoryOptimization:
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_optimized_handles_duplicate_points(self):
         """Test optimized implementation with duplicate points."""
-        x = np.array([
-            [0.0, 0.0],
-            [0.0, 0.0],  # Duplicate
-            [1.0, 1.0],
-            [1.1, 1.1]
-        ], dtype=np.float64)
+        x = np.array(
+            [[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [1.1, 1.1]],  # Duplicate
+            dtype=np.float64,
+        )
 
         c, w = fuzzy_c_means_optimized(x, 2)
 

@@ -59,7 +59,6 @@ def vat_prim_mst_numba(
     while heap_len > 0:
         # Inline heappop: swap last with first, then bubble down
         heap_len -= 1
-        w = heap_keys[0]
         u = int(heap_u[0])
         v0 = int(heap_v[0])
 

@@ -174,6 +174,7 @@ class TestFCMCorrectness:
 class TestFCMPerformance:
     """Benchmark the implementations."""
 
+    @pytest.mark.benchmark
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_performance_small_dataset(self):
         """Benchmark on small dataset (100 samples)."""
@@ -184,13 +185,14 @@ class TestFCMPerformance:
         time_py = self._time_implementation(fuzzy_c_means_python, x, n_clusters)
         time_cy = self._time_implementation(fuzzy_c_means_cython, x, n_clusters)
 
-        print(f"\nSmall dataset (100 samples, 5 features, 3 clusters):")
+        print("\nSmall dataset (100 samples, 5 features, 3 clusters):")
         print(f"  Python: {time_py:.4f}s")
         print(f"  Cython: {time_cy:.4f}s")
         print(f"  Speedup: {time_py / time_cy:.2f}x")
 
         assert time_cy <= time_py * 2.0, "Cython should not be significantly slower"
 
+    @pytest.mark.benchmark
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_performance_medium_dataset(self):
         """Benchmark on medium dataset (1000 samples)."""
@@ -205,13 +207,14 @@ class TestFCMPerformance:
             fuzzy_c_means_cython, x, n_clusters, iterations=1
         )
 
-        print(f"\nMedium dataset (1000 samples, 10 features, 5 clusters):")
+        print("\nMedium dataset (1000 samples, 10 features, 5 clusters):")
         print(f"  Python: {time_py:.4f}s")
         print(f"  Cython: {time_cy:.4f}s")
         print(f"  Speedup: {time_py / time_cy:.2f}x")
 
         assert time_cy <= time_py * 2.0, "Cython should not be significantly slower"
 
+    @pytest.mark.benchmark
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_performance_large_dataset(self):
         """Benchmark on larger dataset (5000 samples)."""
@@ -226,7 +229,7 @@ class TestFCMPerformance:
             fuzzy_c_means_cython, x, n_clusters, iterations=1
         )
 
-        print(f"\nLarge dataset (5000 samples, 10 features, 8 clusters):")
+        print("\nLarge dataset (5000 samples, 10 features, 8 clusters):")
         print(f"  Python: {time_py:.4f}s")
         print(f"  Cython: {time_cy:.4f}s")
         print(f"  Speedup: {time_py / time_cy:.2f}x")

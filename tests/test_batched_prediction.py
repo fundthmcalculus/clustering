@@ -42,13 +42,15 @@ class TestIVATMeansBatchedPrediction:
         assert labels.shape == (50,)
         assert np.all((labels >= 0) & (labels < 3))
 
-    def test_large_batch_prediction(self, trained_ivatmeans):
+    def test_large_batch_prediction(self, trained_ivatmeans, ci_scale):
         """Test prediction with large test set (batching occurs)."""
         np.random.seed(123)
-        X_test = np.random.randn(50000, 5).astype(np.float64)
+        # Stay above the default batch_size (10000) so batching still runs.
+        n = ci_scale(50000, 20000)
+        X_test = np.random.randn(n, 5).astype(np.float64)
         labels = trained_ivatmeans.predict(X_test)
 
-        assert labels.shape == (50000,)
+        assert labels.shape == (n,)
         assert np.all((labels >= 0) & (labels < 3))
 
     def test_batch_consistency(self, trained_ivatmeans):
@@ -125,13 +127,15 @@ class TestFuzzyCMeansBatchedPrediction:
         assert labels.shape == (50,)
         assert np.all((labels >= 0) & (labels < 3))
 
-    def test_large_batch_prediction(self, trained_fuzzy_cmeans):
+    def test_large_batch_prediction(self, trained_fuzzy_cmeans, ci_scale):
         """Test prediction with large test set (batching occurs)."""
         np.random.seed(123)
-        X_test = np.random.randn(50000, 5).astype(np.float64)
+        # Stay above the default batch_size (10000) so batching still runs.
+        n = ci_scale(50000, 20000)
+        X_test = np.random.randn(n, 5).astype(np.float64)
         labels = trained_fuzzy_cmeans.predict(X_test)
 
-        assert labels.shape == (50000,)
+        assert labels.shape == (n,)
         assert np.all((labels >= 0) & (labels < 3))
 
     def test_batch_consistency(self, trained_fuzzy_cmeans):
@@ -200,31 +204,35 @@ class TestFuzzyCMeansBatchedPrediction:
 class TestBatchedPredictionMemoryUsage:
     """Test memory efficiency of batched prediction."""
 
-    def test_memory_efficiency_ivatmeans(self):
+    def test_memory_efficiency_ivatmeans(self, ci_scale):
         """IVATMeans batched prediction uses less memory than direct."""
         np.random.seed(42)
+        # Stay above batch_size (5000) so multiple batches are still exercised.
+        n = ci_scale(100000, 20000)
         X_train = np.random.randn(100, 50).astype(np.float64)
-        X_test = np.random.randn(100000, 50).astype(np.float64)
+        X_test = np.random.randn(n, 50).astype(np.float64)
 
         model = IVATMeans(n_clusters=5)
         model.fit(X_train)
 
         # Batched prediction should complete without memory error
         labels = model.predict(X_test, batch_size=5000)
-        assert labels.shape == (100000,)
+        assert labels.shape == (n,)
 
-    def test_memory_efficiency_fuzzy_cmeans(self):
+    def test_memory_efficiency_fuzzy_cmeans(self, ci_scale):
         """FuzzyCMeans batched prediction uses less memory than direct."""
         np.random.seed(42)
+        # Stay above batch_size (5000) so multiple batches are still exercised.
+        n = ci_scale(100000, 20000)
         X_train = np.random.randn(100, 50).astype(np.float64)
-        X_test = np.random.randn(100000, 50).astype(np.float64)
+        X_test = np.random.randn(n, 50).astype(np.float64)
 
         model = FuzzyCMeans(n_clusters=5)
         model.fit(X_train)
 
         # Batched prediction should complete without memory error
         labels = model.predict(X_test, batch_size=5000)
-        assert labels.shape == (100000,)
+        assert labels.shape == (n,)
 
 
 if __name__ == "__main__":
