@@ -28,6 +28,11 @@ src/tribbleclustering/
   fcm.py             # pure-numpy fuzzy_c_means reference implementation
   cfcm.pyx           # Cython/OpenMP fuzzy_c_means (f32 + f64 fused variants)
   fuzzycmeans.py     # FuzzyCMeans — sklearn-style class wrapper over FCM
+  lk.py              # pure-numpy Lin-Kernighan TSP solver: lin_kernighan,
+                     #   tour_length (reference / fallback path)
+  clk.pyx            # Cython/OpenMP Lin-Kernighan (f32 + f64 fused variants) with
+                     #   multi-threaded multi-start local optimization
+  linkernighan.py    # LinKernighan — sklearn-style class wrapper over LK
   ivatmeans.py       # IVATMeans — sklearn-style class wrapper over IVAT
   util.py            # pairwise_distances (numba), synthetic cluster generators
 tests/               # pytest suite (correctness + benchmark-marked perf tests)
@@ -54,7 +59,7 @@ Start from `experiments/findings/next-steps.md` (the roadmap/artifact index),
 
 ## Compiled-vs-pure-python fallback (important)
 
-The Cython extensions (`pcvat`, `cfcm`) are **optional at runtime**. The
+The Cython extensions (`pcvat`, `cfcm`, `clk`) are **optional at runtime**. The
 sklearn-style wrappers try to import the compiled kernel and silently fall back
 to the pure-Python/numba path if it isn't built:
 
@@ -86,8 +91,10 @@ Import from the top-level package (defined in `__init__.py`):
   `vat_prim_mst_seq`, `get_ivat_levels`, `get_ivat_hierarchy`
 - **Result types:** `IvatMeansResult`, `ClusterNode`
 - **FCM (functional):** `fuzzy_c_means`
+- **Lin-Kernighan TSP (functional):** `lin_kernighan`, `tour_length`
 - **sklearn-style classes:** `FuzzyCMeans`, `IVATMeans` (`.fit`, `.predict`,
-  `.fit_predict`, `.labels_`, `.cluster_centers_`)
+  `.fit_predict`, `.labels_`, `.cluster_centers_`); `LinKernighan`
+  (`.solve`, `.fit`, `.fit_predict`, `.tour_`, `.tour_length_`)
 - **Helpers:** `pairwise_distances`
 
 When you add or rename anything user-facing, update `__all__` in `__init__.py` —
