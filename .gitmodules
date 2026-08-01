@@ -1,3 +1,0 @@
-[submodule "experiments/tsplib"]
-	path = experiments/tsplib
-	url = https://github.com/mastqe/tsplib
