@@ -1,6 +1,5 @@
 from .pvat import (
     vat_prim_mst,
-    vat_prim_mst_seq,
     compute_vat,
     compute_ivat,
     get_ivat_levels,
@@ -32,7 +31,6 @@ from . import gpu_vat
 
 __all__ = [
     "vat_prim_mst",
-    "vat_prim_mst_seq",
     "compute_vat",
     "compute_ivat",
     "get_ivat_levels",

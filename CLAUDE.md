@@ -88,7 +88,7 @@ except ImportError:
 Import from the top-level package (defined in `__init__.py`):
 
 - **VAT/IVAT (functional):** `compute_vat`, `compute_ivat`, `vat_prim_mst`,
-  `vat_prim_mst_seq`, `get_ivat_levels`, `get_ivat_hierarchy`
+  `get_ivat_levels`, `get_ivat_hierarchy`
 - **Result types:** `IvatMeansResult`, `ClusterNode`
 - **FCM (functional):** `fuzzy_c_means`
 - **Lin-Kernighan TSP (functional):** `lin_kernighan`, `tour_length`
