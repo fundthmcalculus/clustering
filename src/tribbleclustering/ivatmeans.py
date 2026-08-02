@@ -343,6 +343,7 @@ class IVATMeans:
         if self.refine == "relational":
             return self._predict_relational(X, batch_size)
 
+        assert self.cluster_centers_ is not None  # checked above
         metric = _resolve_metric(self.metric)
         n_samples = X.shape[0]
         labels = np.empty(n_samples, dtype=np.int32)
@@ -367,7 +368,10 @@ class IVATMeans:
         that neighbor's minimax distance to j) -- exactly how Prim's MST
         would attach a new leaf connected by a single edge.
         """
-        assert self._relational_R_train is not None  # guaranteed by predict()
+        # Guaranteed by predict(): reachable only after a refine="relational" fit.
+        assert self._relational_R_train is not None
+        assert self._relational_X_train is not None
+        assert self._relational_u_train is not None
         metric = _resolve_metric(self.metric)
         n_samples = X.shape[0]
         labels = np.empty(n_samples, dtype=np.int32)
