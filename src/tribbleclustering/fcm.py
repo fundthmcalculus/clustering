@@ -7,28 +7,48 @@ from numpy import ndarray
 def _j_w_c(x: np.ndarray, c: np.ndarray, m: float) -> float:
     """Compute the weighted sum of squared distances"""
     w_ij = _get_weights(c, m, x)
-    j_wc = np.sum(
-        w_ij**m * np.sum((x[:, np.newaxis, :] - c[np.newaxis, :, :]) ** 2.0, axis=2),
-        axis=None,
-    )
-
+    # Compute squared distances using gram identity (same as in _get_weights)
+    x_norm2 = np.sum(x**2, axis=1, keepdims=True)  # (n, 1)
+    c_norm2 = np.sum(c**2, axis=1)  # (k,)
+    xc = 2 * np.dot(x, c.T)  # (n, k)
+    dist2 = np.maximum(x_norm2 + c_norm2 - xc, 0)  # (n, k)
+    j_wc = np.sum(w_ij**m * dist2, axis=None)
     return j_wc
 
 
 def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
-    distances = np.linalg.norm(x[:, np.newaxis, :] - c[np.newaxis, :, :], axis=2)
-    distances_to_jj = distances[:, :, np.newaxis]
-    distances_to_all = distances[:, np.newaxis, :]
-    w_ij = 1.0 / np.sum((distances_to_jj / distances_to_all) ** (2.0 / (m - 1)), axis=2)
+    # Compute squared distances using gram identity: ||x-c||^2 = ||x||^2 - 2*x*c^T + ||c||^2
+    # ||x||^2: shape (n, 1)
+    x_norm2 = np.sum(x**2, axis=1, keepdims=True)  # (n, 1)
+    # ||c||^2: shape (k,)
+    c_norm2 = np.sum(c**2, axis=1)  # (k,)
+    # -2*x*c^T: shape (n, k) via GEMM
+    xc = 2 * np.dot(x, c.T)  # (n, k)
+
+    # distances squared: (n, k)
+    dist2 = x_norm2 + c_norm2 - xc
+    # Ensure non-negative to avoid numerical issues
+    dist2 = np.maximum(dist2, 0)
+    distances = np.sqrt(dist2)
+
+    # Compute weights: w_ij = d_ij^(-2/(m-1)) / Σ_l d_il^(-2/(m-1))
+    # This avoids the (n,k,k) intermediate tensor
+    exp = -2.0 / (m - 1)
+    w_power = distances**exp  # (n, k)
+    w_ij = w_power / np.sum(w_power, axis=1, keepdims=True)  # (n, k)
+
     w_ij = np.where(np.isnan(w_ij) | np.isinf(w_ij), 0.0, w_ij)
     return w_ij
 
 
 def _get_v_ij(w_ij: ndarray, m: float, x: ndarray) -> ndarray:
-    v_ij = (
-        np.sum(w_ij[:, :, np.newaxis] ** m * (x[:, np.newaxis, :]), axis=0)
-        / np.sum(w_ij**m, axis=0)[:, np.newaxis]
-    )
+    # Compute centers: v = (w^m)^T @ x / (w^m).sum(0)[:,None]
+    # This avoids the (n,k,d) intermediate tensor by using GEMM
+    w_m = w_ij**m  # (n, k)
+    denominator = np.sum(w_m, axis=0)  # (k,)
+    # GEMM: (k, n) @ (n, d) = (k, d)
+    numerator = np.dot(w_m.T, x)  # (k, d)
+    v_ij = numerator / denominator[:, np.newaxis]
     return v_ij
 
 
