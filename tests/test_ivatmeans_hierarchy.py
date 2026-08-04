@@ -80,7 +80,9 @@ class TestHierarchyPresence:
         assert model.hierarchy_ is not None
         # With n_levels=2 and 2 clusters, we should have children at level 1
         if len(model.hierarchy_.children) > 0:
-            assert all(isinstance(child, ClusterNode) for child in model.hierarchy_.children)
+            assert all(
+                isinstance(child, ClusterNode) for child in model.hierarchy_.children
+            )
 
     def test_n_levels_default_value(self):
         """Default n_levels should be 1."""
@@ -238,9 +240,9 @@ class TestHierarchyMultiLevel:
             for child in node.children:
                 child_set = set(child.indices)
                 parent_set = set(node.indices)
-                assert child_set.issubset(parent_set), (
-                    f"Child indices {child_set} not subset of parent {parent_set}"
-                )
+                assert child_set.issubset(
+                    parent_set
+                ), f"Child indices {child_set} not subset of parent {parent_set}"
                 check_containment(child)
 
         check_containment(model.hierarchy_)
@@ -282,10 +284,13 @@ class TestHierarchyFitPredict:
 
 # Helper functions
 
+
 def _assert_trees_equal(tree1: ClusterNode, tree2: ClusterNode, depth: int = 0):
     """Recursively check if two ClusterNode trees are structurally equal."""
     # Check that both have same indices (in any order)
-    assert set(tree1.indices) == set(tree2.indices), f"Indices mismatch at depth {depth}"
+    assert set(tree1.indices) == set(
+        tree2.indices
+    ), f"Indices mismatch at depth {depth}"
 
     # Check that both have same number of children
     assert len(tree1.children) == len(tree2.children), (
@@ -294,9 +299,9 @@ def _assert_trees_equal(tree1: ClusterNode, tree2: ClusterNode, depth: int = 0):
     )
 
     # Check centroids are close (floating point comparison)
-    assert np.allclose(tree1.centroid, tree2.centroid, rtol=1e-10), (
-        f"Centroid mismatch at depth {depth}"
-    )
+    assert np.allclose(
+        tree1.centroid, tree2.centroid, rtol=1e-10
+    ), f"Centroid mismatch at depth {depth}"
 
     # Recursively check children (need to match them first, in case order differs)
     if len(tree1.children) > 0:
