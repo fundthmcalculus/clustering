@@ -3,7 +3,7 @@ from typing import Callable, Optional, Union
 import numpy as np
 from numpy import ndarray
 
-from .pvat import get_ivat_levels, IvatMeansResult
+from .pvat import get_ivat_levels, get_ivat_hierarchy, IvatMeansResult, ClusterNode
 from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
 from . import gpu as _gpu
 from . import gpu_vat as _gpu_vat
@@ -101,6 +101,7 @@ class IVATMeans:
     def __init__(
         self,
         n_clusters: int = 2,
+        n_levels: int = 1,
         random_state: Optional[int] = None,
         distance_backend: str = "auto",
         on_device: bool = False,
@@ -110,6 +111,7 @@ class IVATMeans:
         metric: MetricLike = None,
     ):
         self.n_clusters = n_clusters
+        self.n_levels = n_levels
         self.random_state = random_state
         if refine not in ("medoid", "relational", "euclidean"):
             raise ValueError(
@@ -140,6 +142,7 @@ class IVATMeans:
         self.dtype = dtype
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
+        self.hierarchy_: Optional[ClusterNode] = None
         # Soft membership matrix (n_samples, n_clusters_found); only set when
         # refine="relational".
         self.membership_: Optional[ndarray] = None
@@ -225,6 +228,11 @@ class IVATMeans:
         # n_levels=1 always yields a single result, never a list.
         assert isinstance(ivat_result, IvatMeansResult)
         self._ivat_result = ivat_result
+
+        # Compute the hierarchy with the requested number of levels
+        self.hierarchy_ = get_ivat_hierarchy(
+            X, ivat_matrix, vat_order, n_levels=self.n_levels
+        )
 
         if self.refine == "euclidean":
             self.cluster_centers_ = ivat_result.initial_centroids
