@@ -101,6 +101,7 @@ class IVATMeans:
     def __init__(
         self,
         n_clusters: int = 2,
+        *,
         n_levels: int = 1,
         random_state: Optional[int] = None,
         distance_backend: str = "auto",

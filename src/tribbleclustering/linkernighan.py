@@ -66,6 +66,7 @@ class LinKernighan:
 
     def __init__(
         self,
+        *,
         n_starts: Optional[int] = None,
         max_depth: int = 5,
         neighbors: int = 8,

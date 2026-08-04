@@ -27,6 +27,7 @@ class FuzzyCMeans:
     def __init__(
         self,
         n_clusters: int,
+        *,
         m: float = 2.0,
         random_state: Optional[int] = None,
         use_gpu: bool | str = "auto",
