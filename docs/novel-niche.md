@@ -9,11 +9,12 @@
 ## TL;DR — the one-sentence niche
 
 > **There is no *fuzzy* member of the VAT clustering family, and the reason is a
-> geometry mismatch nobody has resolved: iVAT recovers structure in a
+> geometry bound nobody has lifted: iVAT recovers structure in a
 > minimax/ultrametric (single-link) space, but every VAT-based partitioning method
-> to date either stays crisp or, when it needs prototypes, collapses each cluster to
-> a *Euclidean mean* — discarding the very geometry iVAT built. Close that loop:
-> carry the iVAT minimax structure all the way into a *soft* partition.**
+> to date either stays crisp or, when it needs prototypes, summarises each cluster
+> by a *Euclidean mean*, which bounds it to clusters a prototype can stand for.
+> Close that loop: carry the iVAT minimax structure all the way into a *soft*
+> partition, covering the case the prototype cannot.**
 
 That is your niche. The rest of this document argues why it is open, why it is
 defensible, and gives you three concrete instantiations ranked by risk/payoff, plus
@@ -23,8 +24,21 @@ the experiments and citations to back each.
 
 ## 1. The core insight (this is the thesis-defining tension)
 
-Two facts from the literature, each individually well established, collide inside your
-own `IVATMeans`:
+**Read this section as an operating envelope, not as a bug report.** `IVATMeans` is a
+contribution in its own right, and the grad-school document now presents it as one
+(Ch. 3 §3.3.5). It is **initialization-free**: the partition comes off the deterministic
+iVAT ordering, so the same data gives the same answer every run, where FCM has to be
+started somewhere and its random starts give run-to-run variation with no guarantee of
+the same partition twice. The reordered image is an artifact a person can **verify the
+partition against**, which no prototype method offers. One `fit` returns **assignment and
+membership together**. And cluster extraction is called at `n_levels=1` inside a routine
+written for several levels, so the same call **begins to advise on tree structure** (no
+hierarchy is exposed on the estimator; that part is unfinished, not claimed). Everything
+below is about where the *back end* stops, which is a different question from whether the
+method is good.
+
+Two facts from the literature, each individually well established, meet inside your
+own `IVATMeans` and bound what its back end can represent:
 
 **Fact A — iVAT lives in minimax/ultrametric space.**
 The iVAT recurrence `D'[r,c] = max(D*[r,j], D'[j,c])` computes the **minimax path
@@ -69,10 +83,11 @@ re-merges them. That figure has not been produced; it is the predicted loss the
 grad-school proposal tracks as Goal G9, and if `IVATMeans` reaches ARI 1.00 there,
 this section is what needs re-arguing.)
 
-Nobody has resolved this because the VAT community has stayed on the *crisp/visual*
+Nobody has covered that case because the VAT community has stayed on the *crisp/visual*
 side (clusiVAT, aVAT, SpecVAT, ML-aVAT, kernel-iVAT) while the *fuzzy* community
 (FCM++, relational FCM) never adopted the VAT/minimax ordering. **You sit exactly in
-that unoccupied intersection.**
+that unoccupied intersection**, and `IVATMeans` already reaches into it from the
+coordinate side, as far as a Euclidean prototype can go.
 
 ---
 
@@ -108,9 +123,9 @@ ordering-based seeds) into a **relational fuzzy clustering** algorithm that oper
 Rousseeuw). NERFCM even has the β-spread trick for exactly the non-Euclidean
 dissimilarities iVAT produces.
 **Why it's novel & defensible.** Every ingredient is published and trusted, but the
-composition — *the first soft/fuzzy member of the VAT family, computed in the iVAT
-minimax space with no Euclidean-mean step* — does not exist. It directly repairs the
-§1 collision.
+composition, *the first soft/fuzzy member of the VAT family, computed in the iVAT
+minimax space with no Euclidean-mean step*, does not exist. It covers exactly the case
+§1's prototype bound excludes, while keeping `IVATMeans`'s initialization-free front end.
 **Risk:** low-medium. **Payoff:** high (clean "first fuzzy VAT clustering" story).
 **Key comparisons:** clusiVAT (crisp), FCM/FCM++ (Euclidean), NERFCM on raw `D`
 (no iVAT structure) — to isolate what the iVAT ordering/auto-`k` adds.
@@ -148,7 +163,7 @@ on full data.
 
 ---
 
-## 4. The single experiment that proves the niche exists
+## 4. The single experiment that characterises the envelope
 
 One figure will motivate the entire thesis. On **two-moons** and **concentric rings**
 (canonical non-convex sets):
@@ -159,11 +174,22 @@ One figure will motivate the entire thesis. On **two-moons** and **concentric ri
    Euclidean **FCM** separately — two different back ends failing for the same reason,
    not one method doing both.
 4. Show your **Niche-1/2** variant (relational-fuzzy on `D'` / minimax medoids)
-   preserves the correct soft partition.
+   preserves the correct soft partition, covering the case step 3 cannot.
 
-Then quantify over many datasets (ARI/NMI, auto-`k` accuracy, and — for the fuzzy
-claim — a fuzzy validity index such as the partition coefficient / Xie–Beni) with the
+Then quantify over many datasets (ARI/NMI, auto-`k` accuracy, and, for the fuzzy
+claim, a fuzzy validity index such as the partition coefficient / Xie–Beni) with the
 baselines in §3. That progression *is* the contribution narrative.
+
+**This quantification is now a stated dissertation goal, not just a good idea.**
+grad-school Goal **G9** (Ch. 7 §7.2) benchmarks `IVATMeans` head-to-head against FCM and
+k-means on both halves: wall clock across a size ladder with the CPU and on-device
+backends separated, and partition quality by ARI including the non-convex sets where the
+envelope predicts `IVATMeans` loses. Two things to carry into that experiment. The
+predicted loss is the refutation condition: if the Euclidean prototype costs nothing on
+rings and moons, the whole argument for the relational method weakens. And the
+determinism is asymmetric: FCM and k-means need restarts reported as a spread, while
+`IVATMeans` has no spread over seeds, which is itself a result and should be printed
+rather than left as a blank column.
 
 ---
 
@@ -172,9 +198,9 @@ baselines in §3. That progression *is* the contribution narrative.
 > "The VAT family assesses cluster tendency and, in clusiVAT, performs crisp
 > single-linkage partitioning by imaging a sampled minimax (iVAT) dissimilarity and
 > extending labels via a nearest-prototype rule. We observe that this and all
-> prototype-based VAT variants reintroduce a Euclidean-mean representation that is
-> inconsistent with the minimax/ultrametric geometry iVAT is built on, degrading
-> results precisely on the non-convex structure iVAT is meant to capture. We propose
+> prototype-based VAT variants summarise each cluster by a Euclidean mean, which
+> bounds them to clusters a prototype can represent and so excludes precisely the
+> non-convex structure iVAT is otherwise able to capture. We propose
 > the first *fuzzy* member of the VAT family: cluster count and seeds are derived from
 > the exact iVAT ordering, and a *soft* partition is computed **in the minimax
 > dissimilarity space itself** via relational fuzzy clustering, never reverting to
@@ -182,9 +208,9 @@ baselines in §3. That progression *is* the contribution narrative.
 > fused-precision parallel kernels, avoiding the sampling approximation of prior
 > scalable VAT methods."
 
-Claim: **(1)** the geometry-mismatch diagnosis, **(2)** the first fuzzy/relational VAT
-clustering that fixes it, **(3)** the exact-fast implementation enabling it on full
-data. Do **not** claim VAT, iVAT, FCM, MST-cut, minimax distances, or auto-`k`-from-image
+Claim: **(1)** the prototype bound, stated and quantified, **(2)** the first
+fuzzy/relational VAT clustering covering the case it excludes, **(3)** the exact-fast
+implementation enabling both on full data, `IVATMeans` included. Do **not** claim VAT, iVAT, FCM, MST-cut, minimax distances, or auto-`k`-from-image
 as new — cite them and stand on them.
 
 ---
@@ -213,7 +239,8 @@ as new — cite them and stand on them.
 
 ## 7. What to do next (order of operations)
 1. **Reproduce the §4 figure** on two-moons / rings with the current `IVATMeans`. If the
-   mean-centroid failure shows up (it will), you have your motivating result.
+   prototype bound shows up (it will), you have your motivating result, and it doubles as
+   the quality half of Goal G9.
 2. **Prototype Niche 1** (NERFCM on the iVAT `D'`, seeded by iVAT segments). This is the
    smallest step to a defensible "first fuzzy VAT clustering" claim.
 3. **Add Niche 2** (minimax medoids) as the prototype ablation.

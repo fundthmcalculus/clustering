@@ -28,6 +28,9 @@ src/tribbleclustering/
   fcm.py             # pure-numpy fuzzy_c_means reference implementation
   cfcm.pyx           # Cython/OpenMP fuzzy_c_means (f32 + f64 fused variants)
   fuzzycmeans.py     # FuzzyCMeans — sklearn-style class wrapper over FCM
+  nerfcm.py          # relational_fuzzy_c_means / relational_out_of_sample_membership —
+                     #   NERFCM (Hathaway & Bezdek 1994) on a dissimilarity matrix; the
+                     #   geometry-consistent IVATMeans(refine="relational") back end
   lk.py              # pure-numpy Lin-Kernighan TSP solver: lin_kernighan,
                      #   tour_length (reference / fallback path)
   clk.pyx            # Cython/OpenMP Lin-Kernighan (f32 + f64 fused variants) with
@@ -91,10 +94,14 @@ Import from the top-level package (defined in `__init__.py`):
   `get_ivat_levels`, `get_ivat_hierarchy`
 - **Result types:** `IvatMeansResult`, `ClusterNode`
 - **FCM (functional):** `fuzzy_c_means`
+- **Relational FCM (functional):** `relational_fuzzy_c_means`,
+  `relational_out_of_sample_membership` (NERFCM; operates on a dissimilarity
+  matrix, no coordinates — see `IVATMeans(refine="relational")`)
 - **Lin-Kernighan TSP (functional):** `lin_kernighan`, `tour_length`
 - **sklearn-style classes:** `FuzzyCMeans`, `IVATMeans` (`.fit`, `.predict`,
-  `.fit_predict`, `.labels_`, `.cluster_centers_`); `LinKernighan`
-  (`.solve`, `.fit`, `.fit_predict`, `.tour_`, `.tour_length_`)
+  `.fit_predict`, `.labels_`, `.cluster_centers_`; `refine="medoid"` (default),
+  `"relational"`, or `"euclidean"` — see the class docstring and issue #54);
+  `LinKernighan` (`.solve`, `.fit`, `.fit_predict`, `.tour_`, `.tour_length_`)
 - **Helpers:** `pairwise_distances`
 
 When you add or rename anything user-facing, update `__all__` in `__init__.py` —

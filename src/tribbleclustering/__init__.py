@@ -11,6 +11,7 @@ from .pvat import (
 from .util import pairwise_distances
 
 from .fcm import fuzzy_c_means
+from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
 
 from .lk import lin_kernighan, tour_length
 from .conivat import (
@@ -39,6 +40,8 @@ __all__ = [
     "IvatMeansResult",
     "pairwise_distances",
     "fuzzy_c_means",
+    "relational_fuzzy_c_means",
+    "relational_out_of_sample_membership",
     "lin_kernighan",
     "tour_length",
     "compute_conivat",
