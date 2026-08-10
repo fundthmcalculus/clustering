@@ -8,6 +8,41 @@ from numba_progress import ProgressBar
 from numpy import ndarray
 
 
+@njit(cache=True, nogil=True)
+def _ivat_pathmax_kernel(d_star: np.ndarray, d_p_star: np.ndarray) -> np.ndarray:
+    """
+    Compute IVAT path-max values in place.
+
+    For each row r from 1 to n-1, find the minimum value in columns [0, r),
+    then fill the row with minimax distances: max(min_val, d_p_star[best_jj, c]).
+    Returns the argmin sequence.
+    """
+    n = d_star.shape[0]
+    argmin_seq = np.zeros(n - 1, dtype=np.int32)
+
+    for r in range(1, n):
+        # Find minimum distance in columns [0, r)
+        min_val = d_star[r, 0]
+        best_jj = 0
+        for c in range(1, r):
+            if d_star[r, c] < min_val:
+                min_val = d_star[r, c]
+                best_jj = c
+
+        argmin_seq[r - 1] = best_jj
+
+        # Fill row r with minimax values
+        d_p_star[r, best_jj] = min_val
+        d_p_star[best_jj, r] = min_val
+        for c in range(r):
+            if c != best_jj:
+                max_val = max(min_val, d_p_star[best_jj, c])
+                d_p_star[c, r] = max_val
+                d_p_star[r, c] = max_val
+
+    return argmin_seq
+
+
 def compute_ivat(
     matrix_of_pairwise_distance: np.ndarray, inplace: bool = False
 ) -> tuple[np.ndarray, list, np.ndarray]:
@@ -22,26 +57,14 @@ def compute_ivat(
     d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance, inplace=inplace
     )
-    n = d_star.shape[0]
     if not inplace:
         d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
     else:
         d_p_star = d_star
-    argmin_seq = []
-    for r in range(1, n):
-        jj = np.argmin(d_star[r, :r])
-        # TODO - Get from the prim-mst sequence?
-        # jj = as_seq[r-1]
-        argmin_seq.append(jj)
 
-        # TODO - Handle doing just upper-triangular matrix for memory savings?
-        d_p_star[r, jj] = d_star[r, jj]
-        d_p_star[jj, r] = d_star[r, jj]
-        for c in range(r):
-            if c != jj:
-                d_p_star[c, r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c])
+    argmin_seq = _ivat_pathmax_kernel(d_star, d_p_star)
 
-    return d_p_star, argmin_seq, p_seq
+    return d_p_star, argmin_seq.tolist(), p_seq
 
 
 def compute_vat(
