@@ -53,26 +53,35 @@ Euclidean distance; they are "fundamentally constrained to create convex regions
 are known to fail on non-convex/elongated clusters. The **mean of a ring or an
 elongated filament is not in the cluster** and is a meaningless prototype.
 
-**Where the bound bites (in `pvat.get_ivat_levels` → `ivatmeans.py`):**
-`IVATMeans` uses iVAT (Fact A) to *find* clusters, then
+**The bound (in `pvat.get_ivat_levels` → `ivatmeans.py`):** `IVATMeans` uses iVAT
+(Fact A) to *find* clusters, then
 
-1. represents each recovered cluster by `np.mean(all_cities[cluster_ids], axis=0)`,
-   a **Euclidean centroid**, and
-2. assigns every point by **nearest Euclidean centroid** (Fact B). The same centroids
-   also serve as FCM seeds wherever FCM is run downstream.
+1. represents each recovered cluster by `np.mean(all_cities[cluster_ids], axis=0)`
+   — a **Euclidean centroid**, and
+2. assigns every point to its **nearest Euclidean centroid** (Fact B), in
+   `_assign_clusters`.
 
-So the front end and the back end have different reach, and that is the whole content
-of the tension. The front end is where `IVATMeans` earns its place: exact on the whole
-data at the scale the engine reaches, verifiable against the image it read the cuts off,
-deterministic and unseeded, returning assignment and membership from one fit. The back
-end is where it stops: a mean is a Euclidean prototype and nearest-centroid assigns by
-Euclidean distance, so the reach of the method as a whole is the reach of the prototype,
-and no better centroid heuristic lifts that, a ring having no good Euclidean prototype
-at all. **That bound is real and demonstrable, and it is the opening**: a relational
-method in the minimax space is the *complement* covering exactly the case a prototype
-cannot, not a correction of something done wrong. (You can show the bound in one figure:
-two moons / concentric rings, where iVAT cuts them perfectly but the segment *means* land
-in empty space and nearest-centroid re-merges them.)
+There is no FCM in that path. `ivatmeans.py` imports `typing`, `numpy`, `.pvat`,
+`.gpu` and `.gpu_vat`, and nothing else; `grep -c fcm` on it returns 0. Where FCM
+appears alongside `IVATMeans` it is a **separate downstream step** a caller may seed
+with these centroids, which is how `docs/novelty-review.md` has always described it.
+An earlier version of this section said the estimator "refines / assigns with
+Euclidean FCM or nearest-centroid" and called the result a collision inside one
+method. It is not: the assignment step is nearest-centroid, full stop.
+
+What survives the correction is the part that matters, and it is a **bound rather than
+a flaw**. The front end is coordinate-free and the back end is not, so a cluster no
+Euclidean prototype can represent is one `IVATMeans` will mislabel even when iVAT cut
+it correctly — the mean of a ring is in its hole. That is a real and stateable limit
+on where the estimator applies, and it is the opening for a relational back end. It is
+not evidence that the shipped code contradicts itself, and the difference matters:
+one is a design boundary to document, the other would be a bug to fix.
+
+(The demonstration is the same either way: two moons or concentric rings, where iVAT
+cuts them perfectly and the segment *means* land in empty space, so nearest-centroid
+re-merges them. That figure has not been produced; it is the predicted loss the
+grad-school proposal tracks as Goal G9, and if `IVATMeans` reaches ARI 1.00 there,
+this section is what needs re-arguing.)
 
 Nobody has covered that case because the VAT community has stayed on the *crisp/visual*
 side (clusiVAT, aVAT, SpecVAT, ML-aVAT, kernel-iVAT) while the *fuzzy* community
@@ -160,9 +169,10 @@ One figure will motivate the entire thesis. On **two-moons** and **concentric ri
 (canonical non-convex sets):
 
 1. Show iVAT recovers the structure (clean cut points on the ordered profile).
-2. Overlay the **segment means**: they land *between*/outside the true clusters.
-3. Show Euclidean nearest-centroid (`IVATMeans`'s back end, or FCM on those seeds)
-   re-merges or mislabels them. This is the prototype bound, measured.
+2. Overlay the **segment means** — they land *between*/outside the true clusters.
+3. Show **`IVATMeans`** (nearest Euclidean centroid) re-merges or mislabels them, and
+   Euclidean **FCM** separately — two different back ends failing for the same reason,
+   not one method doing both.
 4. Show your **Niche-1/2** variant (relational-fuzzy on `D'` / minimax medoids)
    preserves the correct soft partition, covering the case step 3 cannot.
 
