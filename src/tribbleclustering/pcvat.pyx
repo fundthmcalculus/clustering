@@ -998,3 +998,237 @@ def compute_ivat_c(adj, inplace=False):
         return compute_ivat_c_64(adj_c)
     else:
         raise TypeError(f"Expected float32 or float64, got {adj.dtype}")
+
+
+# ---------------------------------------------------------------------------
+# vat_prim_mst_seq: Direct computation from samples (float64 and float32)
+# ---------------------------------------------------------------------------
+
+cdef void _prim_mst_seq_kernel_64(
+    const double* samples, int n, int d,
+    int* out_seq, int nthreads
+) noexcept nogil:
+    # Prim's algorithm for computing VAT ordering directly from samples.
+    # Computes distances on-the-fly without materializing the full distance matrix.
+    cdef int i, j, v, u, best_v, seq_idx, k
+    cdef double dist, best_key, max_dist, diff
+    cdef int* in_mst = <int*>calloc(n, sizeof(int))
+    cdef double* key = <double*>malloc(n * sizeof(double))
+
+    if in_mst == NULL or key == NULL:
+        raise MemoryError("Failed to allocate memory in _prim_mst_seq_kernel_64")
+
+    try:
+        # Initialize keys to infinity
+        for i in range(n):
+            key[i] = INFINITY
+            in_mst[i] = 0
+
+        # Find the pair of points with maximum distance (seed)
+        max_dist = -INFINITY
+        best_v = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                dist = 0.0
+                for k in range(d):
+                    diff = samples[<Py_ssize_t>i * d + k] - samples[<Py_ssize_t>j * d + k]
+                    dist += diff * diff
+                dist = sqrt(dist)
+                if dist > max_dist:
+                    max_dist = dist
+                    best_v = i
+
+        # Start from the seed vertex
+        out_seq[0] = best_v
+        in_mst[best_v] = 1
+        seq_idx = 1
+        key[best_v] = max_dist
+
+        # Initialize keys from seed vertex to all other vertices
+        for v in range(n):
+            if v != best_v:
+                dist = 0.0
+                for k in range(d):
+                    diff = samples[<Py_ssize_t>best_v * d + k] - samples[<Py_ssize_t>v * d + k]
+                    dist += diff * diff
+                dist = sqrt(dist)
+                key[v] = dist
+
+        # Main loop: select n-1 more vertices
+        for _ in range(n - 1):
+            # Find next vertex with minimum key among non-MST vertices
+            best_key = INFINITY
+            u = -1
+            for v in range(n):
+                if not in_mst[v] and key[v] < best_key:
+                    best_key = key[v]
+                    u = v
+
+            if u == -1:
+                break
+
+            out_seq[seq_idx] = u
+            seq_idx += 1
+            in_mst[u] = 1
+
+            # Update keys for remaining vertices
+            for v in range(n):
+                if not in_mst[v]:
+                    dist = 0.0
+                    for k in range(d):
+                        diff = samples[<Py_ssize_t>u * d + k] - samples[<Py_ssize_t>v * d + k]
+                        dist += diff * diff
+                    dist = sqrt(dist)
+                    if dist < key[v]:
+                        key[v] = dist
+    finally:
+        free(in_mst)
+        free(key)
+
+
+cdef void _prim_mst_seq_kernel_32(
+    const float* samples, int n, int d,
+    int* out_seq, int nthreads
+) noexcept nogil:
+    # Prim's algorithm for computing VAT ordering directly from samples (float32).
+    cdef int i, j, v, u, best_v, seq_idx, k
+    cdef float dist, best_key, max_dist, fdiff
+    cdef int* in_mst = <int*>calloc(n, sizeof(int))
+    cdef float* key = <float*>malloc(n * sizeof(float))
+
+    if in_mst == NULL or key == NULL:
+        raise MemoryError("Failed to allocate memory in _prim_mst_seq_kernel_32")
+
+    try:
+        # Initialize keys to infinity
+        for i in range(n):
+            key[i] = INFINITY_F
+            in_mst[i] = 0
+
+        # Find the pair of points with maximum distance (seed)
+        max_dist = -INFINITY_F
+        best_v = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                dist = 0.0
+                for k in range(d):
+                    fdiff = samples[<Py_ssize_t>i * d + k] - samples[<Py_ssize_t>j * d + k]
+                    dist += fdiff * fdiff
+                dist = sqrt(dist)
+                if dist > max_dist:
+                    max_dist = dist
+                    best_v = i
+
+        # Start from the seed vertex
+        out_seq[0] = best_v
+        in_mst[best_v] = 1
+        seq_idx = 1
+        key[best_v] = max_dist
+
+        # Initialize keys from seed vertex to all other vertices
+        for v in range(n):
+            if v != best_v:
+                dist = 0.0
+                for k in range(d):
+                    fdiff = samples[<Py_ssize_t>best_v * d + k] - samples[<Py_ssize_t>v * d + k]
+                    dist += fdiff * fdiff
+                dist = sqrt(dist)
+                key[v] = dist
+
+        # Main loop: select n-1 more vertices
+        for _ in range(n - 1):
+            # Find next vertex with minimum key among non-MST vertices
+            best_key = INFINITY_F
+            u = -1
+            for v in range(n):
+                if not in_mst[v] and key[v] < best_key:
+                    best_key = key[v]
+                    u = v
+
+            if u == -1:
+                break
+
+            out_seq[seq_idx] = u
+            seq_idx += 1
+            in_mst[u] = 1
+
+            # Update keys for remaining vertices
+            for v in range(n):
+                if not in_mst[v]:
+                    dist = 0.0
+                    for k in range(d):
+                        fdiff = samples[<Py_ssize_t>u * d + k] - samples[<Py_ssize_t>v * d + k]
+                        dist += fdiff * fdiff
+                    dist = sqrt(dist)
+                    if dist < key[v]:
+                        key[v] = dist
+    finally:
+        free(in_mst)
+        free(key)
+
+
+def vat_prim_mst_seq_c_64(double[:, ::1] samples):
+    """
+    Compute VAT ordering directly from samples using Prim's algorithm (float64).
+
+    Args:
+        samples: (n, d) array of float64 samples
+
+    Returns:
+        VAT ordering sequence (n,) int32 array
+    """
+    cdef int n = samples.shape[0]
+    cdef int d = samples.shape[1]
+    cdef int nthreads = openmp.omp_get_max_threads()
+
+    out_seq_np = np.zeros(n, dtype=np.int32)
+    cdef int[::1] out_seq = out_seq_np
+
+    with nogil:
+        _prim_mst_seq_kernel_64(&samples[0, 0], n, d, &out_seq[0], nthreads)
+
+    return out_seq_np
+
+
+def vat_prim_mst_seq_c_32(float[:, ::1] samples):
+    """
+    Compute VAT ordering directly from samples using Prim's algorithm (float32).
+
+    Args:
+        samples: (n, d) array of float32 samples
+
+    Returns:
+        VAT ordering sequence (n,) int32 array
+    """
+    cdef int n = samples.shape[0]
+    cdef int d = samples.shape[1]
+    cdef int nthreads = openmp.omp_get_max_threads()
+
+    out_seq_np = np.zeros(n, dtype=np.int32)
+    cdef int[::1] out_seq = out_seq_np
+
+    with nogil:
+        _prim_mst_seq_kernel_32(&samples[0, 0], n, d, &out_seq[0], nthreads)
+
+    return out_seq_np
+
+
+def vat_prim_mst_seq_c(samples):
+    """
+    Compute VAT ordering directly from samples using Prim's algorithm.
+    Automatically dispatches to float32 or float64 based on input dtype.
+
+    Args:
+        samples: (n, d) array of samples (float32 or float64)
+
+    Returns:
+        VAT ordering sequence (n,) int32 array
+    """
+    if samples.dtype == np.float32:
+        samples_c = np.require(samples, requirements=['C_CONTIGUOUS'], dtype=np.float32)
+        return vat_prim_mst_seq_c_32(samples_c)
+    elif samples.dtype == np.float64:
+        samples_c = np.require(samples, requirements=['C_CONTIGUOUS'], dtype=np.float64)
+        return vat_prim_mst_seq_c_64(samples_c)
+    else:
+        raise TypeError(f"Expected float32 or float64, got {samples.dtype}")
