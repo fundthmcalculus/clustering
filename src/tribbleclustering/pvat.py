@@ -9,6 +9,7 @@ from numpy import ndarray
 
 try:
     from .pcvat import vat_prim_mst_seq_c as _vat_prim_mst_seq_c
+
     _has_compiled_vat_prim_mst_seq = True
 except ImportError:
     _has_compiled_vat_prim_mst_seq = False

@@ -50,9 +50,9 @@ class TestVatPrimMstSeq:
         seq_ordering = vat_prim_mst_seq(random_samples)
 
         # Verify they match (should be identical)
-        assert len(seq_ordering) == len(vat_ordering), (
-            f"Sequence length mismatch: {len(seq_ordering)} vs {len(vat_ordering)}"
-        )
+        assert len(seq_ordering) == len(
+            vat_ordering
+        ), f"Sequence length mismatch: {len(seq_ordering)} vs {len(vat_ordering)}"
         agreement = agreement_ratio(seq_ordering, vat_ordering)
         assert (
             agreement == 1.0
