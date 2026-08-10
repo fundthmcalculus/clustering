@@ -1,7 +1,22 @@
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 from numpy import ndarray
+
+
+@dataclass
+class FuzzyMeansResult:
+    """Result of fuzzy c-means clustering."""
+
+    cluster_centers_: ndarray
+    membership_matrix_: ndarray
+    n_iter_: int
+    converged: bool
+
+    def __iter__(self):
+        """Support tuple unpacking for backward compatibility: c, w = result"""
+        return iter((self.cluster_centers_, self.membership_matrix_))
 
 
 def _j_w_c(x: np.ndarray, c: np.ndarray, m: float) -> float:
@@ -57,19 +72,21 @@ def fuzzy_c_means(
     n: int,
     m: float = 2.0,
     *,
+    max_iter: int = 100,
     indices: Optional[np.ndarray | list[int]] = None,
     initial_guess: Optional[np.ndarray] = None,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> FuzzyMeansResult:
     """
-    Compute the fuzzy c-means tribbleclustering algorithm.
+    Compute the fuzzy c-means clustering algorithm.
 
     :param x: Input data points, shape (n_samples, n_features)
     :param n: Number of clusters
     :param m: Fuzziness parameter, default 2.0
+    :param max_iter: Maximum number of iterations, default 100
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
-    :return: Tuple of membership matrix (shape (n_samples, n_clusters)) and
-        cluster centers (shape (n_clusters, n_features))
+    :return: FuzzyMeansResult containing cluster_centers_, membership_matrix_,
+        n_iter_ (actual iterations), and converged (boolean)
     """
     if initial_guess is not None and indices is not None:
         raise ValueError("initial_guess and indices cannot both be provided")
@@ -89,16 +106,25 @@ def fuzzy_c_means(
         # Combine every two rows into one so no cluster center exactly matches a data-point
         c = c.reshape(n, 2, x.shape[1]).mean(axis=1)
 
-    # Max of 100 iterations
-    for _ in range(100):
+    # Track convergence
+    converged = False
+    n_iter = 0
+
+    for iteration in range(max_iter):
         w_ij = _get_weights(c, m, x)
         c_new = _get_v_ij(w_ij, m, x)
+        n_iter = iteration + 1
         if np.allclose(c_new, c, rtol=1e-5, atol=1e-8):
+            converged = True
             break
         c = c_new
 
-    # Calculate membership matrix
+    # Calculate final membership matrix
     w_ij = _get_weights(c, m, x)
 
-    # 3. Return the center-points
-    return c, w_ij
+    return FuzzyMeansResult(
+        cluster_centers_=c,
+        membership_matrix_=w_ij,
+        n_iter_=n_iter,
+        converged=converged,
+    )

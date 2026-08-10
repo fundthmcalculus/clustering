@@ -45,7 +45,8 @@ class TestFCMCorrectness:
     def test_python_basic(self, synthetic_data):
         """Test Python implementation with basic input."""
         x, n_clusters = synthetic_data
-        c, w = fuzzy_c_means_python(x, n_clusters, m=2.0)
+        result = fuzzy_c_means_python(x, n_clusters, m=2.0)
+        c, w = result  # Test unpacking support
 
         assert c.shape == (n_clusters, x.shape[1])
         assert w.shape == (x.shape[0], n_clusters)
@@ -56,12 +57,16 @@ class TestFCMCorrectness:
     def test_cython_basic(self, synthetic_data):
         """Test Cython implementation with basic input."""
         x, n_clusters = synthetic_data
-        c, w = fuzzy_c_means_cython(x, n_clusters, m=2.0)
+        result = fuzzy_c_means_cython(x, n_clusters, m=2.0)
+        # Cython version returns (c, w, n_iter, converged)
+        c, w, n_iter, converged = result
 
         assert c.shape == (n_clusters, x.shape[1])
         assert w.shape == (x.shape[0], n_clusters)
         assert np.all(w >= 0)
         assert np.allclose(w.sum(axis=1), 1.0, atol=1e-6)
+        assert isinstance(n_iter, int)
+        assert isinstance(converged, bool)
 
     @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
     def test_cython_matches_python(self, synthetic_data):
@@ -72,12 +77,15 @@ class TestFCMCorrectness:
         np.random.seed(42)
         initial_guess = x[:n_clusters].copy()
 
-        c_py, w_py = fuzzy_c_means_python(
+        result_py = fuzzy_c_means_python(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
-        c_cy, w_cy = fuzzy_c_means_cython(
+        c_py, w_py = result_py  # Python version returns FuzzyMeansResult with __iter__
+
+        result_cy = fuzzy_c_means_cython(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
+        c_cy, w_cy, _, _ = result_cy  # Cython returns 4-tuple
 
         # With same initial guess, results should match closely
         # Note: differences may occur due to floating-point rounding and convergence path
@@ -90,7 +98,8 @@ class TestFCMCorrectness:
         x, n_clusters = synthetic_data
         initial_guess = x[:n_clusters].copy()
 
-        c, w = fuzzy_c_means_python(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        result = fuzzy_c_means_python(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        c, w = result
 
         assert c.shape == (n_clusters, x.shape[1])
         assert w.shape == (x.shape[0], n_clusters)
@@ -101,7 +110,8 @@ class TestFCMCorrectness:
         x, n_clusters = synthetic_data
         initial_guess = x[:n_clusters].copy()
 
-        c, w = fuzzy_c_means_cython(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        result = fuzzy_c_means_cython(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        c, w, _, _ = result  # Cython returns 4-tuple
 
         assert c.shape == (n_clusters, x.shape[1])
         assert w.shape == (x.shape[0], n_clusters)
@@ -112,12 +122,15 @@ class TestFCMCorrectness:
         x, n_clusters = synthetic_data
         initial_guess = x[:n_clusters].copy()
 
-        c_py, w_py = fuzzy_c_means_python(
+        result_py = fuzzy_c_means_python(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
-        c_cy, w_cy = fuzzy_c_means_cython(
+        c_py, w_py = result_py
+
+        result_cy = fuzzy_c_means_cython(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
+        c_cy, w_cy, _, _ = result_cy  # Cython returns 4-tuple
 
         # Tolerances account for floating-point rounding differences and convergence path
         # differences from distance caching optimization
@@ -156,7 +169,8 @@ class TestFCMCorrectness:
         x, n_clusters = synthetic_data
 
         for m in [1.5, 2.0, 3.0]:
-            c, w = fuzzy_c_means_python(x, n_clusters, m=m)
+            result = fuzzy_c_means_python(x, n_clusters, m=m)
+            c, w = result
             assert c.shape == (n_clusters, x.shape[1])
             assert w.shape == (x.shape[0], n_clusters)
 
@@ -166,7 +180,8 @@ class TestFCMCorrectness:
         x, n_clusters = synthetic_data
 
         for m in [1.5, 2.0, 3.0]:
-            c, w = fuzzy_c_means_cython(x, n_clusters, m=m)
+            result = fuzzy_c_means_cython(x, n_clusters, m=m)
+            c, w, _, _ = result  # Cython returns 4-tuple
             assert c.shape == (n_clusters, x.shape[1])
             assert w.shape == (x.shape[0], n_clusters)
 
@@ -253,7 +268,8 @@ class TestFCMNumericalStability:
     def test_python_handles_zero_distances(self):
         """Test Python implementation with duplicate points."""
         x = np.array([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [1.1, 1.1]])
-        c, w = fuzzy_c_means_python(x, 2)
+        result = fuzzy_c_means_python(x, 2)
+        c, w = result
 
         assert np.all(np.isfinite(c))
         assert np.all(np.isfinite(w))
@@ -262,7 +278,8 @@ class TestFCMNumericalStability:
     def test_cython_handles_zero_distances(self):
         """Test Cython implementation with duplicate points."""
         x = np.array([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [1.1, 1.1]], dtype=np.float64)
-        c, w = fuzzy_c_means_cython(x, 2)
+        result = fuzzy_c_means_cython(x, 2)
+        c, w, _, _ = result  # Cython returns 4-tuple
 
         assert np.all(np.isfinite(c))
         assert np.all(np.isfinite(w))
@@ -271,7 +288,8 @@ class TestFCMNumericalStability:
         """Test Python with large fuzziness parameter."""
         np.random.seed(42)
         x = np.random.randn(50, 3)
-        c, w = fuzzy_c_means_python(x, 3, m=10.0)
+        result = fuzzy_c_means_python(x, 3, m=10.0)
+        c, w = result
 
         assert np.all(np.isfinite(c))
         assert np.all(np.isfinite(w))
@@ -281,7 +299,8 @@ class TestFCMNumericalStability:
         """Test Cython with large fuzziness parameter."""
         np.random.seed(42)
         x = np.random.randn(50, 3).astype(np.float64)
-        c, w = fuzzy_c_means_cython(x, 3, m=10.0)
+        result = fuzzy_c_means_cython(x, 3, m=10.0)
+        c, w, _, _ = result  # Cython returns 4-tuple
 
         assert np.all(np.isfinite(c))
         assert np.all(np.isfinite(w))
