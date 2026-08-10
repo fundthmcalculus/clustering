@@ -2,7 +2,7 @@
 
 import numpy as np
 cimport cython
-from libc.math cimport sqrt, isnan, isinf
+from libc.math cimport sqrt, isnan, isinf, fmax
 from libc.stdint cimport int64_t, int32_t
 from dataclasses import dataclass
 
@@ -10,47 +10,51 @@ from dataclasses import dataclass
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void _compute_distances_32(
+cdef void _compute_distances_gram_32(
     const float[:, ::1] x,
     const float[:, ::1] c,
+    float[::1] x_norm2,
+    float[::1] c_norm2,
+    float[:, ::1] xc,
     float[:, ::1] distances
 ) noexcept nogil:
+    """Compute distances using gram identity: ||x-c||^2 = ||x||^2 - 2*x*c^T + ||c||^2
+    Inputs are precomputed and passed in."""
     cdef int n_samples = x.shape[0]
     cdef int n_clusters = c.shape[0]
-    cdef int n_features = x.shape[1]
-    cdef int i, j, k
-    cdef float d, diff
+    cdef int i, j
+    cdef float dist2
 
     for i in range(n_samples):
         for j in range(n_clusters):
-            d = 0.0
-            for k in range(n_features):
-                diff = x[i, k] - c[j, k]
-                d += diff * diff
-            distances[i, j] = sqrt(d)
+            dist2 = x_norm2[i] + c_norm2[j] - xc[i, j]
+            dist2 = fmax(dist2, 0.0)
+            distances[i, j] = sqrt(dist2)
 
 
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void _compute_distances_64(
+cdef void _compute_distances_gram_64(
     const double[:, ::1] x,
     const double[:, ::1] c,
+    double[::1] x_norm2,
+    double[::1] c_norm2,
+    double[:, ::1] xc,
     double[:, ::1] distances
 ) noexcept nogil:
+    """Compute distances using gram identity: ||x-c||^2 = ||x||^2 - 2*x*c^T + ||c||^2
+    Inputs are precomputed and passed in."""
     cdef int n_samples = x.shape[0]
     cdef int n_clusters = c.shape[0]
-    cdef int n_features = x.shape[1]
-    cdef int i, j, k
-    cdef double d, diff
+    cdef int i, j
+    cdef double dist2
 
     for i in range(n_samples):
         for j in range(n_clusters):
-            d = 0.0
-            for k in range(n_features):
-                diff = x[i, k] - c[j, k]
-                d += diff * diff
-            distances[i, j] = sqrt(d)
+            dist2 = x_norm2[i] + c_norm2[j] - xc[i, j]
+            dist2 = fmax(dist2, 0.0)
+            distances[i, j] = sqrt(dist2)
 
 
 @cython.cdivision(True)
@@ -270,9 +274,8 @@ cdef tuple _fuzzy_c_means_kernel_32(
     cdef float[:, ::1] distances
     cdef int i, j, k, iteration
     cdef float delta, max_delta
-    cdef bint recompute_distances
-    cdef float movement_threshold = 1e-6
     cdef bint converged = False
+    cdef int n_iter = 0
 
     c = np.zeros((n, n_features), dtype=np.float32)
     c_new = np.zeros((n, n_features), dtype=np.float32)
@@ -283,15 +286,26 @@ cdef tuple _fuzzy_c_means_kernel_32(
         for k in range(n_features):
             c[i, k] = c_init[i, k]
 
-    # Always recompute on first iteration
-    recompute_distances = True
-    cdef int n_iter = 0
-
     for iteration in range(max_iter):
         n_iter = iteration + 1
-        # Only recompute distances if centers moved significantly
-        if recompute_distances:
-            _compute_distances_32(x, c, distances)
+
+        # Compute gram components using numpy BLAS operations (released from GIL)
+        x_np = np.asarray(x)
+        c_np = np.asarray(c)
+
+        # ||x||^2: shape (n_samples,)
+        x_norm2 = np.sum(x_np**2, axis=1)
+        # ||c||^2: shape (n,)
+        c_norm2 = np.sum(c_np**2, axis=1)
+        # -2*x*c^T: shape (n_samples, n)
+        xc = 2 * np.dot(x_np, c_np.T)
+
+        x_norm2_view = x_norm2
+        c_norm2_view = c_norm2
+        xc_view = xc
+
+        # Compute distances using gram identity
+        _compute_distances_gram_32(x, c, x_norm2_view, c_norm2_view, xc_view, distances)
 
         _compute_weights_32(distances, m, w_ij)
 
@@ -312,18 +326,21 @@ cdef tuple _fuzzy_c_means_kernel_32(
             converged = True
             break
 
-        # Check if centers moved significantly for next iteration
-        recompute_distances = _centers_moved_significantly_32(
-            c, c_new, movement_threshold
-        )
-
         # Update centers
         for i in range(n):
             for k in range(n_features):
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    _compute_distances_32(x, c, distances)
+    x_np = np.asarray(x)
+    c_np = np.asarray(c)
+    x_norm2 = np.sum(x_np**2, axis=1)
+    c_norm2 = np.sum(c_np**2, axis=1)
+    xc = 2 * np.dot(x_np, c_np.T)
+    x_norm2_view = x_norm2
+    c_norm2_view = c_norm2
+    xc_view = xc
+    _compute_distances_gram_32(x, c, x_norm2_view, c_norm2_view, xc_view, distances)
     _compute_weights_32(distances, m, w_ij)
 
     return (np.asarray(c), np.asarray(w_ij), n_iter, converged)
@@ -374,9 +391,8 @@ cdef tuple _fuzzy_c_means_kernel_64(
     cdef double[:, ::1] distances
     cdef int i, j, k, iteration
     cdef double delta, max_delta
-    cdef bint recompute_distances
-    cdef double movement_threshold = 1e-6
     cdef bint converged = False
+    cdef int n_iter = 0
 
     c = np.zeros((n, n_features), dtype=np.float64)
     c_new = np.zeros((n, n_features), dtype=np.float64)
@@ -387,15 +403,26 @@ cdef tuple _fuzzy_c_means_kernel_64(
         for k in range(n_features):
             c[i, k] = c_init[i, k]
 
-    # Always recompute on first iteration
-    recompute_distances = True
-    cdef int n_iter = 0
-
     for iteration in range(max_iter):
         n_iter = iteration + 1
-        # Only recompute distances if centers moved significantly
-        if recompute_distances:
-            _compute_distances_64(x, c, distances)
+
+        # Compute gram components using numpy BLAS operations (released from GIL)
+        x_np = np.asarray(x)
+        c_np = np.asarray(c)
+
+        # ||x||^2: shape (n_samples,)
+        x_norm2 = np.sum(x_np**2, axis=1)
+        # ||c||^2: shape (n,)
+        c_norm2 = np.sum(c_np**2, axis=1)
+        # -2*x*c^T: shape (n_samples, n)
+        xc = 2 * np.dot(x_np, c_np.T)
+
+        x_norm2_view = x_norm2
+        c_norm2_view = c_norm2
+        xc_view = xc
+
+        # Compute distances using gram identity
+        _compute_distances_gram_64(x, c, x_norm2_view, c_norm2_view, xc_view, distances)
 
         _compute_weights_64(distances, m, w_ij)
 
@@ -416,18 +443,21 @@ cdef tuple _fuzzy_c_means_kernel_64(
             converged = True
             break
 
-        # Check if centers moved significantly for next iteration
-        recompute_distances = _centers_moved_significantly_64(
-            c, c_new, movement_threshold
-        )
-
         # Update centers
         for i in range(n):
             for k in range(n_features):
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    _compute_distances_64(x, c, distances)
+    x_np = np.asarray(x)
+    c_np = np.asarray(c)
+    x_norm2 = np.sum(x_np**2, axis=1)
+    c_norm2 = np.sum(c_np**2, axis=1)
+    xc = 2 * np.dot(x_np, c_np.T)
+    x_norm2_view = x_norm2
+    c_norm2_view = c_norm2
+    xc_view = xc
+    _compute_distances_gram_64(x, c, x_norm2_view, c_norm2_view, xc_view, distances)
     _compute_weights_64(distances, m, w_ij)
 
     return (np.asarray(c), np.asarray(w_ij), n_iter, converged)
