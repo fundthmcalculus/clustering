@@ -7,6 +7,12 @@ import numpy as np
 from numba_progress import ProgressBar
 from numpy import ndarray
 
+try:
+    from .pcvat import vat_prim_mst_seq_c as _vat_prim_mst_seq_c
+    _has_compiled_vat_prim_mst_seq = True
+except ImportError:
+    _has_compiled_vat_prim_mst_seq = False
+
 
 def compute_ivat(
     matrix_of_pairwise_distance: np.ndarray, inplace: bool = False
@@ -212,7 +218,7 @@ def vat_prim_mst(
 
 
 @njit(cache=True, nogil=True)
-def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
+def _vat_prim_mst_seq_python(samples: np.ndarray) -> np.ndarray:
     n = len(samples)
 
     # Find the pair of points with maximum distance.
@@ -265,6 +271,25 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
                     heapq.heappush(pq, (key[v], v))
 
     return heap_seq[:heap_seq_idx]
+
+
+def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
+    """
+    Compute VAT ordering directly from samples using Prim's algorithm.
+
+    Dispatches to the compiled Cython implementation if available,
+    otherwise falls back to the pure Python/numba implementation.
+
+    Args:
+        samples: (n, d) array of samples (float32 or float64)
+
+    Returns:
+        VAT ordering sequence (n,) int32 array
+    """
+    if _has_compiled_vat_prim_mst_seq:
+        return _vat_prim_mst_seq_c(samples)
+    else:
+        return _vat_prim_mst_seq_python(samples)
 
 
 @njit(cache=True)
