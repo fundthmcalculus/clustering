@@ -4,6 +4,7 @@ import numpy as np
 cimport cython
 from libc.math cimport sqrt, isnan, isinf
 from libc.stdint cimport int64_t, int32_t
+from dataclasses import dataclass
 
 
 @cython.cdivision(True)
@@ -258,7 +259,8 @@ cdef tuple _fuzzy_c_means_kernel_32(
     float[:, ::1] x,
     int n,
     float m,
-    float[:, ::1] c_init
+    float[:, ::1] c_init,
+    int max_iter = 100
 ):
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
@@ -270,6 +272,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
     cdef float delta, max_delta
     cdef bint recompute_distances
     cdef float movement_threshold = 1e-6
+    cdef bint converged = False
 
     c = np.zeros((n, n_features), dtype=np.float32)
     c_new = np.zeros((n, n_features), dtype=np.float32)
@@ -282,8 +285,10 @@ cdef tuple _fuzzy_c_means_kernel_32(
 
     # Always recompute on first iteration
     recompute_distances = True
+    cdef int n_iter = 0
 
-    for iteration in range(100):
+    for iteration in range(max_iter):
+        n_iter = iteration + 1
         # Only recompute distances if centers moved significantly
         if recompute_distances:
             _compute_distances_32(x, c, distances)
@@ -304,6 +309,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
                     max_delta = delta
 
         if max_delta < 1e-10:
+            converged = True
             break
 
         # Check if centers moved significantly for next iteration
@@ -320,7 +326,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
     _compute_distances_32(x, c, distances)
     _compute_weights_32(distances, m, w_ij)
 
-    return np.asarray(c), np.asarray(w_ij)
+    return (np.asarray(c), np.asarray(w_ij), n_iter, converged)
 
 
 @cython.cdivision(True)
@@ -357,7 +363,8 @@ cdef tuple _fuzzy_c_means_kernel_64(
     double[:, ::1] x,
     int n,
     double m,
-    double[:, ::1] c_init
+    double[:, ::1] c_init,
+    int max_iter = 100
 ):
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
@@ -369,6 +376,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
     cdef double delta, max_delta
     cdef bint recompute_distances
     cdef double movement_threshold = 1e-6
+    cdef bint converged = False
 
     c = np.zeros((n, n_features), dtype=np.float64)
     c_new = np.zeros((n, n_features), dtype=np.float64)
@@ -381,8 +389,10 @@ cdef tuple _fuzzy_c_means_kernel_64(
 
     # Always recompute on first iteration
     recompute_distances = True
+    cdef int n_iter = 0
 
-    for iteration in range(100):
+    for iteration in range(max_iter):
+        n_iter = iteration + 1
         # Only recompute distances if centers moved significantly
         if recompute_distances:
             _compute_distances_64(x, c, distances)
@@ -403,6 +413,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
                     max_delta = delta
 
         if max_delta < 1e-10:
+            converged = True
             break
 
         # Check if centers moved significantly for next iteration
@@ -419,7 +430,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
     _compute_distances_64(x, c, distances)
     _compute_weights_64(distances, m, w_ij)
 
-    return np.asarray(c), np.asarray(w_ij)
+    return (np.asarray(c), np.asarray(w_ij), n_iter, converged)
 
 
 def fuzzy_c_means_32(
@@ -427,6 +438,7 @@ def fuzzy_c_means_32(
     int n,
     m = 2.0,
     *,
+    max_iter: int = 100,
     indices = None,
     initial_guess = None,
 ) -> tuple:
@@ -470,7 +482,8 @@ def fuzzy_c_means_32(
         _init_centers_32(x, n, indices_view, c_init)
 
     m_float = np.float32(m)
-    return _fuzzy_c_means_kernel_32(x, n, m_float, c_init)
+    c, w, n_iter, converged = _fuzzy_c_means_kernel_32(x, n, m_float, c_init, max_iter)
+    return (c, w, n_iter, converged)
 
 
 def fuzzy_c_means_64(
@@ -478,6 +491,7 @@ def fuzzy_c_means_64(
     int n,
     m = 2.0,
     *,
+    max_iter: int = 100,
     indices = None,
     initial_guess = None,
 ) -> tuple:
@@ -521,7 +535,8 @@ def fuzzy_c_means_64(
         _init_centers_64(x, n, indices_view, c_init)
 
     m_double = np.float64(m)
-    return _fuzzy_c_means_kernel_64(x, n, m_double, c_init)
+    c, w, n_iter, converged = _fuzzy_c_means_kernel_64(x, n, m_double, c_init, max_iter)
+    return (c, w, n_iter, converged)
 
 
 def fuzzy_c_means(
@@ -529,6 +544,7 @@ def fuzzy_c_means(
     int n,
     m = 2.0,
     *,
+    max_iter: int = 100,
     indices = None,
     initial_guess = None,
 ) -> tuple:
@@ -538,21 +554,24 @@ def fuzzy_c_means(
     :param x: Input data points, shape (n_samples, n_features)
     :param n: Number of clusters
     :param m: Fuzziness parameter, default 2.0
+    :param max_iter: Maximum number of iterations, default 100
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
-    :return: Tuple of cluster centers (shape (n_clusters, n_features)) and membership matrix (shape (n_samples, n_clusters))
+    :return: FuzzyMeansResult containing cluster_centers_, membership_matrix_, n_iter_, and converged
     """
     x = np.asarray(x)
 
     if x.dtype == np.float32:
         return fuzzy_c_means_32(
             x, n, np.float32(m),
+            max_iter=max_iter,
             indices=indices,
             initial_guess=initial_guess
         )
     elif x.dtype == np.float64:
         return fuzzy_c_means_64(
             x, n, np.float64(m),
+            max_iter=max_iter,
             indices=indices,
             initial_guess=initial_guess
         )

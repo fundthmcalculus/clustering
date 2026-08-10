@@ -29,11 +29,13 @@ class FuzzyCMeans:
         n_clusters: int,
         *,
         m: float = 2.0,
+        max_iter: int = 100,
         random_state: Optional[int] = None,
         use_gpu: bool | str = "auto",
     ):
         self.n_clusters = n_clusters
         self.m = m
+        self.max_iter = max_iter
         self.random_state = random_state
         # use_gpu: True force GPU, False force CPU, "auto" use the GPU only when
         # a CUDA device is available and the sample count justifies it. Falls
@@ -42,6 +44,8 @@ class FuzzyCMeans:
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
         self.membership_matrix_: Optional[ndarray] = None
+        self.n_iter_: Optional[int] = None
+        self.converged: Optional[bool] = None
 
     def _should_use_gpu(self, n_samples: int) -> bool:
         if self.use_gpu is True:
@@ -84,10 +88,29 @@ class FuzzyCMeans:
             self.cluster_centers_, self.membership_matrix_ = _gpu.fuzzy_c_means_gpu(
                 X, self.n_clusters, m=self.m
             )
+            # GPU path does not return convergence info
+            self.n_iter_ = None
+            self.converged = None
         else:
-            self.cluster_centers_, self.membership_matrix_ = fcm_algorithm(
-                X, self.n_clusters, m=self.m
-            )
+            result = fcm_algorithm(X, self.n_clusters, m=self.m, max_iter=self.max_iter)
+            # Handle different return types
+            if hasattr(result, "cluster_centers_"):
+                # FuzzyMeansResult dataclass
+                self.cluster_centers_ = result.cluster_centers_
+                self.membership_matrix_ = result.membership_matrix_
+                self.n_iter_ = result.n_iter_
+                self.converged = result.converged
+            elif isinstance(result, tuple) and len(result) == 4:
+                # 4-tuple from Cython version: (c, w, n_iter, converged)
+                self.cluster_centers_ = result[0]
+                self.membership_matrix_ = result[1]
+                self.n_iter_ = result[2]
+                self.converged = result[3]
+            else:
+                # 2-tuple for backwards compatibility
+                self.cluster_centers_, self.membership_matrix_ = result
+                self.n_iter_ = None
+                self.converged = None
 
         self.labels_ = self._get_hard_labels()
 

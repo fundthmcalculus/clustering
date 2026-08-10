@@ -92,13 +92,12 @@ def test_memory_optimization_convergence_iterations():
     # Run both versions - they should converge in similar time
     # (number of iterations should be similar, though not identical)
     t0 = time.perf_counter()
-    c_baseline, w_baseline = fuzzy_c_means_baseline(
-        x, 3, m=2.0, initial_guess=initial_guess
-    )
+    result_baseline = fuzzy_c_means_baseline(x, 3, m=2.0, initial_guess=initial_guess)
+    c_baseline, w_baseline = result_baseline
     t_baseline = time.perf_counter() - t0
 
     t0 = time.perf_counter()
-    c_optimized, w_optimized = fuzzy_c_means_optimized(
+    c_optimized, w_optimized, _, _ = fuzzy_c_means_optimized(
         x, 3, m=2.0, initial_guess=initial_guess
     )
     t_optimized = time.perf_counter() - t0

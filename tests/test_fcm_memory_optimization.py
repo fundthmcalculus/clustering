@@ -54,7 +54,8 @@ class TestFCMMemoryOptimization:
         """Baseline implementation should converge."""
         x, n_clusters = synthetic_data
 
-        c, w = fuzzy_c_means_baseline(x, n_clusters, m=2.0)
+        result = fuzzy_c_means_baseline(x, n_clusters, m=2.0)
+        c, w = result
 
         # Basic sanity checks
         assert c.shape == (n_clusters, x.shape[1])
@@ -68,7 +69,7 @@ class TestFCMMemoryOptimization:
         """Optimized implementation should converge."""
         x, n_clusters = synthetic_data
 
-        c, w = fuzzy_c_means_optimized(x, n_clusters, m=2.0)
+        c, w, _, _ = fuzzy_c_means_optimized(x, n_clusters, m=2.0)
 
         # Basic sanity checks
         assert c.shape == (n_clusters, x.shape[1])
@@ -85,10 +86,11 @@ class TestFCMMemoryOptimization:
         # Use deterministic initialization
         initial_guess = x[:n_clusters].copy()
 
-        c_baseline, w_baseline = fuzzy_c_means_baseline(
+        result_baseline = fuzzy_c_means_baseline(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
-        c_optimized, w_optimized = fuzzy_c_means_optimized(
+        c_baseline, w_baseline = result_baseline
+        c_optimized, w_optimized, _, _ = fuzzy_c_means_optimized(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
 
@@ -104,7 +106,7 @@ class TestFCMMemoryOptimization:
         x, n_clusters = synthetic_data
         initial_guess = x[:n_clusters].copy()
 
-        c, w = fuzzy_c_means_optimized(
+        c, w, _, _ = fuzzy_c_means_optimized(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
 
@@ -117,7 +119,7 @@ class TestFCMMemoryOptimization:
         x, n_clusters = synthetic_data
         indices = np.arange(n_clusters * 2)
 
-        c, w = fuzzy_c_means_optimized(x, n_clusters, m=2.0, indices=indices)
+        c, w, _, _ = fuzzy_c_means_optimized(x, n_clusters, m=2.0, indices=indices)
 
         assert c.shape == (n_clusters, x.shape[1])
         assert w.shape == (x.shape[0], n_clusters)
@@ -128,7 +130,7 @@ class TestFCMMemoryOptimization:
         x, n_clusters = synthetic_data
 
         for m in [1.5, 2.0, 3.0]:
-            c, w = fuzzy_c_means_optimized(x, n_clusters, m=m)
+            c, w, _, _ = fuzzy_c_means_optimized(x, n_clusters, m=m)
             assert c.shape == (n_clusters, x.shape[1])
             assert w.shape == (x.shape[0], n_clusters)
             assert np.all(np.isfinite(c))
@@ -142,7 +144,7 @@ class TestFCMMemoryOptimization:
             dtype=np.float64,
         )
 
-        c, w = fuzzy_c_means_optimized(x, 2)
+        c, w, _, _ = fuzzy_c_means_optimized(x, 2)
 
         assert np.all(np.isfinite(c))
         assert np.all(np.isfinite(w))
@@ -153,7 +155,7 @@ class TestFCMMemoryOptimization:
         """Test with single cluster."""
         x, _ = synthetic_data
 
-        c, w = fuzzy_c_means_optimized(x, 1, m=2.0)
+        c, w, _, _ = fuzzy_c_means_optimized(x, 1, m=2.0)
 
         assert c.shape == (1, x.shape[1])
         assert w.shape == (x.shape[0], 1)
@@ -164,7 +166,7 @@ class TestFCMMemoryOptimization:
         """Test with many clusters."""
         x, _ = synthetic_data
 
-        c, w = fuzzy_c_means_optimized(x, 10, m=2.0)
+        c, w, _, _ = fuzzy_c_means_optimized(x, 10, m=2.0)
 
         assert c.shape == (10, x.shape[1])
         assert w.shape == (x.shape[0], 10)
@@ -184,7 +186,7 @@ class TestFCMMemoryOptimization:
         # This is a proxy test - we just verify it completes successfully
         # and produces reasonable results. A full benchmark would measure
         # wall-clock time and iteration count.
-        c, w = fuzzy_c_means_optimized(
+        c, w, _, _ = fuzzy_c_means_optimized(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
 
@@ -198,7 +200,7 @@ class TestFCMMemoryOptimization:
         np.random.seed(42)
         x = np.random.randn(50, 5).astype(np.float32)
 
-        c, w = fuzzy_c_means_optimized(x, 3, m=2.0)
+        c, w, _, _ = fuzzy_c_means_optimized(x, 3, m=2.0)
 
         # Results should be in float32
         assert c.dtype == np.float32
@@ -210,7 +212,7 @@ class TestFCMMemoryOptimization:
         np.random.seed(42)
         x = np.random.randn(50, 5).astype(np.float64)
 
-        c, w = fuzzy_c_means_optimized(x, 3, m=2.0)
+        c, w, _, _ = fuzzy_c_means_optimized(x, 3, m=2.0)
 
         # Results should be in float64
         assert c.dtype == np.float64
