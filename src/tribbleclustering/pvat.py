@@ -215,47 +215,35 @@ def vat_prim_mst(
 def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
     n = len(samples)
 
-    # Find the column of the maximum value.
-    max_adj = -np.inf
-    max_idx = (-1, -1)
+    # Find the pair of points with maximum distance.
+    max_dist = -np.inf
+    src_vertex = 0
     for ij in range(n):
-        for jk in range(ij, n):
+        for jk in range(ij + 1, n):
             cur_dist = _get_dist(samples, ij, jk)
-            if cur_dist > max_adj:
-                max_adj = cur_dist
-                max_idx = (ij, jk)
+            if cur_dist > max_dist:
+                max_dist = cur_dist
+                src_vertex = ij
 
-    src = max_idx[0]
-    src_key = max_adj
+    src_key = max_dist
 
     # Create a list for keys and initialize all keys as infinite (INF)
-    key: np.ndarray = np.full(n, float("inf"))
-
-    # To store the parent array which, in turn, stores MST
-    parent: np.ndarray = np.full(n, -1)
+    key: np.ndarray = np.full(n, np.inf)
 
     # To keep track of vertices included in MST
     in_mst = np.full(n, False)
 
-    # Insert the source itself into the priority queue and initialize its key as 0
-    pq: list[tuple[float, int]] = [
-        (src_key, src)
-    ]  # Priority queue to store vertices that are being processed
-    key[src] = src_key
+    # Insert the source itself into the priority queue and initialize its key
+    pq: list[tuple[float, int]] = [(src_key, src_vertex)]
+    key[src_vertex] = src_key
 
     # The final sequence of vertices in MST
     heap_seq: np.ndarray = np.zeros(n, dtype=np.int32)
     heap_seq_idx = 0
 
-    # Preallocated
-    vertices = np.arange(n)
-
     # Loop until the priority queue becomes empty
     while pq:
-        # The first vertex in the pair is the minimum key vertex
-        # Extract it from the priority queue
-        # The vertex label is stored in the second of the pair
-        u = heapq.heappop(pq)[1]
+        w, u = heapq.heappop(pq)
 
         # Different key values for the same vertex may exist in the priority queue.
         # The one with the least key value is always processed first.
@@ -268,19 +256,15 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
         heap_seq_idx += 1
 
         # Iterate through all adjacent vertices of a vertex
-        # Parallel processing of adjacent vertices
+        # Compute distances to all non-MST vertices and update keys
+        for v in range(n):
+            if v != u and not in_mst[v]:
+                dist_uv = _get_dist(samples, u, v)
+                if dist_uv < key[v]:
+                    key[v] = dist_uv
+                    heapq.heappush(pq, (key[v], v))
 
-        mask = (
-            (vertices != u)
-            & ~in_mst
-            & (key[vertices] > _get_dist(samples, u, vertices))
-        )
-        key[mask] = _get_dist(samples, u, vertices[mask])
-        for v in vertices[mask]:
-            heapq.heappush(pq, (key[v], v))
-            parent[v] = u
-
-    return heap_seq
+    return heap_seq[:heap_seq_idx]
 
 
 @njit(cache=True)
