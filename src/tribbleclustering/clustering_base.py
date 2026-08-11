@@ -7,7 +7,6 @@ IVATMeans) to enable clean method selection and swapping.
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import numpy as np
 from numpy import ndarray
 
 
