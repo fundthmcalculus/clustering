@@ -480,9 +480,7 @@ def kmeans_gpu(
         n_iter = iteration + 1
 
         # Check convergence
-        if bool(
-            _cp.all(_cp.abs(C_new - C) <= (1e-8 + tol * _cp.abs(C)))
-        ):
+        if bool(_cp.all(_cp.abs(C_new - C) <= (1e-8 + tol * _cp.abs(C)))):
             converged = True
             C = C_new
             break
