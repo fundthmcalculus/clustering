@@ -387,3 +387,117 @@ def fuzzy_c_means_gpu(
 
     U = _membership(C)
     return _cp.asnumpy(C), _cp.asnumpy(U)
+
+
+def kmeans_gpu(
+    x: np.ndarray,
+    n_clusters: int,
+    *,
+    max_iter: int = 100,
+    init: str = "k-means++",
+    tol: float = 1e-4,
+    indices: np.ndarray | None = None,
+    initial_guess: np.ndarray | None = None,
+):
+    """GPU K-Means clustering.
+
+    Mirrors ``kmeans.kmeans`` and returns a KMeansResult with cluster centers,
+    labels, inertia, iteration count, and convergence status.
+
+    Falls back to the CPU implementation if no CUDA device is available.
+    """
+    if not is_available():
+        from .kmeans import kmeans
+
+        return kmeans(
+            x,
+            n_clusters,
+            max_iter=max_iter,
+            init=init,
+            tol=tol,
+            indices=indices,
+            initial_guess=initial_guess,
+        )
+
+    from .kmeans import KMeansResult
+
+    x = np.asarray(x)
+    dtype = x.dtype if x.dtype in (np.float32, np.float64) else np.float64
+    Xd = _cp.asarray(np.ascontiguousarray(x, dtype=dtype))  # (n_samples, d), resident
+    n_samples, d = Xd.shape
+
+    if initial_guess is not None and indices is not None:
+        raise ValueError("initial_guess and indices cannot both be provided")
+
+    # Initialize centers
+    if indices is not None:
+        C = Xd[_cp.asarray(np.asarray(indices))].copy()
+    elif initial_guess is not None:
+        if initial_guess.shape != (n_clusters, d):
+            raise ValueError(
+                f"initial_guess must have shape ({n_clusters}, {d}), "
+                f"got {initial_guess.shape}"
+            )
+        C = _cp.asarray(np.ascontiguousarray(initial_guess, dtype=dtype))
+    elif init == "k-means++":
+        # Use CPU k-means++ initialization and transfer to GPU
+        from .kmeans import _kmeans_plusplus
+
+        C = _cp.asarray(
+            np.ascontiguousarray(_kmeans_plusplus(x, n_clusters), dtype=dtype)
+        )
+    elif init == "random":
+        idx = np.random.choice(n_samples, size=n_clusters, replace=False)
+        C = Xd[_cp.asarray(idx)].copy()
+    else:
+        raise ValueError(f"init must be 'k-means++' or 'random', got {init!r}")
+
+    sqx = _cp.sum(Xd * Xd, axis=1)  # (n_samples,)
+
+    def _distances_sq(C):
+        # squared distances via the gram identity, clamped to >= 0
+        D2 = sqx[:, None] - 2.0 * (Xd @ C.T) + _cp.sum(C * C, axis=1)[None, :]
+        _cp.maximum(D2, 0.0, out=D2)
+        return D2
+
+    converged = False
+    n_iter = 0
+
+    for iteration in range(max_iter):
+        D2 = _distances_sq(C)
+        labels = _cp.argmin(D2, axis=1)
+
+        # Update centers
+        C_new = _cp.empty_like(C)
+        for k in range(n_clusters):
+            mask = labels == k
+            if bool(mask.any()):
+                C_new[k] = _cp.mean(Xd[mask], axis=0)
+            else:
+                # Keep the old center if no points assigned
+                C_new[k] = C[k]
+
+        n_iter = iteration + 1
+
+        # Check convergence
+        if bool(
+            _cp.all(_cp.abs(C_new - C) <= (1e-8 + tol * _cp.abs(C)))
+        ):
+            converged = True
+            C = C_new
+            break
+
+        C = C_new
+
+    # Compute final labels and inertia
+    D2 = _distances_sq(C)
+    labels = _cp.argmin(D2, axis=1)
+    inertia = _cp.sum(_cp.min(D2, axis=1))
+
+    return KMeansResult(
+        cluster_centers_=_cp.asnumpy(C),
+        labels_=_cp.asnumpy(labels).astype(np.int32),
+        inertia_=float(_cp.asnumpy(inertia)),
+        n_iter_=n_iter,
+        converged=converged,
+    )

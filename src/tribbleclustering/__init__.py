@@ -1,3 +1,5 @@
+from .clustering_base import BaseClusterer
+
 from .pvat import (
     vat_prim_mst,
     compute_vat,
@@ -25,12 +27,14 @@ from .conivat import (
 
 from .ivatmeans import IVATMeans
 from .fuzzycmeans import FuzzyCMeans
+from .kmeans import KMeans
 from .linkernighan import LinKernighan
 
 from . import gpu
 from . import gpu_vat
 
 __all__ = [
+    "BaseClusterer",
     "vat_prim_mst",
     "compute_vat",
     "compute_ivat",
@@ -53,6 +57,7 @@ __all__ = [
     "transform_with_metric",
     "IVATMeans",
     "FuzzyCMeans",
+    "KMeans",
     "LinKernighan",
     "gpu",
     "gpu_vat",

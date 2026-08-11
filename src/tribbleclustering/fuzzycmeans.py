@@ -3,6 +3,8 @@ from typing import Optional
 import numpy as np
 from numpy import ndarray
 
+from .clustering_base import BaseClusterer
+
 try:
     from .cfcm import fuzzy_c_means as fcm_algorithm
 
@@ -19,9 +21,12 @@ from . import gpu as _gpu
 _GPU_FCM_MIN_SAMPLES = 5000
 
 
-class FuzzyCMeans:
+class FuzzyCMeans(BaseClusterer):
     """
     Fuzzy C-Means clustering algorithm with scikit-learn compatible interface.
+
+    Can be used interchangeably with KMeans and IVATMeans via the
+    BaseClusterer interface.
     """
 
     def __init__(

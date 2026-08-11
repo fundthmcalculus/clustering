@@ -3,6 +3,7 @@ from typing import Callable, Optional, Union
 import numpy as np
 from numpy import ndarray
 
+from .clustering_base import BaseClusterer
 from .pvat import get_ivat_levels, get_ivat_hierarchy, IvatMeansResult, ClusterNode
 from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
 from . import gpu as _gpu
@@ -71,9 +72,12 @@ def _minimax_medoid(d_sub: ndarray) -> int:
     return int(np.argmin(np.max(d_sub, axis=1)))
 
 
-class IVATMeans:
+class IVATMeans(BaseClusterer):
     """
     IVAT-based clustering algorithm with scikit-learn compatible interface.
+
+    Can be used interchangeably with KMeans and FuzzyCMeans via the
+    BaseClusterer interface.
 
     ``refine`` controls how the clusters iVAT finds are represented and how
     new points are assigned to them (see GitHub issue #54 /
