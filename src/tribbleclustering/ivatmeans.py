@@ -1,10 +1,11 @@
+from dataclasses import dataclass, field
 from typing import Callable, Optional, Union
 
 import numpy as np
 from numpy import ndarray
 
 from .clustering_base import BaseClusterer
-from .pvat import get_ivat_levels, get_ivat_hierarchy, IvatMeansResult, ClusterNode
+from .pvat import get_ivat_levels, IvatMeansResult
 from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
 from . import gpu as _gpu
 from . import gpu_vat as _gpu_vat
@@ -19,6 +20,75 @@ except ImportError:
     from .pvat import compute_ivat as _compute_ivat
 
     _has_compiled_distances = False
+
+
+@dataclass
+class ClusterNode:
+    """Node in a hierarchical clustering tree."""
+
+    indices: ndarray
+    centroid: ndarray
+    children: list["ClusterNode"] = field(default_factory=list)
+
+
+def get_ivat_hierarchy(
+    all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1
+) -> ClusterNode:
+    """
+    Build a hierarchical tree structure from iVAT results.
+
+    Args:
+        all_cities: Original data points (N, D)
+        ivat_mst: iVAT distance matrix
+        vat_order: Permutation indices from VAT/iVAT
+        n_levels: Number of levels to include in the hierarchy
+
+    Returns:
+        Root ClusterNode of the hierarchy
+    """
+    raw_results = get_ivat_levels(all_cities, ivat_mst, vat_order, n_levels=n_levels)
+    # get_ivat_levels returns a single result for n_levels=1, else a list.
+    levels_results: list[IvatMeansResult] = (
+        raw_results if isinstance(raw_results, list) else [raw_results]
+    )
+
+    # Root node contains everything
+    root = ClusterNode(
+        indices=np.arange(len(all_cities)), centroid=np.mean(all_cities, axis=0)
+    )
+
+    # current_level_nodes starts with root
+    current_level_nodes = [root]
+
+    for level_res in levels_results:
+        next_level_nodes = []
+        for cluster_indices in level_res.cluster_city_ids:
+            new_node = ClusterNode(
+                indices=cluster_indices,
+                centroid=np.mean(all_cities[cluster_indices], axis=0),
+            )
+            # Find parent in current_level_nodes
+            # Since it's a strict hierarchy, any point in the cluster will be in its parent node.
+            # We use the first index for efficiency.
+            target_idx = cluster_indices[0]
+            found_parent = False
+            for parent in current_level_nodes:
+                # We can use a faster check since we know parent.indices contains target_idx
+                # if it's the right parent.
+                if target_idx in parent.indices:
+                    parent.children.append(new_node)
+                    found_parent = True
+                    break
+
+            if not found_parent:
+                # Fallback, should not happen if results are hierarchical
+                root.children.append(new_node)
+
+            next_level_nodes.append(new_node)
+        current_level_nodes = next_level_nodes
+
+    return root
+
 
 MetricLike = Union[None, str, Callable[[ndarray, ndarray], ndarray]]
 

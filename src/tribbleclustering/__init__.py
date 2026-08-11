@@ -5,8 +5,6 @@ from .pvat import (
     compute_vat,
     compute_ivat,
     get_ivat_levels,
-    get_ivat_hierarchy,
-    ClusterNode,
     IvatMeansResult,
 )
 
@@ -25,7 +23,7 @@ from .conivat import (
     transform_with_metric,
 )
 
-from .ivatmeans import IVATMeans
+from .ivatmeans import IVATMeans, ClusterNode, get_ivat_hierarchy
 from .fuzzycmeans import FuzzyCMeans
 from .kmeans import KMeans
 from .linkernighan import LinKernighan
@@ -39,9 +37,9 @@ __all__ = [
     "compute_vat",
     "compute_ivat",
     "get_ivat_levels",
-    "get_ivat_hierarchy",
-    "ClusterNode",
     "IvatMeansResult",
+    "ClusterNode",
+    "get_ivat_hierarchy",
     "pairwise_distances",
     "fuzzy_c_means",
     "FuzzyMeansResult",

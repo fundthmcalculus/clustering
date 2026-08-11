@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tribble-clustering"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
   { name="Scott Phillips", email="polygonguru@gmail.com" },
 ]
@@ -17,9 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "numba",
-    "numpy>=2.4.6",
-    "numba-progress>=1.2.0",
-    "matplotlib>=3.10.9",
+    "numpy",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +30,7 @@ dev = [
     "flake8",
     "Flake8-pyproject",
     "mypy",
-    "scipy"
+    "scipy",
 ]
 # Optional GPU acceleration (CUDA 12.x). Install the wheel matching your CUDA
 # toolkit, e.g. `pip install tribble-clustering[gpu]`. Falls back to CPU when
