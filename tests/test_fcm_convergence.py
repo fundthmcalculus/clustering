@@ -5,7 +5,7 @@ Test convergence status reporting for fuzzy c-means.
 import numpy as np
 import pytest
 
-from tribbleclustering import fuzzy_c_means, FuzzyMeansResult
+from tribbleclustering import fuzzy_c_means, FuzzyCMeansResult
 from tribbleclustering.fuzzycmeans import FuzzyCMeans
 
 
@@ -35,11 +35,11 @@ class TestConvergenceStatus:
     """Test convergence status reporting."""
 
     def test_return_type_is_fuzzy_means_result(self, synthetic_data):
-        """Test that fuzzy_c_means returns FuzzyMeansResult."""
+        """Test that fuzzy_c_means returns FuzzyCMeansResult."""
         x, n_clusters = synthetic_data
         result = fuzzy_c_means(x, n_clusters)
 
-        assert isinstance(result, FuzzyMeansResult)
+        assert isinstance(result, FuzzyCMeansResult)
         assert hasattr(result, "cluster_centers_")
         assert hasattr(result, "membership_matrix_")
         assert hasattr(result, "n_iter_")
@@ -212,7 +212,7 @@ class TestConvergenceWithInitialGuess:
 
         result = fuzzy_c_means(x, n_clusters, initial_guess=initial_guess)
 
-        assert isinstance(result, FuzzyMeansResult)
+        assert isinstance(result, FuzzyCMeansResult)
         assert result.converged is not None
 
     def test_convergence_with_indices(self, synthetic_data):
@@ -222,7 +222,7 @@ class TestConvergenceWithInitialGuess:
 
         result = fuzzy_c_means(x, n_clusters, indices=indices)
 
-        assert isinstance(result, FuzzyMeansResult)
+        assert isinstance(result, FuzzyCMeansResult)
         assert result.converged is not None
 
 

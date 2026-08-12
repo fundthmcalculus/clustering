@@ -587,7 +587,7 @@ def fuzzy_c_means(
     :param max_iter: Maximum number of iterations, default 100
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
-    :return: FuzzyMeansResult containing cluster_centers_, membership_matrix_, n_iter_, and converged
+    :return: FuzzyCMeansResult containing cluster_centers_, membership_matrix_, n_iter_, and converged
     """
     x = np.asarray(x)
 

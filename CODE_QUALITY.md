@@ -6,11 +6,11 @@ independently-reviewable PRs** rather than one large drop.
 
 ## Style guide (copied from `optimizers`)
 
-| Tool   | Setting in `optimizers`                                              | Applied here |
-|--------|---------------------------------------------------------------------|--------------|
-| black  | Defaults (line length 88), no `[tool.black]`; CI runs `black --check .` | Same. We additionally pin `target-version = ["py311"]` to silence a spurious AST-safety warning (see below). |
-| flake8 | `max-line-length = 120`, `extend-ignore = ["E203"]`, `exclude` build dirs, via `Flake8-pyproject` | Copied verbatim. |
-| mypy   | *Not actually configured* in `optimizers` (only a stale `.mypy_cache`). | Introduced fresh here as a lenient baseline, then ratcheted. |
+| Tool   | Setting in `optimizers`                                                                           | Applied here                                                                                                 |
+|--------|---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| black  | Defaults (line length 88), no `[tool.black]`; CI runs `black --check .`                           | Same. We additionally pin `target-version = ["py311"]` to silence a spurious AST-safety warning (see below). |
+| flake8 | `max-line-length = 120`, `extend-ignore = ["E203"]`, `exclude` build dirs, via `Flake8-pyproject` | Copied verbatim.                                                                                             |
+| mypy   | *Not actually configured* in `optimizers` (only a stale `.mypy_cache`).                           | Introduced fresh here as a lenient baseline, then ratcheted.                                                 |
 
 Note the intentional black/flake8 split: black formats to 88 columns, flake8's
 `E501` only trips at 120, so the two never fight. `E203` is ignored because black
@@ -18,11 +18,11 @@ and pycodestyle disagree on whitespace around slice colons.
 
 ## Baseline gap (measured against `main`)
 
-| Check  | Result on `main` before this work |
-|--------|-----------------------------------|
-| black  | **6 of 19 files** would be reformatted — CI's existing `black --check .` step is currently **red**. |
-| flake8 (120 / E203) | **34 violations**: unused imports (F401, mostly the re-export `__init__.py`), 6× line-too-long (E501), 5× f-string-without-placeholder (F541), 1× unused local (F841), `== True/False` comparisons (E712), stray operator spacing (E221/E221). |
-| mypy (lenient, `--ignore-missing-imports`) | **6 errors in 2 files** (`pvat.py`, `ivatmeans.py`): a redefinition, a `None`-typed variable reassigned to a real type, and a `Union` that is indexed/iterated without narrowing. Several look like latent bugs, not just annotation noise. |
+| Check                                      | Result on `main` before this work                                                                                                                                                                                                              |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| black                                      | **6 of 19 files** would be reformatted — CI's existing `black --check .` step is currently **red**.                                                                                                                                            |
+| flake8 (120 / E203)                        | **34 violations**: unused imports (F401, mostly the re-export `__init__.py`), 6× line-too-long (E501), 5× f-string-without-placeholder (F541), 1× unused local (F841), `== True/False` comparisons (E712), stray operator spacing (E221/E221). |
+| mypy (lenient, `--ignore-missing-imports`) | **6 errors in 2 files** (`pvat.py`, `ivatmeans.py`): a redefinition, a `None`-typed variable reassigned to a real type, and a `Union` that is indexed/iterated without narrowing. Several look like latent bugs, not just annotation noise.    |
 
 Good news: the gap is small. `src/` is only ~1.1k LOC and mypy in non-strict mode
 already nearly passes.

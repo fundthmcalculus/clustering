@@ -1,12 +1,11 @@
+from dataclasses import dataclass, field
 from typing import Callable, Optional, Union
 
 import numpy as np
 from numpy import ndarray
 
-from .pvat import get_ivat_levels, get_ivat_hierarchy, IvatMeansResult, ClusterNode
+from .clustering_base import BaseClusterer
 from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
-from . import gpu as _gpu
-from . import gpu_vat as _gpu_vat
 
 try:
     from .pcvat import pairwise_distances_c as _pairwise_distances
@@ -18,6 +17,197 @@ except ImportError:
     from .pvat import compute_ivat as _compute_ivat
 
     _has_compiled_distances = False
+
+
+@dataclass
+class IvatMeansResult:
+    """Result of IVAT clustering at a specific level."""
+
+    abrupt_change_indices: ndarray
+    cluster_city_ids: list[ndarray]
+    diagonal_values: ndarray
+    initial_centroids: ndarray
+    max_diff_index: int
+    peak_threshold: float
+    sorted_diagonal: ndarray
+
+
+@dataclass
+class ClusterNode:
+    """Node in a hierarchical clustering tree."""
+
+    indices: ndarray
+    centroid: ndarray
+    children: list["ClusterNode"] = field(default_factory=list)
+
+
+def _arg_max(a: ndarray, n: int = 1) -> ndarray:
+    """Get the indexes of the n-largest values in the array."""
+    if n >= len(a):
+        return np.argsort(a)[::-1]
+    # Use argpartition to find the n largest elements efficiently
+    partitioned_indices = np.argpartition(a, -n)[-n:]
+    # Sort these indices by their corresponding values in descending order
+    sorted_indices = partitioned_indices[np.argsort(a[partitioned_indices])[::-1]]
+    return sorted_indices
+
+
+def get_ivat_levels(
+    all_cities: ndarray,
+    ivat_mst: ndarray,
+    vat_order: ndarray,
+    n_levels: int = 1,
+    n_clusters: int = -1,
+) -> Union[IvatMeansResult, list[IvatMeansResult]]:
+    """
+    Extract multiple levels of clusterings from the iVAT matrix.
+
+    Args:
+        all_cities: Original data points (N, D)
+        ivat_mst: iVAT distance matrix
+        vat_order: Permutation indices from VAT/iVAT
+        n_levels: Number of hierarchical levels to extract (exclusive with n_clusters)
+        n_clusters: Exact number of clusters to consider. If -1, use all possible clusters.
+
+    Returns:
+        A single IvatMeansResult if n_levels=1, or a list of them if n_levels > 1.
+    """
+    if n_levels < 1:
+        raise ValueError("n_levels must be at least 1")
+    if n_clusters != -1 and n_levels != 1:
+        raise ValueError("n_levels and n_clusters cannot be used together")
+    if n_clusters != -1 and n_clusters < 1:
+        raise ValueError(
+            "n_clusters must be at least 1 or -1 for all possible clusters"
+        )
+
+    # Look down the off-by-1 diagonal and count the number of substantial changes.
+    diagonal_values = np.diag(ivat_mst, k=1)
+    # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
+    # Expand this to the original size for convenience.
+    diagonal_values = np.concatenate(
+        [np.array([diagonal_values[0]]), diagonal_values], axis=0
+    )
+    # Sort the diagonal values
+    sorted_diagonal = np.sort(diagonal_values)
+    if n_clusters == -1:
+        # Find the maximum difference and the index thereof
+        diagonal_diffs = np.diff(sorted_diagonal)
+        max_diff_indices = _arg_max(diagonal_diffs, n_levels)
+        peaks_threshold = sorted_diagonal[max_diff_indices + 1]
+
+        # Sort peaks_threshold in decreasing order and reorder max_diff_indices accordingly
+        sort_order = np.argsort(peaks_threshold)[::-1]
+        peaks_threshold = peaks_threshold[sort_order]
+        max_diff_indices = max_diff_indices[sort_order]
+    elif n_clusters == 1:
+        # Pick higher than the highest value
+        peaks_threshold = np.array([sorted_diagonal[-1] * 1.1])
+        max_diff_indices = np.array([-1])
+    else:
+        # Since #clusters = #peaks+1, adjust indexing.
+        peaks_threshold = sorted_diagonal[-(n_clusters - 1) :]
+        max_diff_indices = np.full(n_clusters - 1, -1)
+
+    results = []
+    for index, peak_th in enumerate(peaks_threshold):
+        # Prevent weird floating-point comparisons.
+        abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
+
+        # Use each section as a cluster endpoint, inclusive.
+        cluster_group = np.concatenate(
+            [np.array([0]), abrupt_change_idx, np.array([len(all_cities)])]
+        )
+        cluster_city_indexs = []
+        for idx, cg_start in enumerate(cluster_group[:-1]):
+            cg_end = cluster_group[idx + 1]
+            if cg_start < cg_end:
+                # Use the VAT order to pick out the cities in each cluster
+                cluster_city_indexs.append(vat_order[cg_start:cg_end])
+
+        # Compute the initial guess as the centroid of each city cluster
+        initial_centroids_item = np.array(
+            [
+                np.mean(all_cities[cluster_ids], axis=0)
+                for cluster_ids in cluster_city_indexs
+            ]
+        )
+
+        results.append(
+            IvatMeansResult(
+                abrupt_change_indices=abrupt_change_idx,
+                cluster_city_ids=cluster_city_indexs,
+                diagonal_values=diagonal_values,
+                initial_centroids=initial_centroids_item,
+                max_diff_index=int(max_diff_indices[index]),
+                peak_threshold=float(peak_th),
+                sorted_diagonal=sorted_diagonal,
+            )
+        )
+
+    if n_levels == 1:
+        return results[0]
+    return results
+
+
+def get_ivat_hierarchy(
+    all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1
+) -> ClusterNode:
+    """
+    Build a hierarchical tree structure from iVAT results.
+
+    Args:
+        all_cities: Original data points (N, D)
+        ivat_mst: iVAT distance matrix
+        vat_order: Permutation indices from VAT/iVAT
+        n_levels: Number of levels to include in the hierarchy
+
+    Returns:
+        Root ClusterNode of the hierarchy
+    """
+    raw_results = get_ivat_levels(all_cities, ivat_mst, vat_order, n_levels=n_levels)
+    # get_ivat_levels returns a single result for n_levels=1, else a list.
+    levels_results: list[IvatMeansResult] = (
+        raw_results if isinstance(raw_results, list) else [raw_results]
+    )
+
+    # Root node contains everything
+    root = ClusterNode(
+        indices=np.arange(len(all_cities)), centroid=np.mean(all_cities, axis=0)
+    )
+
+    # current_level_nodes starts with root
+    current_level_nodes = [root]
+
+    for level_res in levels_results:
+        next_level_nodes = []
+        for cluster_indices in level_res.cluster_city_ids:
+            new_node = ClusterNode(
+                indices=cluster_indices,
+                centroid=np.mean(all_cities[cluster_indices], axis=0),
+            )
+            # Find parent in current_level_nodes
+            # Since it's a strict hierarchy, any point in the cluster will be in its parent node.
+            # We use the first index for efficiency.
+            target_idx = cluster_indices[0]
+            found_parent = False
+            for parent in current_level_nodes:
+                # We can use a faster check since we know parent.indices contains target_idx
+                # if it's the right parent.
+                if target_idx in parent.indices:
+                    parent.children.append(new_node)
+                    found_parent = True
+                    break
+
+            if not found_parent:
+                # Fallback, should not happen if results are hierarchical
+                root.children.append(new_node)
+
+            next_level_nodes.append(new_node)
+        current_level_nodes = next_level_nodes
+
+    return root
+
 
 MetricLike = Union[None, str, Callable[[ndarray, ndarray], ndarray]]
 
@@ -71,9 +261,12 @@ def _minimax_medoid(d_sub: ndarray) -> int:
     return int(np.argmin(np.max(d_sub, axis=1)))
 
 
-class IVATMeans:
+class IVATMeans(BaseClusterer):
     """
     IVAT-based clustering algorithm with scikit-learn compatible interface.
+
+    Can be used interchangeably with KMeans and FuzzyCMeans via the
+    BaseClusterer interface.
 
     ``refine`` controls how the clusters iVAT finds are represented and how
     new points are assigned to them (see GitHub issue #54 /
@@ -104,8 +297,6 @@ class IVATMeans:
         *,
         n_levels: int = 1,
         random_state: Optional[int] = None,
-        distance_backend: str = "auto",
-        on_device: bool = False,
         dtype: str = "float32",
         refine: str = "medoid",
         m: float = 2.0,
@@ -121,19 +312,6 @@ class IVATMeans:
         self.refine = refine
         self.m = m
         self.metric = metric
-        # distance_backend controls the pairwise-distance stage of fit():
-        #   "auto" — GPU only when it is expected to win (float32, high feature
-        #            dimension, CUDA present; see gpu.gpu_pairwise_beneficial),
-        #            else the CPU C/OpenMP kernel;
-        #   "gpu"  — force GPU (errors if no device);
-        #   "cpu"  — force the CPU kernel.
-        self.distance_backend = distance_backend
-        # on_device: run the WHOLE VAT pipeline (distances + exact Boruvka MST +
-        # ordering + iVAT recurrence) on the GPU with the dissimilarity matrix
-        # kept resident — nothing but the O(n) order and the final image return
-        # to the host (see gpu_vat.ivat_gpu). Opt-in; requires the matrix to fit
-        # VRAM. At dtype="float32" the result matches the CPU path.
-        self.on_device = on_device
         # dtype: storage precision of the resident matrix on the on_device path.
         #   "float32" (default) — matches the CPU result, half the memory;
         #   "float16"           — max scale, near-exact (a few near-tie flips);
@@ -156,26 +334,7 @@ class IVATMeans:
         self._relational_u_train: Optional[ndarray] = None
         self._relational_beta: float = 0.0
 
-    def _use_on_device(self, X: ndarray) -> bool:
-        if not self.on_device or not _gpu.is_available():
-            return False
-        # resident n x n matrix must fit VRAM (leave headroom for the reorder)
-        n = X.shape[0]
-        itemsize = 8 if np.asarray(X).dtype != np.float32 else 4
-        try:
-            free_bytes, _ = _gpu._cp.cuda.Device().mem_info
-        except Exception:
-            return False
-        return n * n * itemsize < 0.6 * free_bytes
-
     def _compute_distances(self, X: ndarray) -> ndarray:
-        backend = self.distance_backend
-        if backend == "gpu" or (backend == "auto" and _gpu.gpu_pairwise_beneficial(X)):
-            return _gpu.pairwise_distances_gpu(X)
-        if backend not in ("auto", "cpu", "gpu"):
-            raise ValueError(
-                f"distance_backend must be 'auto', 'gpu', or 'cpu', got {backend!r}"
-            )
         return _pairwise_distances(X)
 
     def fit(
@@ -208,20 +367,12 @@ class IVATMeans:
         if self.random_state is not None:
             np.random.seed(self.random_state)
 
-        if self._use_on_device(X):
-            # Whole VAT pipeline on the GPU (distances + exact Boruvka MST +
-            # ordering + iVAT recurrence), matrix resident; only the O(n) order
-            # and the final image return to the host. Apply the GPU-VAT dtype
-            # policy here (f32 default, f16 opt-in, f64 -> f32 with a warning).
-            store_dtype = _gpu_vat._resolve_vat_dtype(self.dtype)
-            ivat_matrix, vat_order = _gpu_vat.ivat_gpu(X, dtype=store_dtype)
-        else:
-            distances = self._compute_distances(X)
-            # `distances` is a throwaway intermediate, so let IVAT consume it in
-            # place: the VAT/IVAT transform reorders it into the result rather
-            # than allocating additional n x n buffers. This roughly halves peak
-            # memory on large inputs (the dominant cost of fitting).
-            ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=True)
+        distances = self._compute_distances(X)
+        # `distances` is a throwaway intermediate, so let IVAT consume it in
+        # place: the VAT/IVAT transform reorders it into the result rather
+        # than allocating additional n x n buffers. This roughly halves peak
+        # memory on large inputs (the dominant cost of fitting).
+        ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=True)
 
         ivat_result = get_ivat_levels(
             X, ivat_matrix, vat_order, n_levels=1, n_clusters=self.n_clusters

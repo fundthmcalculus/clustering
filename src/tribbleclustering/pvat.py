@@ -1,10 +1,6 @@
 import heapq
-from dataclasses import dataclass, field
-from typing import Union
-
 from numba import njit, prange
 import numpy as np
-from numba_progress import ProgressBar
 from numpy import ndarray
 
 try:
@@ -94,7 +90,6 @@ def compute_vat(
 def compute_ordered_dis_njit_merge(
     matrix_of_pairwise_distance: np.ndarray,
     inplace: bool = False,
-    progress_bar: ProgressBar | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     n = matrix_of_pairwise_distance.shape[0]
     if inplace:
@@ -103,25 +98,18 @@ def compute_ordered_dis_njit_merge(
         ordered_matrix = np.zeros(
             matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype
         )
-    p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
-
-    if progress_bar is not None:
-        progress_bar.set(0)
+    p, q = vat_prim_mst(matrix_of_pairwise_distance)
 
     if inplace:
         # Reorder in place as P·M·Pᵀ (see _permute_sym_inplace). Serial by
         # nature, so the round-count is reported in one progress step.
         _permute_sym_inplace(ordered_matrix, p)
-        if progress_bar is not None:
-            progress_bar.update(n)
     else:
         for ij in prange(n):
             for jk in range(ij, n):
                 ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = (
                     matrix_of_pairwise_distance[p[ij], p[jk]]
                 )
-                if progress_bar is not None:
-                    progress_bar.update(1)
 
     return ordered_matrix, p, q
 
@@ -168,9 +156,7 @@ def _permute_sym_inplace(M: ndarray, p: ndarray) -> None:
 
 
 @njit(cache=True, nogil=True)
-def vat_prim_mst(
-    adj: np.ndarray, progress_bar: ProgressBar | None = None
-) -> tuple[np.ndarray, np.ndarray]:
+def vat_prim_mst(adj: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     n: int = len(adj)
 
     # Find the column of the maximum value.
@@ -224,9 +210,6 @@ def vat_prim_mst(
 
         parent_seq[parent_seq_idx] = v0
         parent_seq_idx += 1
-
-        if progress_bar is not None:
-            progress_bar.update(1)
 
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
@@ -320,189 +303,3 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
 def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
     diff = samples[idx1, :] - samples[idx2, :]
     return np.sqrt(np.sum(np.square(diff)))
-
-
-@dataclass
-class IvatMeansResult:
-    abrupt_change_indices: ndarray
-    cluster_city_ids: list[ndarray]
-    diagonal_values: ndarray
-    initial_centroids: ndarray
-    max_diff_index: int
-    peak_threshold: float
-    sorted_diagonal: ndarray
-
-
-@dataclass
-class ClusterNode:
-    indices: ndarray
-    centroid: ndarray
-    children: list["ClusterNode"] = field(default_factory=list)
-
-
-def _arg_max(a: ndarray, n: int = 1) -> ndarray:
-    """Get the indexes of the n-largest values in the array."""
-    if n >= len(a):
-        return np.argsort(a)[::-1]
-    # Use argpartition to find the n largest elements efficiently
-    partitioned_indices = np.argpartition(a, -n)[-n:]
-    # Sort these indices by their corresponding values in descending order
-    sorted_indices = partitioned_indices[np.argsort(a[partitioned_indices])[::-1]]
-    return sorted_indices
-
-
-def get_ivat_levels(
-    all_cities: ndarray,
-    ivat_mst: ndarray,
-    vat_order: ndarray,
-    n_levels: int = 1,
-    n_clusters: int = -1,
-) -> Union[IvatMeansResult, list[IvatMeansResult]]:
-    """
-    Extract multiple levels of clusterings from the iVAT matrix.
-
-    Args:
-        all_cities: Original data points (N, D)
-        ivat_mst: iVAT distance matrix
-        vat_order: Permutation indices from VAT/iVAT
-        n_levels: Number of hierarchical levels to extract (exclusive with n_clusters)
-        n_clusters: Exact number of clusters to consider. If -1, use all possible clusters.
-
-    Returns:
-        A single IvatMeansResult if n_levels=1, or a list of them if n_levels > 1.
-    """
-    if n_levels < 1:
-        raise ValueError("n_levels must be at least 1")
-    if n_clusters != -1 and n_levels != 1:
-        raise ValueError("n_levels and n_clusters cannot be used together")
-    if n_clusters != -1 and n_clusters < 1:
-        raise ValueError(
-            "n_clusters must be at least 1 or -1 for all possible clusters"
-        )
-
-    # Look down the off-by-1 diagonal and count the number of substantial changes.
-    diagonal_values = np.diag(ivat_mst, k=1)
-    # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
-    # Expand this to the original size for convenience.
-    diagonal_values = np.concatenate(
-        [np.array([diagonal_values[0]]), diagonal_values], axis=0
-    )
-    # Sort the diagonal values
-    sorted_diagonal = np.sort(diagonal_values)
-    if n_clusters == -1:
-        # Find the maximum difference and the index thereof
-        diagonal_diffs = np.diff(sorted_diagonal)
-        max_diff_indices = _arg_max(diagonal_diffs, n_levels)
-        peaks_threshold = sorted_diagonal[max_diff_indices + 1]
-
-        # Sort peaks_threshold in decreasing order and reorder max_diff_indices accordingly
-        sort_order = np.argsort(peaks_threshold)[::-1]
-        peaks_threshold = peaks_threshold[sort_order]
-        max_diff_indices = max_diff_indices[sort_order]
-    elif n_clusters == 1:
-        # Pick higher than the highest value
-        peaks_threshold = np.array([sorted_diagonal[-1] * 1.1])
-        max_diff_indices = np.array([-1])
-    else:
-        # Since #clusters = #peaks+1, adjust indexing.
-        peaks_threshold = sorted_diagonal[-(n_clusters - 1) :]
-        max_diff_indices = np.full(n_clusters - 1, -1)
-
-    results = []
-    for index, peak_th in enumerate(peaks_threshold):
-        # Prevent weird floating-point comparisons.
-        abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
-
-        # Use each section as a cluster endpoint, inclusive.
-        cluster_group = np.concatenate(
-            [np.array([0]), abrupt_change_idx, np.array([len(all_cities)])]
-        )
-        cluster_city_indexs = []
-        for idx, cg_start in enumerate(cluster_group[:-1]):
-            cg_end = cluster_group[idx + 1]
-            if cg_start < cg_end:
-                # Use the VAT order to pick out the cities in each cluster
-                cluster_city_indexs.append(vat_order[cg_start:cg_end])
-
-        # Compute the initial guess as the centroid of each city cluster
-        initial_centroids_item = np.array(
-            [
-                np.mean(all_cities[cluster_ids], axis=0)
-                for cluster_ids in cluster_city_indexs
-            ]
-        )
-
-        results.append(
-            IvatMeansResult(
-                abrupt_change_indices=abrupt_change_idx,
-                cluster_city_ids=cluster_city_indexs,
-                diagonal_values=diagonal_values,
-                initial_centroids=initial_centroids_item,
-                max_diff_index=int(max_diff_indices[index]),
-                peak_threshold=float(peak_th),
-                sorted_diagonal=sorted_diagonal,
-            )
-        )
-
-    if n_levels == 1:
-        return results[0]
-    return results
-
-
-def get_ivat_hierarchy(
-    all_cities: ndarray, ivat_mst: ndarray, vat_order: ndarray, n_levels: int = 1
-) -> ClusterNode:
-    """
-    Build a hierarchical tree structure from iVAT results.
-
-    Args:
-        all_cities: Original data points (N, D)
-        ivat_mst: iVAT distance matrix
-        vat_order: Permutation indices from VAT/iVAT
-        n_levels: Number of levels to include in the hierarchy
-
-    Returns:
-        Root ClusterNode of the hierarchy
-    """
-    raw_results = get_ivat_levels(all_cities, ivat_mst, vat_order, n_levels=n_levels)
-    # get_ivat_levels returns a single result for n_levels=1, else a list.
-    levels_results: list[IvatMeansResult] = (
-        raw_results if isinstance(raw_results, list) else [raw_results]
-    )
-
-    # Root node contains everything
-    root = ClusterNode(
-        indices=np.arange(len(all_cities)), centroid=np.mean(all_cities, axis=0)
-    )
-
-    # current_level_nodes starts with root
-    current_level_nodes = [root]
-
-    for level_res in levels_results:
-        next_level_nodes = []
-        for cluster_indices in level_res.cluster_city_ids:
-            new_node = ClusterNode(
-                indices=cluster_indices,
-                centroid=np.mean(all_cities[cluster_indices], axis=0),
-            )
-            # Find parent in current_level_nodes
-            # Since it's a strict hierarchy, any point in the cluster will be in its parent node.
-            # We use the first index for efficiency.
-            target_idx = cluster_indices[0]
-            found_parent = False
-            for parent in current_level_nodes:
-                # We can use a faster check since we know parent.indices contains target_idx
-                # if it's the right parent.
-                if target_idx in parent.indices:
-                    parent.children.append(new_node)
-                    found_parent = True
-                    break
-
-            if not found_parent:
-                # Fallback, should not happen if results are hierarchical
-                root.children.append(new_node)
-
-            next_level_nodes.append(new_node)
-        current_level_nodes = next_level_nodes
-
-    return root
