@@ -1,6 +1,6 @@
 """GPU-accelerated primitives (optional, CuPy).
 
-Currently provides a tiled dense pairwise-distance matrix. The design targets
+Currently, provides a tiled dense pairwise-distance matrix. The design targets
 the scaling regime where the n x n output does not fit in the 12 GB-class VRAM
 of a laptop GPU: distances are computed in row-tiles on the device and streamed
 into a host (NumPy) matrix, so only one R x n tile is ever resident on the GPU.
