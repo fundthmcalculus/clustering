@@ -14,12 +14,6 @@ except ImportError:
 
     _has_compiled_fcm = False
 
-from . import gpu as _gpu
-
-# GPU FCM wins decisively above a few thousand samples (iterative, data stays
-# resident on the device); below this the launch overhead loses to the CPU.
-_GPU_FCM_MIN_SAMPLES = 5000
-
 
 class FuzzyCMeans(BaseClusterer):
     """
@@ -36,28 +30,16 @@ class FuzzyCMeans(BaseClusterer):
         m: float = 2.0,
         max_iter: int = 100,
         random_state: Optional[int] = None,
-        use_gpu: bool | str = "auto",
     ):
         self.n_clusters = n_clusters
         self.m = m
         self.max_iter = max_iter
         self.random_state = random_state
-        # use_gpu: True force GPU, False force CPU, "auto" use the GPU only when
-        # a CUDA device is available and the sample count justifies it. Falls
-        # back to CPU transparently when CuPy/CUDA is absent.
-        self.use_gpu = use_gpu
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
         self.membership_matrix_: Optional[ndarray] = None
         self.n_iter_: Optional[int] = None
         self.converged: Optional[bool] = None
-
-    def _should_use_gpu(self, n_samples: int) -> bool:
-        if self.use_gpu is True:
-            return _gpu.is_available()
-        if self.use_gpu == "auto":
-            return _gpu.is_available() and n_samples >= _GPU_FCM_MIN_SAMPLES
-        return False
 
     def fit(
         self,
@@ -89,33 +71,25 @@ class FuzzyCMeans(BaseClusterer):
         if self.random_state is not None:
             np.random.seed(self.random_state)
 
-        if self._should_use_gpu(X.shape[0]):
-            self.cluster_centers_, self.membership_matrix_ = _gpu.fuzzy_c_means_gpu(
-                X, self.n_clusters, m=self.m
-            )
-            # GPU path does not return convergence info
+        result = fcm_algorithm(X, self.n_clusters, m=self.m, max_iter=self.max_iter)
+        # Handle different return types
+        if hasattr(result, "cluster_centers_"):
+            # FuzzyCMeansResult dataclass
+            self.cluster_centers_ = result.cluster_centers_
+            self.membership_matrix_ = result.membership_matrix_
+            self.n_iter_ = result.n_iter_
+            self.converged = result.converged
+        elif isinstance(result, tuple) and len(result) == 4:
+            # 4-tuple from Cython version: (c, w, n_iter, converged)
+            self.cluster_centers_ = result[0]
+            self.membership_matrix_ = result[1]
+            self.n_iter_ = result[2]
+            self.converged = result[3]
+        else:
+            # 2-tuple for backwards compatibility
+            self.cluster_centers_, self.membership_matrix_ = result
             self.n_iter_ = None
             self.converged = None
-        else:
-            result = fcm_algorithm(X, self.n_clusters, m=self.m, max_iter=self.max_iter)
-            # Handle different return types
-            if hasattr(result, "cluster_centers_"):
-                # FuzzyCMeansResult dataclass
-                self.cluster_centers_ = result.cluster_centers_
-                self.membership_matrix_ = result.membership_matrix_
-                self.n_iter_ = result.n_iter_
-                self.converged = result.converged
-            elif isinstance(result, tuple) and len(result) == 4:
-                # 4-tuple from Cython version: (c, w, n_iter, converged)
-                self.cluster_centers_ = result[0]
-                self.membership_matrix_ = result[1]
-                self.n_iter_ = result[2]
-                self.converged = result[3]
-            else:
-                # 2-tuple for backwards compatibility
-                self.cluster_centers_, self.membership_matrix_ = result
-                self.n_iter_ = None
-                self.converged = None
 
         self.labels_ = self._get_hard_labels()
 

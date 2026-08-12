@@ -16,8 +16,6 @@ except ImportError:
     kmeans_algorithm = None
     _has_compiled_kmeans = False
 
-from . import gpu as _gpu
-
 
 @dataclass
 class KMeansResult:
@@ -237,7 +235,6 @@ class KMeans(BaseClusterer):
         max_iter: int = 100,
         tol: float = 1e-4,
         random_state: Optional[int] = None,
-        use_gpu: bool | str = "auto",
     ):
         """
         Initialize K-Means clustering.
@@ -254,30 +251,18 @@ class KMeans(BaseClusterer):
             Relative tolerance for convergence. Default 1e-4.
         random_state : int, optional
             Random seed for reproducibility.
-        use_gpu : bool or str, optional
-            Whether to use GPU:
-            - True: force GPU (errors if no CUDA device)
-            - False: force CPU
-            - "auto" (default): use GPU only when CUDA is available and sample count justifies it
         """
         self.n_clusters = n_clusters
         self.init = init
         self.max_iter = max_iter
         self.tol = tol
         self.random_state = random_state
-        self.use_gpu = use_gpu
         self.cluster_centers_: Optional[ndarray] = None
         self.labels_: Optional[ndarray] = None
         self.inertia_: Optional[float] = None
         self.n_iter_: Optional[int] = None
         self.converged: Optional[bool] = None
 
-    def _should_use_gpu(self, n_samples: int) -> bool:
-        if self.use_gpu is True:
-            return _gpu.is_available()
-        if self.use_gpu == "auto":
-            return _gpu.is_available() and n_samples >= _GPU_KMEANS_MIN_SAMPLES
-        return False
 
     def fit(
         self,
@@ -309,22 +294,13 @@ class KMeans(BaseClusterer):
         if self.random_state is not None:
             np.random.seed(self.random_state)
 
-        if self._should_use_gpu(X.shape[0]):
-            result = _gpu.kmeans_gpu(
-                X,
-                self.n_clusters,
-                max_iter=self.max_iter,
-                init=self.init,
-                tol=self.tol,
-            )
-        else:
-            result = kmeans(
-                X,
-                self.n_clusters,
-                max_iter=self.max_iter,
-                init=self.init,
-                tol=self.tol,
-            )
+        result = kmeans(
+            X,
+            self.n_clusters,
+            max_iter=self.max_iter,
+            init=self.init,
+            tol=self.tol,
+        )
 
         self.cluster_centers_ = result.cluster_centers_
         self.labels_ = result.labels_

@@ -6,8 +6,6 @@ from numpy import ndarray
 
 from .clustering_base import BaseClusterer
 from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
-from . import gpu as _gpu
-from . import gpu_vat as _gpu_vat
 
 try:
     from .pcvat import pairwise_distances_c as _pairwise_distances
@@ -299,8 +297,6 @@ class IVATMeans(BaseClusterer):
         *,
         n_levels: int = 1,
         random_state: Optional[int] = None,
-        distance_backend: str = "auto",
-        on_device: bool = False,
         dtype: str = "float32",
         refine: str = "medoid",
         m: float = 2.0,
@@ -316,19 +312,6 @@ class IVATMeans(BaseClusterer):
         self.refine = refine
         self.m = m
         self.metric = metric
-        # distance_backend controls the pairwise-distance stage of fit():
-        #   "auto" — GPU only when it is expected to win (float32, high feature
-        #            dimension, CUDA present; see gpu.gpu_pairwise_beneficial),
-        #            else the CPU C/OpenMP kernel;
-        #   "gpu"  — force GPU (errors if no device);
-        #   "cpu"  — force the CPU kernel.
-        self.distance_backend = distance_backend
-        # on_device: run the WHOLE VAT pipeline (distances + exact Boruvka MST +
-        # ordering + iVAT recurrence) on the GPU with the dissimilarity matrix
-        # kept resident — nothing but the O(n) order and the final image return
-        # to the host (see gpu_vat.ivat_gpu). Opt-in; requires the matrix to fit
-        # VRAM. At dtype="float32" the result matches the CPU path.
-        self.on_device = on_device
         # dtype: storage precision of the resident matrix on the on_device path.
         #   "float32" (default) — matches the CPU result, half the memory;
         #   "float16"           — max scale, near-exact (a few near-tie flips);
@@ -351,26 +334,7 @@ class IVATMeans(BaseClusterer):
         self._relational_u_train: Optional[ndarray] = None
         self._relational_beta: float = 0.0
 
-    def _use_on_device(self, X: ndarray) -> bool:
-        if not self.on_device or not _gpu.is_available():
-            return False
-        # resident n x n matrix must fit VRAM (leave headroom for the reorder)
-        n = X.shape[0]
-        itemsize = 8 if np.asarray(X).dtype != np.float32 else 4
-        try:
-            free_bytes, _ = _gpu._cp.cuda.Device().mem_info
-        except Exception:
-            return False
-        return n * n * itemsize < 0.6 * free_bytes
-
     def _compute_distances(self, X: ndarray) -> ndarray:
-        backend = self.distance_backend
-        if backend == "gpu" or (backend == "auto" and _gpu.gpu_pairwise_beneficial(X)):
-            return _gpu.pairwise_distances_gpu(X)
-        if backend not in ("auto", "cpu", "gpu"):
-            raise ValueError(
-                f"distance_backend must be 'auto', 'gpu', or 'cpu', got {backend!r}"
-            )
         return _pairwise_distances(X)
 
     def fit(
@@ -403,20 +367,12 @@ class IVATMeans(BaseClusterer):
         if self.random_state is not None:
             np.random.seed(self.random_state)
 
-        if self._use_on_device(X):
-            # Whole VAT pipeline on the GPU (distances + exact Boruvka MST +
-            # ordering + iVAT recurrence), matrix resident; only the O(n) order
-            # and the final image return to the host. Apply the GPU-VAT dtype
-            # policy here (f32 default, f16 opt-in, f64 -> f32 with a warning).
-            store_dtype = _gpu_vat._resolve_vat_dtype(self.dtype)
-            ivat_matrix, vat_order = _gpu_vat.ivat_gpu(X, dtype=store_dtype)
-        else:
-            distances = self._compute_distances(X)
-            # `distances` is a throwaway intermediate, so let IVAT consume it in
-            # place: the VAT/IVAT transform reorders it into the result rather
-            # than allocating additional n x n buffers. This roughly halves peak
-            # memory on large inputs (the dominant cost of fitting).
-            ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=True)
+        distances = self._compute_distances(X)
+        # `distances` is a throwaway intermediate, so let IVAT consume it in
+        # place: the VAT/IVAT transform reorders it into the result rather
+        # than allocating additional n x n buffers. This roughly halves peak
+        # memory on large inputs (the dominant cost of fitting).
+        ivat_matrix, _, vat_order = _compute_ivat(distances, inplace=True)
 
         ivat_result = get_ivat_levels(
             X, ivat_matrix, vat_order, n_levels=1, n_clusters=self.n_clusters

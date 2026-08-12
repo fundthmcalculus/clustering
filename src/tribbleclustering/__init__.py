@@ -32,8 +32,6 @@ from .fuzzycmeans import FuzzyCMeans
 from .kmeans import KMeans
 from .linkernighan import LinKernighan
 
-from . import gpu
-from . import gpu_vat
 
 __all__ = [
     "BaseClusterer",
@@ -61,6 +59,4 @@ __all__ = [
     "FuzzyCMeans",
     "KMeans",
     "LinKernighan",
-    "gpu",
-    "gpu_vat",
 ]
