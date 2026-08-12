@@ -100,7 +100,7 @@ class FuzzyCMeans(BaseClusterer):
             result = fcm_algorithm(X, self.n_clusters, m=self.m, max_iter=self.max_iter)
             # Handle different return types
             if hasattr(result, "cluster_centers_"):
-                # FuzzyMeansResult dataclass
+                # FuzzyCMeansResult dataclass
                 self.cluster_centers_ = result.cluster_centers_
                 self.membership_matrix_ = result.membership_matrix_
                 self.n_iter_ = result.n_iter_

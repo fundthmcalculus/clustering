@@ -4,13 +4,11 @@ from .pvat import (
     vat_prim_mst,
     compute_vat,
     compute_ivat,
-    get_ivat_levels,
-    IvatMeansResult,
 )
 
 from .util import pairwise_distances
 
-from .fcm import fuzzy_c_means, FuzzyMeansResult
+from .fcm import fuzzy_c_means, FuzzyCMeansResult
 from .nerfcm import relational_fuzzy_c_means, relational_out_of_sample_membership
 
 from .lk import lin_kernighan, tour_length
@@ -23,7 +21,13 @@ from .conivat import (
     transform_with_metric,
 )
 
-from .ivatmeans import IVATMeans, ClusterNode, get_ivat_hierarchy
+from .ivatmeans import (
+    IVATMeans,
+    ClusterNode,
+    get_ivat_hierarchy,
+    get_ivat_levels,
+    IvatMeansResult,
+)
 from .fuzzycmeans import FuzzyCMeans
 from .kmeans import KMeans
 from .linkernighan import LinKernighan
@@ -36,13 +40,13 @@ __all__ = [
     "vat_prim_mst",
     "compute_vat",
     "compute_ivat",
-    "get_ivat_levels",
     "IvatMeansResult",
+    "get_ivat_levels",
     "ClusterNode",
     "get_ivat_hierarchy",
     "pairwise_distances",
     "fuzzy_c_means",
-    "FuzzyMeansResult",
+    "FuzzyCMeansResult",
     "relational_fuzzy_c_means",
     "relational_out_of_sample_membership",
     "lin_kernighan",

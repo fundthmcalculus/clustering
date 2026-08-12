@@ -46,7 +46,8 @@ from typing import Optional, Sequence
 import numpy as np
 from numpy import ndarray
 
-from .pvat import compute_ivat, get_ivat_levels, IvatMeansResult
+from .pvat import compute_ivat
+from .ivatmeans import get_ivat_levels, IvatMeansResult
 from .util import pairwise_distances
 
 # Optional compiled kernels (mirrors the fallback pattern in ivatmeans.py /

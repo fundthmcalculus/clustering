@@ -80,7 +80,7 @@ class TestFCMCorrectness:
         result_py = fuzzy_c_means_python(
             x, n_clusters, m=2.0, initial_guess=initial_guess
         )
-        c_py, w_py = result_py  # Python version returns FuzzyMeansResult with __iter__
+        c_py, w_py = result_py  # Python version returns FuzzyCMeansResult with __iter__
 
         result_cy = fuzzy_c_means_cython(
             x, n_clusters, m=2.0, initial_guess=initial_guess

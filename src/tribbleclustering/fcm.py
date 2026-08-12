@@ -6,7 +6,7 @@ from numpy import ndarray
 
 
 @dataclass
-class FuzzyMeansResult:
+class FuzzyCMeansResult:
     """Result of fuzzy c-means clustering."""
 
     cluster_centers_: ndarray
@@ -75,7 +75,7 @@ def fuzzy_c_means(
     max_iter: int = 100,
     indices: Optional[np.ndarray | list[int]] = None,
     initial_guess: Optional[np.ndarray] = None,
-) -> FuzzyMeansResult:
+) -> FuzzyCMeansResult:
     """
     Compute the fuzzy c-means clustering algorithm.
 
@@ -85,7 +85,7 @@ def fuzzy_c_means(
     :param max_iter: Maximum number of iterations, default 100
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
-    :return: FuzzyMeansResult containing cluster_centers_, membership_matrix_,
+    :return: FuzzyCMeansResult containing cluster_centers_, membership_matrix_,
         n_iter_ (actual iterations), and converged (boolean)
     """
     if initial_guess is not None and indices is not None:
@@ -122,7 +122,7 @@ def fuzzy_c_means(
     # Calculate final membership matrix
     w_ij = _get_weights(c, m, x)
 
-    return FuzzyMeansResult(
+    return FuzzyCMeansResult(
         cluster_centers_=c,
         membership_matrix_=w_ij,
         n_iter_=n_iter,
