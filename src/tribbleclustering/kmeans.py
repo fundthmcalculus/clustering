@@ -263,7 +263,6 @@ class KMeans(BaseClusterer):
         self.n_iter_: Optional[int] = None
         self.converged: Optional[bool] = None
 
-
     def fit(
         self,
         X: ndarray,

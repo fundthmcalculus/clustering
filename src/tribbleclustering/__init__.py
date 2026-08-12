@@ -32,7 +32,6 @@ from .fuzzycmeans import FuzzyCMeans
 from .kmeans import KMeans
 from .linkernighan import LinKernighan
 
-
 __all__ = [
     "BaseClusterer",
     "vat_prim_mst",
