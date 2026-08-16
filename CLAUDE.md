@@ -126,22 +126,44 @@ it is the source of truth for the API and drives the re-export lint exemption.
 
 ## Development workflow
 
-Install with the dev extra (also cythonizes and builds the extensions in-place):
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management and builds.
+
+### Setup
+
+Install the development environment with all dependencies and build the extensions:
+
+```bash
+uv sync --extra dev
+```
+
+This creates a `.venv` directory with the project and all development tools (numpy, cython,
+pytest, black, flake8, mypy, etc.), and builds the compiled Cython extensions.
+
+### Rebuilding extensions
+
+After editing a `.pyx` file, rebuild the extensions:
+
+```bash
+uv pip install -e . --no-deps
+```
+
+Or using setuptools directly:
+
+```bash
+python setup.py build_ext --inplace
+```
+
+**Build note:** optimization flags are selected per-compiler at build time — `/O2 /arch:AVX2 /fp:fast /openmp`
+on MSVC, `-O3 -march=native -ffast-math -fopenmp` on unix. Don't hardcode GCC flags; MSVC silently ignores
+them (that bug is why the switch exists).
+
+### Alternative: pip (without uv)
+
+If you prefer pip/venv, the project still works with the traditional approach:
 
 ```bash
 pip install -e ".[dev]"
 ```
-
-If you only need to (re)build the C extensions after editing a `.pyx`:
-
-```bash
-python setup.py build_ext --inplace     # or re-run: pip install -e .
-```
-
-Build note (`setup.py`): optimization flags are selected per-compiler at build
-time — `/O2 /arch:AVX2 /fp:fast /openmp` on MSVC, `-O3 -march=native
--ffast-math -fopenmp` on unix. Don't hardcode GCC flags; MSVC silently ignores
-them (that bug is why the switch exists).
 
 ### Quality gates (all enforced in CI — `.github/workflows/pr.yaml`)
 
