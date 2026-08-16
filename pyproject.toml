@@ -25,7 +25,9 @@ classifiers = [
 ]
 dependencies = [
     "numba",
-    "numpy",
+    "numpy>=2.4.6",
+    "numba-progress>=1.2.0",
+    "matplotlib>=3.10.9",
 ]
 
 [project.optional-dependencies]
