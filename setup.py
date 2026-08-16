@@ -4,20 +4,20 @@ import numpy
 
 # Compiler-specific optimization flags.
 #
-# The previous flags (-O3 -march=native -fopenmp) are GCC/Clang syntax. MSVC —
-# the default compiler for CPython on Windows — does not understand them and
-# silently ignores each one, so Windows builds got no SIMD/AVX vectorization at
-# all (baseline SSE2 only). Select flags by compiler at build time instead.
+# Both platforms target a conservative x86-64 baseline with AVX2 support (available
+# since ~2013) instead of -march=native, which would produce SIGILL crashes on CPUs
+# lacking the build machine's instruction set (e.g., AVX-512). MSVC and Unix both
+# emit AVX2 with various other baseline features for broad portability.
 COMPILE_ARGS = {
     "msvc": [
         "/O2",  # max speed (MSVC has no /O3)
-        "/arch:AVX2",  # emit AVX2 + FMA SIMD — the Windows equivalent of -march=native
+        "/arch:AVX2",  # emit AVX2 + FMA SIMD — matches Unix x86-64-v3 baseline
         "/fp:fast",  # relaxed FP, lets the vectorizer fuse/reorder (~ -ffast-math)
         "/openmp",  # OpenMP (links VCOMP140)
     ],
     "unix": [
         "-O3",
-        "-march=native",
+        "-march=x86-64-v3",
         "-ffast-math",
         "-fopenmp",
     ],
