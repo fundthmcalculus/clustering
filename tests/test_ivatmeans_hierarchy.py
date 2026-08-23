@@ -347,11 +347,19 @@ def test_get_ivat_levels_no_oversegmentation_on_tied_gaps():
         ivat[i, i + 1] = g
     cities = np.arange(N, dtype=float).reshape(-1, 1)
     vat_order = np.arange(N)
-    assert len(get_ivat_levels(cities, ivat, vat_order, n_clusters=2).cluster_city_ids) == 2
-    assert len(get_ivat_levels(cities, ivat, vat_order, n_clusters=3).cluster_city_ids) == 3
+    assert (
+        len(get_ivat_levels(cities, ivat, vat_order, n_clusters=2).cluster_city_ids)
+        == 2
+    )
+    assert (
+        len(get_ivat_levels(cities, ivat, vat_order, n_clusters=3).cluster_city_ids)
+        == 3
+    )
     # a no-tie case is unaffected
     ivat2 = np.zeros((N, N))
     for i, g in enumerate([1.0, 2.0, 9.0, 3.0, 8.0]):
         ivat2[i, i + 1] = g
-    assert len(get_ivat_levels(cities, ivat2, vat_order, n_clusters=3).cluster_city_ids) == 3
-
+    assert (
+        len(get_ivat_levels(cities, ivat2, vat_order, n_clusters=3).cluster_city_ids)
+        == 3
+    )
