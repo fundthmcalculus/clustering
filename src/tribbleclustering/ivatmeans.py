@@ -114,6 +114,16 @@ def get_ivat_levels(
         # Prevent weird floating-point comparisons.
         abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
 
+        # When an exact cluster count was requested, ties at the threshold can make
+        # `>=` select more than n_clusters-1 cut points -> more clusters than asked
+        # for. Keep the n_clusters-1 largest gaps, tie-broken by position (stable)
+        # so the result is deterministic. (The n_clusters == -1 hierarchy mode is
+        # left alone: cutting at every equally-large gap is intended there.)
+        if n_clusters != -1 and len(abrupt_change_idx) > n_clusters - 1:
+            gap_vals = diagonal_values[abrupt_change_idx]
+            keep = np.argsort(-gap_vals, kind="stable")[: n_clusters - 1]
+            abrupt_change_idx = np.sort(abrupt_change_idx[keep])
+
         # Use each section as a cluster endpoint, inclusive.
         cluster_group = np.concatenate(
             [np.array([0]), abrupt_change_idx, np.array([len(all_cities)])]
