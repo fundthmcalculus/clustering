@@ -333,3 +333,25 @@ def _get_max_depth(node: ClusterNode) -> int:
     if not node.children:
         return 0
     return 1 + max(_get_max_depth(child) for child in node.children)
+
+
+def test_get_ivat_levels_no_oversegmentation_on_tied_gaps():
+    """n_clusters must be honored exactly even when the diagonal gaps tie: a `>=`
+    threshold used to select every tied gap and return more clusters than asked."""
+    import numpy as np
+    from tribbleclustering.ivatmeans import get_ivat_levels
+
+    N = 6
+    ivat = np.zeros((N, N))
+    for i, g in enumerate([1.0, 1.0, 5.0, 1.0, 5.0]):  # two tied gaps of 5.0
+        ivat[i, i + 1] = g
+    cities = np.arange(N, dtype=float).reshape(-1, 1)
+    vat_order = np.arange(N)
+    assert len(get_ivat_levels(cities, ivat, vat_order, n_clusters=2).cluster_city_ids) == 2
+    assert len(get_ivat_levels(cities, ivat, vat_order, n_clusters=3).cluster_city_ids) == 3
+    # a no-tie case is unaffected
+    ivat2 = np.zeros((N, N))
+    for i, g in enumerate([1.0, 2.0, 9.0, 3.0, 8.0]):
+        ivat2[i, i + 1] = g
+    assert len(get_ivat_levels(cities, ivat2, vat_order, n_clusters=3).cluster_city_ids) == 3
+
