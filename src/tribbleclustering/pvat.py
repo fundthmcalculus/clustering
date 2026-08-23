@@ -168,9 +168,6 @@ def vat_prim_mst(adj: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     # Create a list for keys and initialize all keys as infinite (INF)
     key: np.ndarray = np.full(n, np.inf, dtype=adj.dtype)
 
-    # To store the parent array which, in turn, stores MST
-    parent: np.ndarray = np.full(n, -1, dtype=np.int32)
-
     # To keep track of vertices included in MST
     in_mst: np.ndarray = np.full(n, False, dtype=np.bool_)
 
@@ -213,13 +210,12 @@ def vat_prim_mst(adj: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
-        mask = (vertices != u) & ~in_mst & (key[vertices] >= adj[u, vertices])
+        mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
         key[mask] = adj[u, mask]
         for v in vertices[mask]:
             # Heterogeneous heap-key tuple (numpy int vs Python int); mypy cannot
             # infer the element type but numba handles it at runtime.
             heapq.heappush(pq, (key[v], v, heap_seq_idx))  # type: ignore[misc]
-            parent[v] = u
 
     return heap_seq, parent_seq
 
