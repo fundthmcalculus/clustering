@@ -364,9 +364,9 @@ class IVATMeans(BaseClusterer):
         if X.ndim != 2:
             raise ValueError(f"X must be 2-dimensional, got shape {X.shape}")
 
-        if self.random_state is not None:
-            np.random.seed(self.random_state)
-
+        # No global np.random.seed() here: the medoid/euclidean paths use no
+        # randomness and the relational path takes a hard u_init, so reseeding the
+        # process-global RNG only perturbs unrelated code's reproducibility.
         distances = self._compute_distances(X)
         # `distances` is a throwaway intermediate, so let IVAT consume it in
         # place: the VAT/IVAT transform reorders it into the result rather

@@ -70,6 +70,7 @@ def relational_fuzzy_c_means(
     max_iter: int = 100,
     tol: float = 1e-5,
     beta_spread: bool = True,
+    random_state: Optional[int] = None,
 ) -> tuple[ndarray, float]:
     """Run NERFCM on a dissimilarity matrix.
 
@@ -109,7 +110,7 @@ def relational_fuzzy_c_means(
         col_sums = np.where(col_sums == 0.0, 1.0, col_sums)
         u = u / col_sums
     else:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(random_state)
         u = rng.dirichlet(np.ones(n_clusters), size=n)
 
     r_work = np.array(r, copy=True)

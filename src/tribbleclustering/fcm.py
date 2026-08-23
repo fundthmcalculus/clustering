@@ -49,10 +49,21 @@ def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
     # Compute weights: w_ij = d_ij^(-2/(m-1)) / Σ_l d_il^(-2/(m-1))
     # This avoids the (n,k,k) intermediate tensor
     exp = -2.0 / (m - 1)
-    w_power = distances**exp  # (n, k)
-    w_ij = w_power / np.sum(w_power, axis=1, keepdims=True)  # (n, k)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        w_power = distances**exp  # (n, k)
+        w_ij = w_power / np.sum(w_power, axis=1, keepdims=True)  # (n, k)
 
     w_ij = np.where(np.isnan(w_ij) | np.isinf(w_ij), 0.0, w_ij)
+    # A point coincident with a center has distance 0 -> 0**exp = inf -> inf/inf =
+    # nan -> zeroed above, leaving an all-zero (non-normalized) membership row. The
+    # correct FCM behavior is crisp membership split across the coincident centers
+    # (mirrors nerfcm._get_relational_weights).
+    zero_mask = dist2 == 0.0  # (n, k)
+    has_zero = zero_mask.any(axis=1)
+    if np.any(has_zero):
+        crisp = zero_mask[has_zero].astype(float)
+        crisp /= crisp.sum(axis=1, keepdims=True)
+        w_ij[has_zero] = crisp
     return w_ij
 
 
