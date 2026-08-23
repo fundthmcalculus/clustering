@@ -168,7 +168,6 @@ def vat_prim_mst(adj: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     # Create a list for keys and initialize all keys as infinite (INF)
     key: np.ndarray = np.full(n, np.inf, dtype=adj.dtype)
 
-
     # To keep track of vertices included in MST
     in_mst: np.ndarray = np.full(n, False, dtype=np.bool_)
 
