@@ -112,7 +112,10 @@ def fuzzy_c_means(
             )
         c = initial_guess
     else:
-        indices = np.random.choice(x.shape[0], size=n * 2, replace=False)
+        # replace=True only when there aren't 2n distinct rows to draw (avoids a
+        # ValueError); a coincident center from a duplicated pair is handled by the
+        # zero-distance branch in _get_weights.
+        indices = np.random.choice(x.shape[0], size=n * 2, replace=2 * n > x.shape[0])
         c = x[indices, :]
         # Combine every two rows into one so no cluster center exactly matches a data-point
         c = c.reshape(n, 2, x.shape[1]).mean(axis=1)

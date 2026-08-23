@@ -507,7 +507,9 @@ def fuzzy_c_means_32(
                 f"indices must have exactly {n} elements or at least {2*n} elements, got {indices_arr.shape[0]}"
             )
     else:
-        indices_arr = np.random.choice(n_samples, size=n * 2, replace=False).astype(np.int64)
+        # replace=True only when there aren't 2n distinct rows (avoids ValueError);
+        # matches fcm.py. A coincident center is handled by the zero-distance branch.
+        indices_arr = np.random.choice(n_samples, size=n * 2, replace=2 * n > n_samples).astype(np.int64)
         indices_view = indices_arr
         _init_centers_32(x, n, indices_view, c_init)
 
@@ -560,7 +562,9 @@ def fuzzy_c_means_64(
                 f"indices must have exactly {n} elements or at least {2*n} elements, got {indices_arr.shape[0]}"
             )
     else:
-        indices_arr = np.random.choice(n_samples, size=n * 2, replace=False).astype(np.int64)
+        # replace=True only when there aren't 2n distinct rows (avoids ValueError);
+        # matches fcm.py. A coincident center is handled by the zero-distance branch.
+        indices_arr = np.random.choice(n_samples, size=n * 2, replace=2 * n > n_samples).astype(np.int64)
         indices_view = indices_arr
         _init_centers_64(x, n, indices_view, c_init)
 

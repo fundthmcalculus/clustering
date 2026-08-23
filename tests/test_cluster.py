@@ -694,3 +694,19 @@ def test_visualize_hierarchy():
 
     # plt.show()
     assert len(root.children) > 0
+
+
+def test_fcm_more_clusters_than_half_the_rows():
+    """FCM must not crash when n_samples < 2*n_clusters (the default init used
+    np.random.choice(size=2n, replace=False), which raised ValueError)."""
+    import numpy as np
+    from tribbleclustering.fuzzycmeans import FuzzyCMeans
+    import tribbleclustering.fcm as fcm
+
+    X = np.random.default_rng(0).normal(size=(10, 2))  # 10 rows, 6 clusters -> 2n=12 > 10
+    fc = FuzzyCMeans(n_clusters=6, random_state=0).fit(X)   # compiled path (or pure fallback)
+    assert fc.cluster_centers_.shape == (6, 2)
+    # pure path directly
+    res = fcm.fuzzy_c_means(X, 6, m=2.0)
+    assert np.asarray(res.cluster_centers_).shape == (6, 2)
+
