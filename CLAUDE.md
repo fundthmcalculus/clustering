@@ -20,14 +20,16 @@ further ~15–20x on top.
 ```
 src/tribbleclustering/
   __init__.py        # public API surface (see __all__) — keep this authoritative
-  pvat.py            # VAT/IVAT core: numba-JIT Prim MST, compute_vat/compute_ivat,
-                     #   get_ivat_levels/get_ivat_hierarchy, IvatMeansResult, ClusterNode
+  clustering_base.py # BaseClusterer — shared ABC (.fit/.predict/.fit_predict) for
+                     #   KMeans, FuzzyCMeans, IVATMeans, ConiVAT
+  pvat.py            # VAT/IVAT core: numba-JIT Prim MST, compute_vat/compute_ivat
   pqvat.py           # alternate fully-inlined numba Prim MST (vat_prim_mst_numba); not exported
   pcvat.pyx          # Cython/OpenMP VAT/IVAT: pairwise_distances_c, compute_vat_c,
                      #   compute_ivat_c, vat_prim_mst_c (f32 + f64 fused variants)
   fcm.py             # pure-numpy fuzzy_c_means reference implementation
-  cfcm.pyx           # Cython/OpenMP fuzzy_c_means (f32 + f64 fused variants)
+  cfcm.pyx           # Cython/OpenMP fuzzy_c_means + k-means (f32 + f64 fused variants)
   fuzzycmeans.py     # FuzzyCMeans — sklearn-style class wrapper over FCM
+  kmeans.py          # KMeans — sklearn-style class wrapper, optional GPU acceleration
   nerfcm.py          # relational_fuzzy_c_means / relational_out_of_sample_membership —
                      #   NERFCM (Hathaway & Bezdek 1994) on a dissimilarity matrix; the
                      #   geometry-consistent IVATMeans(refine="relational") back end
@@ -36,7 +38,14 @@ src/tribbleclustering/
   clk.pyx            # Cython/OpenMP Lin-Kernighan (f32 + f64 fused variants) with
                      #   multi-threaded multi-start local optimization
   linkernighan.py    # LinKernighan — sklearn-style class wrapper over LK
-  ivatmeans.py       # IVATMeans — sklearn-style class wrapper over IVAT
+  ivatmeans.py       # IVATMeans — sklearn-style class wrapper over IVAT;
+                     #   get_ivat_levels/get_ivat_hierarchy, IvatMeansResult, ClusterNode
+  conivat.py         # ConiVAT — constraint-based iVAT (Rathore, Bezdek, Santi & Ratti,
+                     #   2020): semi-supervised iVAT from must-link/cannot-link constraints
+  gpu.py             # CuPy pairwise-distance/FCM/k-means device kernels; optional,
+                     #   gated on gpu.is_available(), falls back to CPU when absent
+  gpu_vat.py         # fully on-device VAT front-end (CuPy): distances -> Borůvka MST ->
+                     #   ordering, kept resident on the GPU end-to-end
   util.py            # pairwise_distances (numba), synthetic cluster generators
 tests/               # pytest suite (correctness + benchmark-marked perf tests)
 benchmarks/          # dev-only scale/memory harness (NOT shipped in the wheel)
@@ -98,10 +107,20 @@ Import from the top-level package (defined in `__init__.py`):
   `relational_out_of_sample_membership` (NERFCM; operates on a dissimilarity
   matrix, no coordinates — see `IVATMeans(refine="relational")`)
 - **Lin-Kernighan TSP (functional):** `lin_kernighan`, `tour_length`
-- **sklearn-style classes:** `FuzzyCMeans`, `IVATMeans` (`.fit`, `.predict`,
-  `.fit_predict`, `.labels_`, `.cluster_centers_`; `refine="medoid"` (default),
-  `"relational"`, or `"euclidean"` — see the class docstring and issue #54);
-  `LinKernighan` (`.solve`, `.fit`, `.fit_predict`, `.tour_`, `.tour_length_`)
+- **ConiVAT (constraint-based iVAT):** `compute_conivat`, `ConiVAT`,
+  `expand_constraints`, `generate_constraints_from_labels`, `learn_metric`,
+  `transform_with_metric`
+- **Base class:** `BaseClusterer` — shared `.fit`/`.predict`/`.fit_predict`
+  interface for all sklearn-style classes below
+- **sklearn-style classes:** `FuzzyCMeans`, `KMeans`, `IVATMeans` (`.fit`,
+  `.predict`, `.fit_predict`, `.labels_`, `.cluster_centers_`;
+  `refine="medoid"` (default), `"relational"`, or `"euclidean"` — see the
+  class docstring and issue #54); `LinKernighan` (`.solve`, `.fit`,
+  `.fit_predict`, `.tour_`, `.tour_length_`); `ConiVAT`
+- **GPU (optional, CuPy):** `gpu.py`/`gpu_vat.py` provide device-resident
+  pairwise-distance, FCM, k-means, and VAT/MST kernels; not re-exported from
+  `__init__.py` — import from `tribbleclustering.gpu`/`tribbleclustering.gpu_vat`
+  directly, guarding with `gpu.is_available()`
 - **Helpers:** `pairwise_distances`
 
 When you add or rename anything user-facing, update `__all__` in `__init__.py` —
@@ -228,3 +247,7 @@ is the scaling wall.**
 - Keep the compiled and pure-Python paths in sync, and both f32/f64 variants.
 - Keep `black`, `flake8`, `mypy`, and `pytest` green before pushing.
 - Don't commit build artifacts (`.so`, generated `.c`) — they're git-ignored.
+- **Never commit directly to `main`.** Always create a feature branch and open
+  a pull request for review, even for small fixes/docs — this applies to AI
+  agents as much as humans. `pr.yaml` only runs CI on PRs into `main`/`master`,
+  so a direct commit to `main` also skips the quality gates.

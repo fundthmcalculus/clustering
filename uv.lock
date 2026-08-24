@@ -1210,6 +1210,7 @@ name = "tribble-clustering"
 version = "0.2.1"
 source = { editable = "." }
 dependencies = [
+    { name = "matplotlib" },
     { name = "numba" },
     { name = "numpy" },
 ]
@@ -1242,10 +1243,11 @@ requires-dist = [
     { name = "elkai", marker = "extra == 'experiments'", specifier = ">=2.0" },
     { name = "flake8", marker = "extra == 'dev'" },
     { name = "flake8-pyproject", marker = "extra == 'dev'" },
+    { name = "matplotlib", specifier = ">=3.10.9" },
     { name = "matplotlib", marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numba" },
-    { name = "numpy" },
+    { name = "numpy", specifier = ">=2.4.6" },
     { name = "pandas-stubs", marker = "extra == 'dev'", specifier = "~=3.0.3" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "scipy", marker = "extra == 'dev'" },
