@@ -109,55 +109,75 @@ def get_ivat_levels(
         peaks_threshold = sorted_diagonal[-(n_clusters - 1) :]
         max_diff_indices = np.full(n_clusters - 1, -1)
 
-    results = []
-    for index, peak_th in enumerate(peaks_threshold):
-        # Prevent weird floating-point comparisons.
-        abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
-
-        # When an exact cluster count was requested, ties at the threshold can make
-        # `>=` select more than n_clusters-1 cut points -> more clusters than asked
-        # for. Keep the n_clusters-1 largest gaps, tie-broken by position (stable)
-        # so the result is deterministic. (The n_clusters == -1 hierarchy mode is
-        # left alone: cutting at every equally-large gap is intended there.)
-        if n_clusters != -1 and len(abrupt_change_idx) > n_clusters - 1:
-            gap_vals = diagonal_values[abrupt_change_idx]
-            keep = np.argsort(-gap_vals, kind="stable")[: n_clusters - 1]
-            abrupt_change_idx = np.sort(abrupt_change_idx[keep])
-
-        # Use each section as a cluster endpoint, inclusive.
-        cluster_group = np.concatenate(
-            [np.array([0]), abrupt_change_idx, np.array([len(all_cities)])]
+    results = [
+        _build_ivat_level(
+            peak_th,
+            int(max_diff_indices[index]),
+            diagonal_values,
+            sorted_diagonal,
+            vat_order,
+            all_cities,
+            n_clusters,
         )
-        cluster_city_indexs = []
-        for idx, cg_start in enumerate(cluster_group[:-1]):
-            cg_end = cluster_group[idx + 1]
-            if cg_start < cg_end:
-                # Use the VAT order to pick out the cities in each cluster
-                cluster_city_indexs.append(vat_order[cg_start:cg_end])
-
-        # Compute the initial guess as the centroid of each city cluster
-        initial_centroids_item = np.array(
-            [
-                np.mean(all_cities[cluster_ids], axis=0)
-                for cluster_ids in cluster_city_indexs
-            ]
-        )
-
-        results.append(
-            IvatMeansResult(
-                abrupt_change_indices=abrupt_change_idx,
-                cluster_city_ids=cluster_city_indexs,
-                diagonal_values=diagonal_values,
-                initial_centroids=initial_centroids_item,
-                max_diff_index=int(max_diff_indices[index]),
-                peak_threshold=float(peak_th),
-                sorted_diagonal=sorted_diagonal,
-            )
-        )
+        for index, peak_th in enumerate(peaks_threshold)
+    ]
 
     if n_levels == 1:
         return results[0]
     return results
+
+
+def _build_ivat_level(
+    peak_th: float,
+    max_diff_index: int,
+    diagonal_values: ndarray,
+    sorted_diagonal: ndarray,
+    vat_order: ndarray,
+    all_cities: ndarray,
+    n_clusters: int,
+) -> IvatMeansResult:
+    """Build the IvatMeansResult for a single cut threshold of get_ivat_levels."""
+    # Prevent weird floating-point comparisons.
+    abrupt_change_idx = np.where(diagonal_values >= peak_th)[0]
+
+    # When an exact cluster count was requested, ties at the threshold can make
+    # `>=` select more than n_clusters-1 cut points -> more clusters than asked
+    # for. Keep the n_clusters-1 largest gaps, tie-broken by position (stable)
+    # so the result is deterministic. (The n_clusters == -1 hierarchy mode is
+    # left alone: cutting at every equally-large gap is intended there.)
+    if n_clusters != -1 and len(abrupt_change_idx) > n_clusters - 1:
+        gap_vals = diagonal_values[abrupt_change_idx]
+        keep = np.argsort(-gap_vals, kind="stable")[: n_clusters - 1]
+        abrupt_change_idx = np.sort(abrupt_change_idx[keep])
+
+    # Use each section as a cluster endpoint, inclusive.
+    cluster_group = np.concatenate(
+        [np.array([0]), abrupt_change_idx, np.array([len(all_cities)])]
+    )
+    cluster_city_indexs = []
+    for idx, cg_start in enumerate(cluster_group[:-1]):
+        cg_end = cluster_group[idx + 1]
+        if cg_start < cg_end:
+            # Use the VAT order to pick out the cities in each cluster
+            cluster_city_indexs.append(vat_order[cg_start:cg_end])
+
+    # Compute the initial guess as the centroid of each city cluster
+    initial_centroids_item = np.array(
+        [
+            np.mean(all_cities[cluster_ids], axis=0)
+            for cluster_ids in cluster_city_indexs
+        ]
+    )
+
+    return IvatMeansResult(
+        abrupt_change_indices=abrupt_change_idx,
+        cluster_city_ids=cluster_city_indexs,
+        diagonal_values=diagonal_values,
+        initial_centroids=initial_centroids_item,
+        max_diff_index=max_diff_index,
+        peak_threshold=float(peak_th),
+        sorted_diagonal=sorted_diagonal,
+    )
 
 
 def get_ivat_hierarchy(
