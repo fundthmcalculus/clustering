@@ -319,6 +319,11 @@ class IVATMeans(BaseClusterer):
       Euclidean nearest-centroid assignment. Kept for backward compatibility
       but is no longer the default since it reintroduces the geometry
       mismatch described in issue #54.
+
+    ``random_state`` is accepted for ``BaseClusterer`` compatibility and is
+    consumed by nothing: all three ``refine`` paths are deterministic (the
+    relational path takes a hard ``u_init``). It is stored, never read. See
+    the comment in ``fit``.
     """
 
     def __init__(
