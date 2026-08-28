@@ -361,8 +361,11 @@ def fuzzy_c_means_gpu(
             )
         C = _cp.asarray(np.ascontiguousarray(initial_guess, dtype=dtype))
     else:
+        # replace=True only when there aren't 2n distinct rows to draw, matching
+        # fcm.py / cfcm.pyx; replace=False raised ValueError when n_samples < 2n
+        # (tests/test_cluster.py::test_fcm_more_clusters_than_half_the_rows).
         rng = np.random.default_rng(random_state)
-        idx = rng.choice(n_samples, size=n * 2, replace=False)
+        idx = rng.choice(n_samples, size=n * 2, replace=2 * n > n_samples)
         C = (
             _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype))
             .reshape(n, 2, d)

@@ -340,6 +340,16 @@ class TestGpuFallbackSeeding:
         )
         assert np.array_equal(without, with_call)
 
+    def test_fcm_gpu_survives_more_clusters_than_half_the_rows(self):
+        """n_samples < 2*n_clusters. The device branch drew with
+        ``replace=False`` and would have raised ValueError on this shape --
+        the same defect ``test_fcm_more_clusters_than_half_the_rows`` pins for
+        the CPU kernels. Only the fallback executes here (no CUDA), so this
+        pins the entry point's contract, NOT the device code."""
+        x = np.random.default_rng(0).normal(size=(10, 2))  # 10 rows, 2n = 12
+        res = gpu.fuzzy_c_means_gpu(x, 6, random_state=0)
+        assert np.asarray(res.cluster_centers_).shape == (6, 2)
+
     def test_kmeans_gpu_fallback_accepts_random_state(self, blobs):
         a = gpu.kmeans_gpu(blobs, 3, random_state=11)
         b = gpu.kmeans_gpu(blobs, 3, random_state=11)
