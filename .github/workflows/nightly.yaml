@@ -1,0 +1,90 @@
+name: Nightly (full suite)
+
+# pr.yaml runs `pytest --ci-fast`, and the project's own addopts already
+# deselect `-m benchmark`. Two categories therefore run in no automated place:
+#
+#   * `ci_slow` scaling/plotting tests, and the full-size inputs the
+#     `ci_scale(full, fast)` fixture shrinks under --ci-fast;
+#   * everything marked `benchmark` -- the wall-clock assertions guarding the
+#     Cython/OpenMP speedups this package exists for.
+#
+# A silent 20x loss in the compiled VAT path would pass every PR. It fails here.
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Confirm the Cython extensions actually built
+        # The benchmark leg below asserts wall-clock speedups. Those tests
+        # skipif-guard on CYTHON_AVAILABLE, so an unbuilt extension turns the
+        # entire point of this workflow into a green skip.
+        run: python -c "import tribbleclustering.pcvat, tribbleclustering.cfcm, tribbleclustering.clk; print('compiled kernels present')"
+
+      # CI_FAST is force-disabled: conftest auto-enables it from GITHUB_ACTIONS,
+      # which is exactly the trimming this workflow exists to undo. `--no-ci-fast`
+      # does not exist, so the env var that drives it is cleared instead.
+      - name: Run the full-size correctness suite
+        run: GITHUB_ACTIONS= CI= TRIBBLE_CI_FAST= pytest -v --durations=25
+
+      - name: Run the benchmark suite
+        # Separate step so a wall-clock regression is distinguishable at a glance
+        # from a correctness failure -- they need very different responses.
+        run: GITHUB_ACTIONS= CI= TRIBBLE_CI_FAST= pytest -m benchmark -v --durations=25
+
+      - name: Report a failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Nightly full suite is failing"
+          # `gh issue create --label` errors on an unknown label, and a failed
+          # report is worse than a noisy one, so ensure the label exists first.
+          gh label create nightly-failure --color B60205             --description "Opened automatically when the nightly suite fails" 2>/dev/null || true
+          existing=$(gh issue list --state open --label nightly-failure             --search "$TITLE in:title" --json number -q '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            # One issue that accumulates nights, not one issue per night.
+            gh issue comment "$existing"               --body "Still failing on \`${{ github.sha }}\` -- [run]($RUN_URL)"
+            echo "commented on #$existing"
+          else
+            {
+              echo "The nightly run failed. \`pr.yaml\` runs \`pytest --ci-fast\` and addopts deselect \`-m benchmark\`, so this is either a full-size correctness failure or a wall-clock benchmark regression -- neither is visible to the PR gate."
+              echo
+              echo "Check which step failed: \"full-size correctness suite\" vs \"benchmark suite\"."
+              echo
+              echo "- Commit: \`${{ github.sha }}\`"
+              echo "- Run: $RUN_URL"
+              echo
+              echo "This issue collects one comment per failing night and is NOT closed"
+              echo "automatically -- a nightly that starts passing again may just be flaky."
+              echo "Close it once the cause is understood."
+            } > issue-body.md
+            gh issue create --title "$TITLE" --label nightly-failure --body-file issue-body.md
+          fi
