@@ -322,16 +322,29 @@ def fuzzy_c_means_gpu(
     indices=None,
     max_iter: int = 100,
     tol: float = 1e-5,
+    random_state: int | np.random.Generator | None = None,
 ):
     """GPU Fuzzy C-Means. Mirrors ``fcm.fuzzy_c_means`` and returns
     ``(centers, membership)`` with shapes ``(n, d)`` and ``(n_samples, n)``.
+
+    ``random_state`` seeds the random center initialization (int, Generator, or
+    None); like the CPU kernels it is threaded, never seeded into the
+    process-global ``np.random`` stream.
 
     Falls back to the CPU implementation if no CUDA device is available.
     """
     if not is_available():
         from .fcm import fuzzy_c_means
 
-        return fuzzy_c_means(x, n, m=m, indices=indices, initial_guess=initial_guess)
+        return fuzzy_c_means(
+            x,
+            n,
+            m=m,
+            max_iter=max_iter,
+            indices=indices,
+            initial_guess=initial_guess,
+            random_state=random_state,
+        )
 
     x = np.asarray(x)
     dtype = x.dtype if x.dtype in (np.float32, np.float64) else np.float64
@@ -349,7 +362,11 @@ def fuzzy_c_means_gpu(
             )
         C = _cp.asarray(np.ascontiguousarray(initial_guess, dtype=dtype))
     else:
-        idx = np.random.choice(n_samples, size=n * 2, replace=False)
+        # replace=True only when there aren't 2n distinct rows to draw, matching
+        # fcm.py / cfcm.pyx; replace=False raised ValueError when n_samples < 2n
+        # (tests/test_cluster.py::test_fcm_more_clusters_than_half_the_rows).
+        rng = np.random.default_rng(random_state)
+        idx = rng.choice(n_samples, size=n * 2, replace=2 * n > n_samples)
         C = (
             _cp.asarray(np.ascontiguousarray(x[idx], dtype=dtype))
             .reshape(n, 2, d)
@@ -398,11 +415,16 @@ def kmeans_gpu(
     tol: float = 1e-4,
     indices: np.ndarray | None = None,
     initial_guess: np.ndarray | None = None,
+    random_state: int | np.random.Generator | None = None,
 ):
     """GPU K-Means clustering.
 
     Mirrors ``kmeans.kmeans`` and returns a KMeansResult with cluster centers,
     labels, inertia, iteration count, and convergence status.
+
+    ``random_state`` seeds the random/k-means++ initialization (int, Generator,
+    or None); like the CPU kernels it is threaded, never seeded into the
+    process-global ``np.random`` stream.
 
     Falls back to the CPU implementation if no CUDA device is available.
     """
@@ -417,6 +439,7 @@ def kmeans_gpu(
             tol=tol,
             indices=indices,
             initial_guess=initial_guess,
+            random_state=random_state,
         )
 
     from .kmeans import KMeansResult
@@ -444,10 +467,13 @@ def kmeans_gpu(
         from .kmeans import _kmeans_plusplus
 
         C = _cp.asarray(
-            np.ascontiguousarray(_kmeans_plusplus(x, n_clusters), dtype=dtype)
+            np.ascontiguousarray(
+                _kmeans_plusplus(x, n_clusters, random_state), dtype=dtype
+            )
         )
     elif init == "random":
-        idx = np.random.choice(n_samples, size=n_clusters, replace=False)
+        rng = np.random.default_rng(random_state)
+        idx = rng.choice(n_samples, size=n_clusters, replace=False)
         C = Xd[_cp.asarray(idx)].copy()
     else:
         raise ValueError(f"init must be 'k-means++' or 'random', got {init!r}")
