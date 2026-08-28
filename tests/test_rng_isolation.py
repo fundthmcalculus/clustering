@@ -340,6 +340,10 @@ class TestGpuFallbackSeeding:
         )
         assert np.array_equal(without, with_call)
 
+    def test_fcm_gpu_fallback_forwards_max_iter(self, blobs):
+        """The fallback used to drop max_iter on the floor."""
+        assert gpu.fuzzy_c_means_gpu(blobs, 3, max_iter=1, random_state=0).n_iter_ == 1
+
     def test_fcm_gpu_survives_more_clusters_than_half_the_rows(self):
         """n_samples < 2*n_clusters. The device branch drew with
         ``replace=False`` and would have raised ValueError on this shape --

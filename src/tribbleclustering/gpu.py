@@ -340,6 +340,7 @@ def fuzzy_c_means_gpu(
             x,
             n,
             m=m,
+            max_iter=max_iter,
             indices=indices,
             initial_guess=initial_guess,
             random_state=random_state,
