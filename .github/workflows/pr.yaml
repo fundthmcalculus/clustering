@@ -17,32 +17,29 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Check the lockfile matches pyproject.toml
+        # Runs BEFORE the dependency install: the check takes ~1s and the
+        # install ~60s, so a desync should not cost a full Cython/numpy build
+        # before anyone hears about it. Safe this early -- `uv lock --check`
+        # reads static [project] metadata and never invokes the build backend,
+        # verified by it succeeding with a cold cache under --offline.
+        #
+        # Scope: lock <-> pyproject agreement ONLY. It cannot see a
+        # revision-less git dependency drifting behind its upstream branch,
+        # since such a source is "in sync" with any locked commit however old.
+        # Nothing here is git-sourced today, so do not read a green run as
+        # "dependencies are current". Note a bare [project] version bump also
+        # needs `uv lock` -- the lock records this project's own version.
+        #
+        # See #90 for the two incidents this exists to prevent.
+        run: |
+          python -m pip install "uv==0.12.7"
+          uv lock --check
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-
-      - name: Check the lockfile matches pyproject.toml
-        # Nothing else in this job can see a `uv.lock` that disagrees with
-        # `pyproject.toml`, and a desync here is not merely stale: while one is
-        # live, a plain `uv run --project .` re-resolves and REWRITES the lock,
-        # so a read-only command dirties the working tree. That breaks the
-        # downstream grad-school harness, which vendors this repo as a pinned
-        # submodule and requires that reproducing a result leaves it clean.
-        #
-        # `c4efd84` added three declarations without re-locking and the desync
-        # survived four commits and nine days until #87 fixed it incidentally.
-        # This is the check that would have caught it on the first PR.
-        #
-        # Scope worth knowing: this verifies lock <-> pyproject agreement only.
-        # It cannot see a revision-less git dependency drifting behind its
-        # upstream branch -- such a source is "in sync" with any locked commit,
-        # however old (tribble-fis#201). Nothing here is git-sourced today, so
-        # that gap is not live in this repo; do not read a green run as
-        # "dependencies are current".
-        run: |
-          python -m pip install uv
-          uv lock --check
 
       - name: Run black format check
         run: |
