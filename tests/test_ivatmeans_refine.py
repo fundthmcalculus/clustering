@@ -12,6 +12,10 @@ import numpy as np
 import pytest
 
 from tribbleclustering import IVATMeans
+
+# Import the VAT/iVAT front end through ivatmeans so these tests exercise
+# whichever kernel the class itself picked (compiled pcvat or pure numba).
+from tribbleclustering.ivatmeans import _compute_ivat, _pairwise_distances
 from tribbleclustering.nerfcm import (
     relational_fuzzy_c_means,
     relational_out_of_sample_membership,
@@ -34,10 +38,68 @@ def _concentric_rings(n_per_ring: int = 60, seed: int = 0):
     return X, y
 
 
+def _unbalanced_blobs(seed: int = 2):
+    """Three well-separated Gaussian blobs of very different size (80/12/30).
+
+    The iVAT front end cuts these perfectly, so any disagreement between
+    ``labels_`` and ``y`` is the relational refinement undoing a correct cut
+    (GitHub issue #89).
+    """
+    rng = np.random.default_rng(seed)
+    X = np.vstack(
+        [
+            rng.normal([0.0, 0.0], 0.6, (80, 2)),
+            rng.normal([4.0, 0.0], 0.6, (12, 2)),
+            rng.normal([2.0, 4.0], 0.6, (30, 2)),
+        ]
+    )
+    y = np.repeat([0, 1, 2], [80, 12, 30])
+    return X, y
+
+
 def _best_permutation_accuracy(labels: np.ndarray, y: np.ndarray) -> float:
     """Accuracy against ground truth, allowing for label-permutation (2 clusters)."""
     labels = np.asarray(labels)
     return max(np.mean(labels == y), np.mean(labels == (1 - y)))
+
+
+def _adjusted_rand_index(a: np.ndarray, b: np.ndarray) -> float:
+    """Label-permutation-invariant partition agreement (Hubert & Arabie 1985).
+
+    Written out rather than pulled from sklearn, which is not a dependency.
+    """
+    a, b = np.asarray(a), np.asarray(b)
+    ia = {v: i for i, v in enumerate(np.unique(a))}
+    ib = {v: i for i, v in enumerate(np.unique(b))}
+    table = np.zeros((len(ia), len(ib)), dtype=np.int64)
+    for x, y in zip(a, b):
+        table[ia[x], ib[y]] += 1
+
+    def choose2(x):
+        return x * (x - 1) / 2
+
+    sum_ij = choose2(table).sum()
+    sum_a = choose2(table.sum(axis=1)).sum()
+    sum_b = choose2(table.sum(axis=0)).sum()
+    expected = sum_a * sum_b / choose2(len(a))
+    maximum = (sum_a + sum_b) / 2
+    if maximum == expected:
+        return 1.0
+    return float((sum_ij - expected) / (maximum - expected))
+
+
+def _labels_from_ivat_cut(model: IVATMeans, n: int) -> np.ndarray:
+    """The crisp partition the iVAT front end handed to the refine back end."""
+    labels = np.full(n, -1, dtype=np.int32)
+    for k, cluster_ids in enumerate(model._ivat_result.cluster_city_ids):
+        labels[cluster_ids] = k
+    return labels
+
+
+def _crispness(membership: np.ndarray) -> float:
+    """0.0 when every row is the uniform 1/k partition, 1.0 when fully crisp."""
+    k = membership.shape[1]
+    return float(np.mean((membership.max(axis=1) - 1.0 / k) / (1.0 - 1.0 / k)))
 
 
 @pytest.fixture(scope="module")
@@ -210,19 +272,30 @@ class TestRelationalFuzzyCMeans:
         assert beta == 0.0
 
     def test_beta_spread_applied_for_non_euclidean_input(self):
-        # An asymmetric-ish, non-Euclidean dissimilarity matrix (e.g. a
-        # minimax/ultrametric-like matrix with a triangle-inequality-violating
-        # perturbation) can require the beta-spread correction.
-        rng = np.random.default_rng(1)
-        n = 12
-        r = rng.uniform(0.5, 1.0, size=(n, n))
-        r = (r + r.T) / 2.0
-        np.fill_diagonal(r, 0.0)
+        # Beta-spread fires exactly when `r` is NOT of negative type, i.e. when
+        # no point configuration has `r` as its squared distances. A near-clique
+        # with one hugely stretched edge is the simplest such matrix.
+        #
+        # The matrix this test used to build -- uniform(0.5, 1.0), symmetrized,
+        # hollow -- is of negative type (min eigenvalue of -0.5 J r J measured
+        # at +2.4e-16), so beta was always 0.0 and the only assertion made on
+        # it, `beta >= 0.0`, could not fail. See issue #89.
+        n = 6
+        r = np.ones((n, n)) - np.eye(n)
+        r[0, 1] = r[1, 0] = 20.0
+        assert not TestBetaSpread.is_of_negative_type(r)
 
-        u, beta = relational_fuzzy_c_means(r, n_clusters=3, beta_spread=True)
-        assert u.shape == (n, 3)
+        u, beta = relational_fuzzy_c_means(
+            r, n_clusters=2, beta_spread=True, random_state=0
+        )
+        assert u.shape == (n, 2)
         assert np.allclose(u.sum(axis=1), 1.0)
-        assert beta >= 0.0
+        assert beta > 0.0
+
+        _, beta_off = relational_fuzzy_c_means(
+            r, n_clusters=2, beta_spread=False, random_state=0
+        )
+        assert beta_off == 0.0
 
     def test_out_of_sample_membership_shape_and_normalization(self):
         rng = np.random.default_rng(0)
@@ -243,3 +316,130 @@ class TestRelationalFuzzyCMeans:
         assert membership.shape == (1, 2)
         assert np.isclose(membership.sum(), 1.0)
         assert np.argmax(membership) == 0
+
+
+class TestBetaSpread:
+    """Issue #89: the beta-spread docstring stated its trigger condition backwards.
+
+    It claimed the correction was needed whenever ``r`` induces negative
+    relational distances, "always true for a genuinely non-Euclidean ``r``,
+    such as the iVAT minimax matrix". The iVAT matrix is the subdominant
+    ultrametric u(D), and ultrametrics have strict p-negative type for every
+    p >= 0 (Faver, Kochalski, Murugan, Verheggen, Wesson & Weston, *Roundness
+    properties of ultrametric spaces*, Glasgow Math. J. 56(3):519-535, 2014),
+    so it is the one input on which beta-spread can never fire.
+    """
+
+    @staticmethod
+    def is_of_negative_type(r: np.ndarray) -> bool:
+        """Schoenberg's criterion: a hollow symmetric ``r`` is of negative type
+        iff ``-0.5 J r J`` is PSD -- equivalently, iff some point configuration
+        has ``r`` as its matrix of squared distances."""
+        n = r.shape[0]
+        centering = np.eye(n) - np.ones((n, n)) / n
+        gram = -0.5 * centering @ r @ centering
+        eigenvalues = np.linalg.eigvalsh((gram + gram.T) / 2.0)
+        tolerance = 1e-10 * max(float(np.abs(eigenvalues).max()), 1.0)
+        return bool(eigenvalues.min() > -tolerance)
+
+    @staticmethod
+    def minimax_matrix(X: np.ndarray) -> np.ndarray:
+        ivat_matrix, _, _ = _compute_ivat(_pairwise_distances(X))
+        r = np.asarray(ivat_matrix, dtype=np.float64)
+        r = (r + r.T) / 2.0
+        np.fill_diagonal(r, 0.0)
+        return r
+
+    def test_ivat_matrix_is_an_ultrametric(self, rings):
+        X, _ = rings
+        r = self.minimax_matrix(X)
+        for k in range(0, r.shape[0], 7):  # strided; the full check is O(n^3)
+            bound = np.maximum(r[:, k][:, np.newaxis], r[k, :][np.newaxis, :])
+            assert np.all(
+                r <= bound + 1e-9
+            ), "minimax matrix violates u[i,j] <= max(u[i,k], u[k,j])"
+
+    def test_minimax_matrix_is_of_negative_type_at_both_powers(self, rings):
+        X, _ = rings
+        r = self.minimax_matrix(X)
+        assert self.is_of_negative_type(r)
+        assert self.is_of_negative_type(r**2)
+
+    def test_beta_spread_never_fires_on_a_minimax_matrix(self, rings):
+        X, _ = rings
+        r = self.minimax_matrix(X)
+        for label, matrix in (("u(D)", r), ("u(D)**2", r**2)):
+            _, beta = relational_fuzzy_c_means(
+                matrix, n_clusters=2, beta_spread=True, random_state=0
+            )
+            assert beta == 0.0, f"beta-spread fired on {label}, of negative type"
+
+    def test_ivatmeans_relational_fit_never_needs_beta_spread(self, rings):
+        X, _ = rings
+        model = IVATMeans(n_clusters=2, refine="relational", random_state=42)
+        model.fit(X)
+        assert model._relational_beta == 0.0
+
+
+class TestRelationalSquaredDistances:
+    """Issue #89: NERFCM's relational dual is defined on SQUARED dissimilarities.
+
+    ``d_i(j) = (R v)_j - 0.5 v'Rv`` is the squared distance to the fuzzy
+    centroid only when ``R`` holds squared distances (Hathaway, Davenport &
+    Bezdek 1989). IVATMeans used to hand it the raw minimax matrix, which
+    silently clusters in the flattened geometry of ``sqrt(u(D))``.
+    """
+
+    def test_training_matrix_is_the_squared_minimax_matrix(self, rings):
+        X, _ = rings
+        model = IVATMeans(n_clusters=2, refine="relational", random_state=42)
+        model.fit(X)
+
+        ivat_matrix, _, _ = _compute_ivat(_pairwise_distances(X))
+        expected = np.asarray(ivat_matrix, dtype=np.float64) ** 2
+        assert np.allclose(
+            np.asarray(model._relational_R_train, dtype=np.float64), expected
+        )
+
+    def test_relational_refinement_does_not_undo_a_correct_ivat_cut(self):
+        """The regression this fix exists for.
+
+        On these blobs the front-end cut is already perfect; before the fix the
+        relational refinement dropped it to ARI 0.62 (seed 2) / 0.55 (seed 3).
+        """
+        for seed in (2, 3):
+            X, y = _unbalanced_blobs(seed)
+            model = IVATMeans(n_clusters=3, refine="relational", random_state=42)
+            model.fit(X)
+
+            cut = _labels_from_ivat_cut(model, len(X))
+            assert _adjusted_rand_index(cut, y) == pytest.approx(1.0), (
+                f"seed {seed}: the iVAT cut itself is wrong, so this test no "
+                "longer isolates the relational back end"
+            )
+            assert (
+                _adjusted_rand_index(model.labels_, y) > 0.99
+            ), f"seed {seed}: relational refinement degraded a perfect cut"
+
+    def test_membership_does_not_collapse_to_the_uniform_partition(self):
+        """Unsquared distances compress the distance *ratios* the FCM membership
+        update depends on; in higher dimensions that flattened ``membership_``
+        to a constant 1/k (measured crispness 0.05 -> 0.59 with the fix).
+        """
+        rng = np.random.default_rng(0)
+        X = np.vstack([rng.normal(0.0, 1.0, (40, 20)), rng.normal(2.0, 1.0, (40, 20))])
+        model = IVATMeans(n_clusters=2, refine="relational", random_state=42)
+        model.fit(X)
+
+        assert model.membership_ is not None
+        assert _crispness(model.membership_) > 0.25
+
+    def test_predict_on_training_data_reproduces_the_fitted_labels(self, rings):
+        """The single-linkage insertion of a training point is that point's own
+        row, so out-of-sample scoring must reproduce the in-sample partition.
+        This is what catches squaring the fit side but not the predict side.
+        """
+        X, _ = rings
+        model = IVATMeans(n_clusters=2, refine="relational", random_state=42)
+        model.fit(X)
+        assert np.array_equal(model.predict(X), model.labels_)

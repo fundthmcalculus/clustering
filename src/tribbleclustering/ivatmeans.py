@@ -310,10 +310,12 @@ class IVATMeans(BaseClusterer):
       minimax distance), so it is always a real point inside the cluster.
       Assignment is crisp nearest-prototype under ``metric``.
     - ``"relational"`` -- fits Non-Euclidean Relational FCM (NERFCM,
-      Hathaway & Bezdek 1994) directly on the iVAT minimax matrix, producing
-      a soft partition without ever taking a Euclidean mean. New points are
-      scored via the relational out-of-sample extension, using ``metric``
-      only to find each new point's single nearest training neighbor (the
+      Hathaway & Bezdek 1994) directly on the *squared* iVAT minimax matrix,
+      producing a soft partition without ever taking a Euclidean mean (the
+      relational dual is defined on squared distances -- see
+      :mod:`tribbleclustering.nerfcm` and issue #89). New points are scored
+      via the relational out-of-sample extension, using ``metric`` only to
+      find each new point's single nearest training neighbor (the
       single-linkage insertion step). Sets ``membership_``.
     - ``"euclidean"`` -- the original behavior: Euclidean-mean prototypes,
       Euclidean nearest-centroid assignment. Kept for backward compatibility
@@ -360,6 +362,8 @@ class IVATMeans(BaseClusterer):
         # _predict_relational): kept in VAT-order (position) space so it lines
         # up with the iVAT matrix without an extra n x n permutation copy.
         self._relational_X_train: Optional[ndarray] = None
+        # Squared iVAT minimax matrix -- the units NERFCM's relational dual is
+        # defined in; see _fit_relational.
         self._relational_R_train: Optional[ndarray] = None
         self._relational_u_train: Optional[ndarray] = None
         self._relational_beta: float = 0.0
@@ -476,8 +480,26 @@ class IVATMeans(BaseClusterer):
         for k, cluster_ids in enumerate(cluster_city_ids):
             u_init[pos[cluster_ids], k] = 1.0
 
+        # NERFCM's relational dual is defined on SQUARED dissimilarities
+        # (Hathaway, Davenport & Bezdek 1989): d_i(j) = (R v)_j - 0.5 v'Rv is
+        # the squared distance to the cluster centroid only when R holds
+        # squared distances. `ivat_matrix` holds minimax *distances*, so it is
+        # squared here; feeding it raw optimizes in the flattened geometry of
+        # sqrt(u(D)) instead, which compresses exactly the inter- vs
+        # intra-cluster gap the iVAT front end found (issue #89).
+        #
+        # Squared here and not upstream on purpose. u(D ** 2) == u(D) ** 2
+        # exactly -- the minimax recurrence is a max-min composition and any
+        # monotone map commutes with both -- so squaring the input distances
+        # would give the same matrix, but get_ivat_levels cuts on *differences*
+        # along the iVAT diagonal, which a monotone map does not preserve.
+        # Squaring here leaves the front end's cut untouched.
+        # Costs one extra (n, n) buffer; squaring `ivat_matrix` in place is not
+        # safe because `ivat_result` holds views onto its diagonal.
+        r_train = ivat_matrix**2
+
         u_pos, beta = relational_fuzzy_c_means(
-            ivat_matrix, n_clusters, self.m, u_init=u_init
+            r_train, n_clusters, self.m, u_init=u_init
         )
 
         # Scatter back to original sample order for the public membership_.
@@ -485,7 +507,7 @@ class IVATMeans(BaseClusterer):
         membership[vat_order] = u_pos
 
         self._relational_X_train = X[vat_order]
-        self._relational_R_train = ivat_matrix
+        self._relational_R_train = r_train
         self._relational_u_train = u_pos
         self._relational_beta = beta
 
@@ -556,7 +578,8 @@ class IVATMeans(BaseClusterer):
         neighbor extension: a new point's minimax distance to any training
         point j is bounded by max(distance to its own nearest neighbor,
         that neighbor's minimax distance to j) -- exactly how Prim's MST
-        would attach a new leaf connected by a single edge.
+        would attach a new leaf connected by a single edge. The result is
+        squared to match the squared training matrix NERFCM was fit on.
         """
         # Guaranteed by predict(): reachable only after a refine="relational" fit.
         assert self._relational_R_train is not None
@@ -575,8 +598,11 @@ class IVATMeans(BaseClusterer):
             x_batch = X[start:end]
             dists = metric(x_batch, x_train)
             nn_idx = np.argmin(dists, axis=1)
-            nn_dist = dists[np.arange(len(x_batch)), nn_idx]
-            r_new = np.maximum(nn_dist[:, np.newaxis], r_train[nn_idx, :])
+            # `r_train` is squared (see _fit_relational), so the inserted edge
+            # has to be squared to match. Squaring commutes with the max, so
+            # this is exactly max(nn_dist, u(D)) ** 2.
+            nn_dist_sq = dists[np.arange(len(x_batch)), nn_idx] ** 2
+            r_new = np.maximum(nn_dist_sq[:, np.newaxis], r_train[nn_idx, :])
             membership = relational_out_of_sample_membership(
                 r_new, r_train, u_train, self.m, beta=beta
             )

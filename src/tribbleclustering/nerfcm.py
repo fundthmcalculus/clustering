@@ -6,21 +6,42 @@ relational fuzzy clustering," *Pattern Recognition* 27(3):429-437.
 NERFCM computes a fuzzy partition directly from an (n, n) dissimilarity
 matrix ``R`` -- it never falls back to a coordinate mean. That makes it the
 geometry-consistent back end for :class:`~tribbleclustering.IVATMeans`: fed
-the iVAT minimax matrix ``D'``, it stays in the same minimax/ultrametric
+the (squared) iVAT minimax matrix, it stays in the same minimax/ultrametric
 space that the front end used to find the clusters in the first place (see
 ``docs/novel-niche.md`` and GitHub issue #54).
 
+``R`` must hold **squared** dissimilarities
+-------------------------------------------
 The relational distance of object ``j`` to a fuzzy cluster with membership
 column ``u_i`` is
 
     d_i(j) = (R v_i)_j - 0.5 * v_i^T R v_i,       v_i = u_i^m / sum(u_i^m)
 
-which reduces to squared Euclidean centroid distance when ``R`` is a squared
-Euclidean dissimilarity matrix, but stays well defined for any symmetric
-dissimilarity. When ``R`` is not Euclidean (true of the iVAT minimax matrix),
-``d_i(j)`` can go negative; the beta-spread correction (paper Sec. 3) adds a
-constant to every off-diagonal entry of ``R`` until all distances are
+This is the relational *dual* of the FCM objective (Hathaway, Davenport &
+Bezdek, "Relational duals of the c-means clustering algorithms," *Pattern
+Recognition* 22(2):205-212, 1989), and the duality holds only when ``R``
+holds squared distances: ``d_i(j)`` is then exactly the squared Euclidean
+distance from object ``j`` to the FCM centroid of cluster ``i``. Passing
+``D`` where ``D ** 2`` is meant does not error -- it silently optimizes in
+the flattened geometry of ``sqrt(R)`` instead (GitHub issue #89).
+
+When beta-spread fires, and when it cannot
+------------------------------------------
+``d_i(j)`` can go negative when ``R`` is not of *negative type* -- Schoenberg's
+condition for ``R`` to be realizable as the squared distances between n points
+in R^(n-1). The beta-spread correction (Hathaway & Bezdek 1994, Sec. 3) then
+adds a constant to every off-diagonal entry of ``R`` until the distances are
 non-negative again.
+
+Beta-spread is therefore a safeguard for inputs *outside* that class, and the
+iVAT minimax matrix is not one of them. That matrix is the subdominant
+ultrametric ``u(D)``, and ultrametrics have strict p-negative type for every
+``p >= 0`` (Faver, Kochalski, Murugan, Verheggen, Wesson & Weston, "Roundness
+properties of ultrametric spaces," *Glasgow Math. J.* 56(3):519-535, 2014).
+Both ``u(D)`` and ``u(D) ** 2`` are admissible, so beta-spread provably never
+fires on a minimax input -- the correction is inert on exactly the input this
+module was added for. See
+``tests/test_ivatmeans_refine.py::TestBetaSpread``.
 """
 
 from typing import Optional
@@ -74,7 +95,10 @@ def relational_fuzzy_c_means(
 ) -> tuple[ndarray, float]:
     """Run NERFCM on a dissimilarity matrix.
 
-    :param r: Symmetric (n, n) dissimilarity matrix (need not be Euclidean).
+    :param r: Symmetric (n, n) matrix of **squared** dissimilarities -- the
+        relational dual is defined on squared distances (see the module
+        docstring). It need not be of negative type; ``beta_spread`` covers
+        the case where it is not.
     :param n_clusters: Number of clusters.
     :param m: Fuzziness parameter, default 2.0. Must be > 1.
     :param u_init: Optional initial (n, n_clusters) membership matrix (columns
@@ -83,8 +107,10 @@ def relational_fuzzy_c_means(
     :param max_iter: Maximum number of iterations.
     :param tol: Convergence threshold on the largest membership change.
     :param beta_spread: Apply the Hathaway-Bezdek beta-spread correction when
-        ``r`` induces negative relational distances (always true for a
-        genuinely non-Euclidean ``r``, such as the iVAT minimax matrix).
+        ``r`` induces negative relational distances -- i.e. when ``r`` is not
+        of negative type. It is inert on any ultrametric/minimax input,
+        including the iVAT matrix, which is of negative type at every power
+        (see the module docstring).
     :return: Tuple of ``(u, beta)`` -- the converged (n, n_clusters) membership
         matrix (rows sum to 1) and the total beta-spread correction applied to
         ``r`` (0.0 if none was needed).
@@ -151,13 +177,15 @@ def relational_out_of_sample_membership(
     never given a coordinate or added to ``r_train``, it is scored against the
     existing cluster weight vectors ``v_i`` derived from ``u_train``.
 
-    :param r_new: (n_new, n_train) dissimilarities from each new object to
-        every training object, in the same units/scale as ``r_train`` (for the
-        iVAT/minimax use case, built via the single-linkage nearest-neighbor
-        extension -- see :mod:`tribbleclustering.ivatmeans`).
-    :param r_train: (n_train, n_train) training dissimilarity matrix, as
-        originally passed to :func:`relational_fuzzy_c_means` (*not* the
-        beta-corrected working copy).
+    :param r_new: (n_new, n_train) **squared** dissimilarities from each new
+        object to every training object, in the same units/scale as
+        ``r_train`` (for the iVAT/minimax use case, built via the
+        single-linkage nearest-neighbor extension -- see
+        :mod:`tribbleclustering.ivatmeans`).
+    :param r_train: (n_train, n_train) training matrix of squared
+        dissimilarities, as originally passed to
+        :func:`relational_fuzzy_c_means` (*not* the beta-corrected working
+        copy).
     :param u_train: (n_train, n_clusters) converged training membership matrix.
     :param m: Fuzziness parameter used when ``u_train`` was fit.
     :param beta: Beta-spread correction returned by
