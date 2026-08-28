@@ -113,7 +113,7 @@ warn_redundant_casts = true
 # as untyped so its symbols are Any; the JIT kernels' own bodies are still
 # checked. This keeps the baseline lenient but stable.
 [[tool.mypy.overrides]]
-module = ["numba", "numba.*", "numba_progress", "numba_progress.*"]
+module = ["numba", "numba.*"]
 follow_imports = "skip"
 ignore_missing_imports = true
 

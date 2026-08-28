@@ -17,6 +17,25 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Check the lockfile matches pyproject.toml
+        # Runs BEFORE the dependency install: the check takes ~1s and the
+        # install ~60s, so a desync should not cost a full Cython/numpy build
+        # before anyone hears about it. Safe this early -- `uv lock --check`
+        # reads static [project] metadata and never invokes the build backend,
+        # verified by it succeeding with a cold cache under --offline.
+        #
+        # Scope: lock <-> pyproject agreement ONLY. It cannot see a
+        # revision-less git dependency drifting behind its upstream branch,
+        # since such a source is "in sync" with any locked commit however old.
+        # Nothing here is git-sourced today, so do not read a green run as
+        # "dependencies are current". Note a bare [project] version bump also
+        # needs `uv lock` -- the lock records this project's own version.
+        #
+        # See #90 for the two incidents this exists to prevent.
+        run: |
+          python -m pip install "uv==0.12.7"
+          uv lock --check
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
