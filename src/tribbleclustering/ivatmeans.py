@@ -314,7 +314,9 @@ class IVATMeans(BaseClusterer):
       a soft partition without ever taking a Euclidean mean. New points are
       scored via the relational out-of-sample extension, using ``metric``
       only to find each new point's single nearest training neighbor (the
-      single-linkage insertion step). Sets ``membership_``.
+      single-linkage insertion step). Sets ``membership_``. The dissimilarity
+      matrix is raised to the ``dissimilarity_power`` before NERFCM runs
+      (default 2.0, see below); the iVAT cut itself is never touched.
     - ``"euclidean"`` -- the original behavior: Euclidean-mean prototypes,
       Euclidean nearest-centroid assignment. Kept for backward compatibility
       but is no longer the default since it reintroduces the geometry
@@ -324,6 +326,20 @@ class IVATMeans(BaseClusterer):
     consumed by nothing: all three ``refine`` paths are deterministic (the
     relational path takes a hard ``u_init``). It is stored, never read. See
     the comment in ``fit``.
+
+    ``dissimilarity_power`` applies to ``refine="relational"`` only. The
+    iVAT minimax matrix ``u(D)`` is of negative type at every power ``p``
+    (ultrametrics have strict p-negative type for every ``p >= 0``), so any
+    ``p`` is an admissible geometry for NERFCM -- but the memberships
+    differ. ``p = 1`` is the geometry Chehreghani's minimax embedding
+    ("squared distance = minimax," ``docs/novel-niche.md`` section 6) and
+    the repo's own NERFCM docs call the theoretical spine; ``p = 2``
+    measures materially better (GitHub issue #95: ARI(labels_) 0.9474 ->
+    0.9993, and membership_ that collapsed to exactly uniform in 20-D
+    recovers to crispness 0.43--0.59), so it is the default. The choice is
+    a measured geometry, not a correctness fix: see the module
+    :mod:`tribbleclustering.nerfcm` docstring and ``docs/novel-niche.md``
+    section 3 (Niche 1) for the literature on both sides.
     """
 
     def __init__(
@@ -336,6 +352,7 @@ class IVATMeans(BaseClusterer):
         refine: str = "medoid",
         m: float = 2.0,
         metric: MetricLike = None,
+        dissimilarity_power: float = 2.0,
     ):
         self.n_clusters = n_clusters
         self.n_levels = n_levels
@@ -347,6 +364,12 @@ class IVATMeans(BaseClusterer):
         self.refine = refine
         self.m = m
         self.metric = metric
+        if not np.isfinite(dissimilarity_power) or dissimilarity_power <= 0.0:
+            raise ValueError(
+                "dissimilarity_power must be a finite positive number, "
+                f"got {dissimilarity_power!r}"
+            )
+        self.dissimilarity_power = dissimilarity_power
         # dtype: storage precision of the resident matrix on the on_device path.
         #   "float32" (default) — matches the CPU result, half the memory;
         #   "float16"           — max scale, near-exact (a few near-tie flips);
@@ -364,6 +387,8 @@ class IVATMeans(BaseClusterer):
         # Out-of-sample state for refine="relational" (see _fit_relational /
         # _predict_relational): kept in VAT-order (position) space so it lines
         # up with the iVAT matrix without an extra n x n permutation copy.
+        # _relational_R_train is the minimax matrix *as powered by
+        # dissimilarity_power* -- the matrix NERFCM was actually fit on.
         self._relational_X_train: Optional[ndarray] = None
         self._relational_R_train: Optional[ndarray] = None
         self._relational_u_train: Optional[ndarray] = None
@@ -481,8 +506,26 @@ class IVATMeans(BaseClusterer):
         for k, cluster_ids in enumerate(cluster_city_ids):
             u_init[pos[cluster_ids], k] = 1.0
 
+        # Raise the minimax matrix to ``dissimilarity_power`` (default 2.0)
+        # before NERFCM runs (issue #95). The iVAT cut above was taken on the
+        # raw matrix's diagonal and is never touched: this power is a choice
+        # of the refinement's geometry, not of the front end's. u(D) is of
+        # negative type at every power, so every ``p`` is admissible; the
+        # default of 2.0 is what measures better on the sweep in issue #95,
+        # while ``p=1`` is the Chehreghani spine geometry (docs/novel-niche.md
+        # section 6).
+        #
+        # Powering here, not upstream in fit(), on purpose: the recurrence is
+        # max-min, so u(D**p) == u(D)**p for the same VAT order, but the cut
+        # thresholds are *differences* along the iVAT diagonal, which a
+        # monotone map does not preserve. Powering here leaves the cut
+        # untouched. Costs one extra (n, n) buffer; ``ivat_result`` holds
+        # views onto ivat_matrix's diagonal, so in-place is not safe.
+        p = self.dissimilarity_power
+        r_train = ivat_matrix**p if p != 1.0 else ivat_matrix
+
         u_pos, beta = relational_fuzzy_c_means(
-            ivat_matrix, n_clusters, self.m, u_init=u_init
+            r_train, n_clusters, self.m, u_init=u_init
         )
 
         # Scatter back to original sample order for the public membership_.
@@ -490,7 +533,7 @@ class IVATMeans(BaseClusterer):
         membership[vat_order] = u_pos
 
         self._relational_X_train = X[vat_order]
-        self._relational_R_train = ivat_matrix
+        self._relational_R_train = r_train
         self._relational_u_train = u_pos
         self._relational_beta = beta
 
@@ -561,7 +604,9 @@ class IVATMeans(BaseClusterer):
         neighbor extension: a new point's minimax distance to any training
         point j is bounded by max(distance to its own nearest neighbor,
         that neighbor's minimax distance to j) -- exactly how Prim's MST
-        would attach a new leaf connected by a single edge.
+        would attach a new leaf connected by a single edge. The inserted row
+        is powered by ``dissimilarity_power`` to match the units ``r_train``
+        was fit in (see _fit_relational).
         """
         # Guaranteed by predict(): reachable only after a refine="relational" fit.
         assert self._relational_R_train is not None
@@ -574,6 +619,7 @@ class IVATMeans(BaseClusterer):
         r_train = self._relational_R_train
         u_train = self._relational_u_train
         beta = self._relational_beta
+        p = self.dissimilarity_power
 
         for start in range(0, n_samples, batch_size):
             end = min(start + batch_size, n_samples)
@@ -581,7 +627,11 @@ class IVATMeans(BaseClusterer):
             dists = metric(x_batch, x_train)
             nn_idx = np.argmin(dists, axis=1)
             nn_dist = dists[np.arange(len(x_batch)), nn_idx]
-            r_new = np.maximum(nn_dist[:, np.newaxis], r_train[nn_idx, :])
+            # r_train is powered by ``p`` (see _fit_relational), so the
+            # inserted edge must be too. Powering commutes with max, so this
+            # is exactly max(nn_dist, u(D)) ** p.
+            nn_dist_pow = nn_dist**p
+            r_new = np.maximum(nn_dist_pow[:, np.newaxis], r_train[nn_idx, :])
             membership = relational_out_of_sample_membership(
                 r_new, r_train, u_train, self.m, beta=beta
             )

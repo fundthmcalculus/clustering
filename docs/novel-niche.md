@@ -120,7 +120,9 @@ Do not go back to feature vectors and means. Feed `D'` (and iVAT-derived auto-`k
 ordering-based seeds) into a **relational fuzzy clustering** algorithm that operates
 *directly on a dissimilarity matrix* and returns soft memberships — **NERFCM**
 (Non-Euclidean Relational FCM, Hathaway & Bezdek 1994) or **FANNY** (Kaufman &
-Rousseeuw). Feed it `D'` directly — no squaring, no correction term.
+Rousseeuw). Feed it `D'` raised to a power — `IVATMeans` exposes
+`dissimilarity_power` (default 2.0), and the front-end cut is always taken on
+the raw `D'`, so the power is the refinement's geometry, not the front end's.
 
 **Do not claim β-spread as a selling point; it provably never fires here.**
 `D'` is the subdominant ultrametric `u(D)`, and ultrametrics have strict
@@ -131,6 +133,21 @@ satisfies the relational dual's requirement — it is realizable as a matrix of
 in §6 ("squared distance = minimax"). β-spread is a safeguard for inputs
 *outside* that class; on `D'` it is inert. That is a point in the composition's
 favour (nothing to defend), not a feature to advertise. See GitHub issue #89.
+
+**The power is a measured choice, documented, not hidden (issue #95).**
+`u(D)` is of negative type at every power, so `p = 1` and `p = 2` are both
+admissible geometries — but they are different ones, and they measure
+differently. `p = 1` is the geometry the sentence above calls the
+theoretical spine: Chehreghani's embedding is an embedding *into* whose
+squared distances equal the minimax, i.e. it argues the p = 1 geometry.
+`p = 2`, on the other hand, is what the relational refinement *measures*
+better on: on the issue #95 sweep (4 datasets × 4 seeds) it lifts
+ARI(`labels_`) from 0.9474 to 0.9993, and on 20-D data the soft
+memberships recover from exactly-uniform (crispness ≤ 0.05) to 0.43–0.59.
+The library therefore defaults to `p = 2` — the stronger measured result —
+and leaves `p = 1` one keyword away. If the spine is what the Chapter 5
+estimator should live in, the benchmark (C11) should say so *before* it
+runs, not after.
 
 **Why it's novel & defensible.** Every ingredient is published and trusted, but the
 composition, *the first soft/fuzzy member of the VAT family, computed in the iVAT

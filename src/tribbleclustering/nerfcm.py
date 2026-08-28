@@ -23,6 +23,29 @@ is *realizable as squared Euclidean distances* -- Schoenberg's condition that
 ``-0.5 J R J`` be PSD, equivalently that ``R`` be of **negative type**. That is
 a property of the matrix, not of the units its author had in mind.
 
+Which power to feed it
+---------------------
+The iVAT minimax matrix ``u(D)`` is of negative type at *every* power
+``p >= 0`` -- an ultrametric has strict p-negative type (see the section
+below) -- so a caller may feed NERFCM ``u(D)``, ``u(D) ** 2``,
+``u(D) ** 0.5``, ... and the dual is well defined for all of them. That
+is a continuum, not a dichotomy: nothing in the negative-type argument
+singles out one power, and the powers measure differently. Two ends of
+the continuum are documented:
+
+- ``p = 1`` is the geometry Chehreghani's minimax embedding ("squared
+  distance = minimax," ``docs/novel-niche.md`` section 6) and this
+  repo's own docs call the theoretical spine.
+- ``p = 2`` measures materially better as the relational refinement of
+  the iVAT cut (GitHub issue #95: ARI(labels_) 0.9474 -> 0.9993 across
+  four datasets; 20-D memberships that collapsed to the uniform
+  partition recover to crispness 0.43-0.59).
+
+:class:`~tribbleclustering.IVATMeans` therefore exposes
+``dissimilarity_power`` (default 2.0) and raises the minimax matrix to
+that power before calling here. The default is a measured geometry
+choice, not a correctness fix; ``p = 1`` remains reachable.
+
 When beta-spread fires, and when it cannot
 ------------------------------------------
 For an ``R`` outside that class, ``d_i(j)`` can go negative; the beta-spread
