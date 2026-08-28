@@ -21,8 +21,9 @@ if it merely consumes from it.
 import numpy as np
 import pytest
 
-from tribbleclustering import fuzzy_c_means
+from tribbleclustering import KMeans, fuzzy_c_means, gpu
 from tribbleclustering.fuzzycmeans import FuzzyCMeans
+from tribbleclustering.kmeans import kmeans
 
 try:
     from tribbleclustering.cfcm import fuzzy_c_means as fuzzy_c_means_cython
@@ -239,3 +240,113 @@ class TestPureAndCompiledAgree:
             fuzzy_c_means(blobs, 3, max_iter=1, random_state=1).cluster_centers_
         )
         assert np.abs(np.sort(a, axis=0) - np.sort(b, axis=0)).max() > 1e-3
+
+
+class TestKMeansRepeatability:
+    """``KMeans.random_state`` carries the same public-API contract."""
+
+    def test_same_random_state_gives_identical_labels(self, blobs):
+        a = KMeans(n_clusters=3, random_state=42).fit(blobs).labels_
+        b = KMeans(n_clusters=3, random_state=42).fit(blobs).labels_
+        assert np.array_equal(a, b)
+
+    @pytest.mark.parametrize("init", ["k-means++", "random"])
+    def test_same_random_state_gives_identical_centers(self, blobs, init):
+        a = KMeans(n_clusters=3, init=init, random_state=42).fit(blobs)
+        b = KMeans(n_clusters=3, init=init, random_state=42).fit(blobs)
+        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
+        assert a.inertia_ == b.inertia_
+
+    def test_repeatable_across_an_intervening_global_reseed(self, blobs):
+        a = KMeans(n_clusters=3, random_state=42).fit(blobs).labels_
+        np.random.seed(999)
+        np.random.random(17)
+        b = KMeans(n_clusters=3, random_state=42).fit(blobs).labels_
+        assert np.array_equal(a, b)
+
+    def test_random_state_none_still_fits(self, blobs):
+        model = KMeans(n_clusters=3).fit(blobs)
+        assert model.cluster_centers_ is not None
+        assert model.cluster_centers_.shape == (3, 2)
+
+
+class TestKMeansGlobalRngIsolation:
+    @pytest.mark.parametrize("init", ["k-means++", "random"])
+    def test_fit_does_not_disturb_global_stream(self, blobs, init):
+        without, with_fit = _global_draws_around(
+            lambda: KMeans(n_clusters=3, init=init, random_state=42).fit(blobs)
+        )
+        assert np.array_equal(without, with_fit), (
+            f"KMeans(init={init!r}).fit perturbed the process-global np.random "
+            f"stream: {without} -> {with_fit}"
+        )
+
+    def test_unseeded_fit_does_not_disturb_global_stream(self, blobs):
+        without, with_fit = _global_draws_around(
+            lambda: KMeans(n_clusters=3).fit(blobs)
+        )
+        assert np.array_equal(without, with_fit)
+
+    def test_free_function_does_not_disturb_global_stream(self, blobs):
+        without, with_call = _global_draws_around(
+            lambda: kmeans(blobs, 3, random_state=42)
+        )
+        assert np.array_equal(without, with_call)
+
+
+class TestKMeansFreeFunctionSeeding:
+    @pytest.mark.parametrize("init", ["k-means++", "random"])
+    def test_accepts_random_state(self, blobs, init):
+        a = kmeans(blobs, 3, init=init, random_state=11)
+        b = kmeans(blobs, 3, init=init, random_state=11)
+        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
+
+    def test_accepts_a_generator(self, blobs):
+        a = kmeans(blobs, 3, random_state=np.random.default_rng(5))
+        b = kmeans(blobs, 3, random_state=np.random.default_rng(5))
+        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
+
+    def test_distinct_seeds_reach_distinct_initializations(self, blobs):
+        """k-means++ picks the first center uniformly at random, so different
+        seeds must produce different draws. Measured at max_iter=1 for the
+        same reason as the FCM case: at convergence these blobs are
+        seed-independent."""
+        seen = {
+            kmeans(blobs, 3, max_iter=1, random_state=s).cluster_centers_.tobytes()
+            for s in range(6)
+        }
+        assert len(seen) > 1
+
+    def test_seed_is_ignored_when_centers_are_given(self, blobs):
+        guess = blobs[:3].copy()
+        a = kmeans(blobs, 3, initial_guess=guess, random_state=1)
+        b = kmeans(blobs, 3, initial_guess=guess, random_state=2)
+        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
+
+
+class TestGpuFallbackSeeding:
+    """``gpu.py`` mirrors the CPU kernels and must expose the same knob. Only
+    the CPU-fallback branch runs here -- ``gpu.is_available()`` is False
+    without CUDA, so the device branches are NOT covered by these tests."""
+
+    def test_fcm_gpu_fallback_accepts_random_state(self, blobs):
+        a = gpu.fuzzy_c_means_gpu(blobs, 3, random_state=11)
+        b = gpu.fuzzy_c_means_gpu(blobs, 3, random_state=11)
+        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
+
+    def test_fcm_gpu_fallback_does_not_disturb_global_stream(self, blobs):
+        without, with_call = _global_draws_around(
+            lambda: gpu.fuzzy_c_means_gpu(blobs, 3, random_state=11)
+        )
+        assert np.array_equal(without, with_call)
+
+    def test_kmeans_gpu_fallback_accepts_random_state(self, blobs):
+        a = gpu.kmeans_gpu(blobs, 3, random_state=11)
+        b = gpu.kmeans_gpu(blobs, 3, random_state=11)
+        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
+
+    def test_kmeans_gpu_fallback_does_not_disturb_global_stream(self, blobs):
+        without, with_call = _global_draws_around(
+            lambda: gpu.kmeans_gpu(blobs, 3, random_state=11)
+        )
+        assert np.array_equal(without, with_call)

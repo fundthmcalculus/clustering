@@ -29,7 +29,9 @@ class KMeansResult:
 
 
 def _kmeans_plusplus(
-    X: ndarray, n_clusters: int, random_state: Optional[int] = None
+    X: ndarray,
+    n_clusters: int,
+    random_state: Optional[int | np.random.Generator] = None,
 ) -> ndarray:
     """Initialize cluster centers using k-means++ algorithm.
 
@@ -39,8 +41,10 @@ def _kmeans_plusplus(
         Data points.
     n_clusters : int
         Number of clusters.
-    random_state : int, optional
-        Random seed.
+    random_state : int or np.random.Generator, optional
+        Seed, or an already-constructed Generator to draw from. Threaded --
+        this function neither reads nor reseeds the process-global np.random
+        stream.
 
     Returns
     -------
@@ -53,11 +57,10 @@ def _kmeans_plusplus(
             f"n_clusters ({n_clusters}) cannot exceed n_samples ({n_samples})"
         )
 
-    if random_state is not None:
-        np.random.seed(random_state)
+    rng = np.random.default_rng(random_state)
 
     # Choose first center randomly
-    center_idx = np.random.randint(n_samples)
+    center_idx = int(rng.integers(n_samples))
     centers = [X[center_idx]]
 
     # Choose remaining centers
@@ -73,7 +76,7 @@ def _kmeans_plusplus(
         probabilities = min_distances**2
         probabilities /= probabilities.sum()
         cumsum = np.cumsum(probabilities)
-        r = np.random.rand()
+        r = rng.random()
         next_idx = np.searchsorted(cumsum, r)
         centers.append(X[next_idx])
 
@@ -115,6 +118,7 @@ def kmeans(
     tol: float = 1e-4,
     indices: Optional[ndarray] = None,
     initial_guess: Optional[ndarray] = None,
+    random_state: Optional[int | np.random.Generator] = None,
 ) -> KMeansResult:
     """
     Compute K-Means clustering.
@@ -135,6 +139,12 @@ def kmeans(
         Indices of initial cluster centers.
     initial_guess : ndarray of shape (n_clusters, n_features), optional
         Initial cluster centers.
+    random_state : int or np.random.Generator, optional
+        Seed for the random initialization -- an int, an already-constructed
+        Generator, or None for fresh OS entropy. Only consulted when centers
+        are drawn (init='k-means++' or 'random'); `indices` / `initial_guess`
+        are already deterministic. Threaded: neither reads nor reseeds the
+        process-global np.random stream.
 
     Returns
     -------
@@ -163,9 +173,10 @@ def kmeans(
             )
         centers = initial_guess.copy()
     elif init == "k-means++":
-        centers = _kmeans_plusplus(X, n_clusters)
+        centers = _kmeans_plusplus(X, n_clusters, random_state)
     elif init == "random":
-        indices = np.random.choice(n_samples, size=n_clusters, replace=False)
+        rng = np.random.default_rng(random_state)
+        indices = rng.choice(n_samples, size=n_clusters, replace=False)
         centers = X[indices].copy()
     else:
         raise ValueError(f"init must be 'k-means++' or 'random', got {init!r}")
@@ -250,7 +261,10 @@ class KMeans(BaseClusterer):
         tol : float, optional
             Relative tolerance for convergence. Default 1e-4.
         random_state : int, optional
-            Random seed for reproducibility.
+            Seed for the random initialization. The same value gives the same
+            fit. It is threaded into the kernel as a ``np.random.Generator``
+            and does **not** touch the process-global ``np.random`` stream, so
+            it neither perturbs nor is perturbed by other code in the process.
         """
         self.n_clusters = n_clusters
         self.init = init
@@ -290,8 +304,14 @@ class KMeans(BaseClusterer):
         if X.ndim != 2:
             raise ValueError(f"X must be 2-dimensional, got shape {X.shape}")
 
-        if self.random_state is not None:
-            np.random.seed(self.random_state)
+        # A threaded Generator, not np.random.seed(self.random_state): the old
+        # call reseeded the *process-global* legacy stream, so fitting this
+        # estimator silently rewound every other np.random consumer in the
+        # process (ivatmeans.py:397 already states this position). random_state
+        # keeps its meaning -- the same int still gives the same fit -- only the
+        # mechanism changes. random_state=None now draws fresh OS entropy rather
+        # than consuming the global stream.
+        rng = np.random.default_rng(self.random_state)
 
         result = kmeans(
             X,
@@ -299,6 +319,7 @@ class KMeans(BaseClusterer):
             max_iter=self.max_iter,
             init=self.init,
             tol=self.tol,
+            random_state=rng,
         )
 
         self.cluster_centers_ = result.cluster_centers_
