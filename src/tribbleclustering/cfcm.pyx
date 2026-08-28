@@ -471,6 +471,7 @@ def fuzzy_c_means_32(
     max_iter: int = 100,
     indices = None,
     initial_guess = None,
+    random_state = None,
 ) -> tuple:
     x = np.asarray(x, dtype=np.float32)
     cdef int n_samples = x.shape[0]
@@ -509,7 +510,8 @@ def fuzzy_c_means_32(
     else:
         # replace=True only when there aren't 2n distinct rows (avoids ValueError);
         # matches fcm.py. A coincident center is handled by the zero-distance branch.
-        indices_arr = np.random.choice(n_samples, size=n * 2, replace=2 * n > n_samples).astype(np.int64)
+        rng = np.random.default_rng(random_state)
+        indices_arr = rng.choice(n_samples, size=n * 2, replace=2 * n > n_samples).astype(np.int64)
         indices_view = indices_arr
         _init_centers_32(x, n, indices_view, c_init)
 
@@ -526,6 +528,7 @@ def fuzzy_c_means_64(
     max_iter: int = 100,
     indices = None,
     initial_guess = None,
+    random_state = None,
 ) -> tuple:
     x = np.asarray(x, dtype=np.float64)
     cdef int n_samples = x.shape[0]
@@ -564,7 +567,8 @@ def fuzzy_c_means_64(
     else:
         # replace=True only when there aren't 2n distinct rows (avoids ValueError);
         # matches fcm.py. A coincident center is handled by the zero-distance branch.
-        indices_arr = np.random.choice(n_samples, size=n * 2, replace=2 * n > n_samples).astype(np.int64)
+        rng = np.random.default_rng(random_state)
+        indices_arr = rng.choice(n_samples, size=n * 2, replace=2 * n > n_samples).astype(np.int64)
         indices_view = indices_arr
         _init_centers_64(x, n, indices_view, c_init)
 
@@ -581,6 +585,7 @@ def fuzzy_c_means(
     max_iter: int = 100,
     indices = None,
     initial_guess = None,
+    random_state = None,
 ) -> tuple:
     """
     Compute the fuzzy c-means clustering algorithm (Cython-optimized).
@@ -591,6 +596,11 @@ def fuzzy_c_means(
     :param max_iter: Maximum number of iterations, default 100
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
+    :param random_state: Seed for the random center initialization -- an int, an
+        already-constructed np.random.Generator, or None for fresh OS entropy.
+        Only consulted when neither `indices` nor `initial_guess` is given.
+        Threaded, like fcm.fuzzy_c_means: neither reads nor reseeds the
+        process-global np.random stream.
     :return: FuzzyCMeansResult containing cluster_centers_, membership_matrix_, n_iter_, and converged
     """
     x = np.asarray(x)
@@ -600,14 +610,16 @@ def fuzzy_c_means(
             x, n, np.float32(m),
             max_iter=max_iter,
             indices=indices,
-            initial_guess=initial_guess
+            initial_guess=initial_guess,
+            random_state=random_state
         )
     elif x.dtype == np.float64:
         return fuzzy_c_means_64(
             x, n, np.float64(m),
             max_iter=max_iter,
             indices=indices,
-            initial_guess=initial_guess
+            initial_guess=initial_guess,
+            random_state=random_state
         )
     else:
         raise TypeError(

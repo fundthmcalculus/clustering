@@ -31,6 +31,21 @@ class FuzzyCMeans(BaseClusterer):
         max_iter: int = 100,
         random_state: Optional[int] = None,
     ):
+        """
+        Parameters
+        ----------
+        n_clusters : int
+            Number of clusters.
+        m : float, optional
+            Fuzziness parameter. Default 2.0.
+        max_iter : int, optional
+            Maximum number of iterations. Default 100.
+        random_state : int, optional
+            Seed for the random center initialization. The same value gives the
+            same fit. It is threaded into the kernel as a ``np.random.Generator``
+            and does **not** touch the process-global ``np.random`` stream, so it
+            neither perturbs nor is perturbed by other code in the process.
+        """
         self.n_clusters = n_clusters
         self.m = m
         self.max_iter = max_iter
@@ -68,10 +83,22 @@ class FuzzyCMeans(BaseClusterer):
         if X.ndim != 2:
             raise ValueError(f"X must be 2-dimensional, got shape {X.shape}")
 
-        if self.random_state is not None:
-            np.random.seed(self.random_state)
+        # A threaded Generator, not np.random.seed(self.random_state): the old
+        # call reseeded the *process-global* legacy stream, so fitting this
+        # estimator silently rewound every other np.random consumer in the
+        # process (ivatmeans.py:397 already states this position). random_state
+        # keeps its meaning -- the same int still gives the same fit -- only the
+        # mechanism changes. random_state=None now draws fresh OS entropy rather
+        # than consuming the global stream.
+        rng = np.random.default_rng(self.random_state)
 
-        result = fcm_algorithm(X, self.n_clusters, m=self.m, max_iter=self.max_iter)
+        result = fcm_algorithm(
+            X,
+            self.n_clusters,
+            m=self.m,
+            max_iter=self.max_iter,
+            random_state=rng,
+        )
         # Handle different return types
         if hasattr(result, "cluster_centers_"):
             # FuzzyCMeansResult dataclass

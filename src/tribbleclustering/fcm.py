@@ -86,6 +86,7 @@ def fuzzy_c_means(
     max_iter: int = 100,
     indices: Optional[np.ndarray | list[int]] = None,
     initial_guess: Optional[np.ndarray] = None,
+    random_state: Optional[int | np.random.Generator] = None,
 ) -> FuzzyCMeansResult:
     """
     Compute the fuzzy c-means clustering algorithm.
@@ -96,6 +97,13 @@ def fuzzy_c_means(
     :param max_iter: Maximum number of iterations, default 100
     :param indices: Indices of initial cluster centers, if provided
     :param initial_guess: Initial cluster centers, if provided
+    :param random_state: Seed for the random center initialization -- an int, an
+        already-constructed ``np.random.Generator``, or ``None`` for fresh OS
+        entropy. Only consulted when neither ``indices`` nor ``initial_guess``
+        is given (those paths are already deterministic). Threaded, in the style
+        of :func:`~tribbleclustering.nerfcm.relational_fuzzy_c_means`: this
+        function neither reads nor reseeds the process-global ``np.random``
+        stream.
     :return: FuzzyCMeansResult containing cluster_centers_, membership_matrix_,
         n_iter_ (actual iterations), and converged (boolean)
     """
@@ -115,7 +123,8 @@ def fuzzy_c_means(
         # replace=True only when there aren't 2n distinct rows to draw (avoids a
         # ValueError); a coincident center from a duplicated pair is handled by the
         # zero-distance branch in _get_weights.
-        indices = np.random.choice(x.shape[0], size=n * 2, replace=2 * n > x.shape[0])
+        rng = np.random.default_rng(random_state)
+        indices = rng.choice(x.shape[0], size=n * 2, replace=2 * n > x.shape[0])
         c = x[indices, :]
         # Combine every two rows into one so no cluster center exactly matches a data-point
         c = c.reshape(n, 2, x.shape[1]).mean(axis=1)
