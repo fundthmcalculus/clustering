@@ -15,12 +15,30 @@ column ``u_i`` is
 
     d_i(j) = (R v_i)_j - 0.5 * v_i^T R v_i,       v_i = u_i^m / sum(u_i^m)
 
-which reduces to squared Euclidean centroid distance when ``R`` is a squared
-Euclidean dissimilarity matrix, but stays well defined for any symmetric
-dissimilarity. When ``R`` is not Euclidean (true of the iVAT minimax matrix),
-``d_i(j)`` can go negative; the beta-spread correction (paper Sec. 3) adds a
-constant to every off-diagonal entry of ``R`` until all distances are
-non-negative again.
+This is the relational *dual* of the FCM objective (Hathaway, Davenport &
+Bezdek, "Relational duals of the c-means clustering algorithms," *Pattern
+Recognition* 22(2):205-212, 1989). ``d_i(j)`` is exactly the squared Euclidean
+distance from object ``j`` to the FCM centroid of cluster ``i`` whenever ``R``
+is *realizable as squared Euclidean distances* -- Schoenberg's condition that
+``-0.5 J R J`` be PSD, equivalently that ``R`` be of **negative type**. That is
+a property of the matrix, not of the units its author had in mind.
+
+When beta-spread fires, and when it cannot
+------------------------------------------
+For an ``R`` outside that class, ``d_i(j)`` can go negative; the beta-spread
+correction (Hathaway & Bezdek 1994, Sec. 3) then adds a constant to every
+off-diagonal entry of ``R`` until the distances are non-negative again.
+
+Beta-spread is therefore a safeguard for inputs *outside* the negative-type
+class, and the iVAT minimax matrix is not one of them. That matrix is the
+subdominant ultrametric ``u(D)``, and ultrametrics have strict p-negative type
+for every ``p >= 0`` (Faver, Kochalski, Murugan, Verheggen, Wesson & Weston,
+"Roundness properties of ultrametric spaces," *Glasgow Math. J.*
+56(3):519-535, 2014). So ``u(D)`` is admissible as-is -- it is precisely
+Chehreghani's minimax embedding, in which squared Euclidean distance *equals*
+the minimax distance (``docs/novel-niche.md`` section 6) -- and beta-spread
+provably never fires on it. The correction is inert on exactly the input this
+module was added for. See ``tests/test_ivatmeans_refine.py::TestBetaSpread``.
 """
 
 from typing import Optional
@@ -74,7 +92,9 @@ def relational_fuzzy_c_means(
 ) -> tuple[ndarray, float]:
     """Run NERFCM on a dissimilarity matrix.
 
-    :param r: Symmetric (n, n) dissimilarity matrix (need not be Euclidean).
+    :param r: Symmetric (n, n) dissimilarity matrix. The relational dual is
+        exact when ``r`` is of negative type (realizable as squared Euclidean
+        distances); ``beta_spread`` covers the case where it is not.
     :param n_clusters: Number of clusters.
     :param m: Fuzziness parameter, default 2.0. Must be > 1.
     :param u_init: Optional initial (n, n_clusters) membership matrix (columns
@@ -83,8 +103,10 @@ def relational_fuzzy_c_means(
     :param max_iter: Maximum number of iterations.
     :param tol: Convergence threshold on the largest membership change.
     :param beta_spread: Apply the Hathaway-Bezdek beta-spread correction when
-        ``r`` induces negative relational distances (always true for a
-        genuinely non-Euclidean ``r``, such as the iVAT minimax matrix).
+        ``r`` induces negative relational distances -- i.e. when ``r`` is not
+        of negative type. It is inert on any ultrametric/minimax input,
+        including the iVAT matrix, which is of negative type at every power
+        (see the module docstring).
     :return: Tuple of ``(u, beta)`` -- the converged (n, n_clusters) membership
         matrix (rows sum to 1) and the total beta-spread correction applied to
         ``r`` (0.0 if none was needed).

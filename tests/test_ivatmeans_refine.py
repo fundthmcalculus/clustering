@@ -12,6 +12,10 @@ import numpy as np
 import pytest
 
 from tribbleclustering import IVATMeans
+
+# Import the VAT/iVAT front end through ivatmeans so these tests exercise
+# whichever kernel the class itself picked (compiled pcvat or pure numba).
+from tribbleclustering.ivatmeans import _compute_ivat, _pairwise_distances
 from tribbleclustering.nerfcm import (
     relational_fuzzy_c_means,
     relational_out_of_sample_membership,
@@ -210,19 +214,33 @@ class TestRelationalFuzzyCMeans:
         assert beta == 0.0
 
     def test_beta_spread_applied_for_non_euclidean_input(self):
-        # An asymmetric-ish, non-Euclidean dissimilarity matrix (e.g. a
-        # minimax/ultrametric-like matrix with a triangle-inequality-violating
-        # perturbation) can require the beta-spread correction.
-        rng = np.random.default_rng(1)
-        n = 12
-        r = rng.uniform(0.5, 1.0, size=(n, n))
-        r = (r + r.T) / 2.0
-        np.fill_diagonal(r, 0.0)
+        # Beta-spread fires exactly when `r` is NOT of negative type, i.e. when
+        # no point configuration has `r` as its squared distances. A near-clique
+        # with one hugely stretched edge is the simplest such matrix.
+        #
+        # The matrix this test used to build -- uniform(0.5, 1.0), symmetrized,
+        # hollow -- is of negative type (min eigenvalue of -0.5 J r J measured
+        # at +2.4e-16), so beta was always 0.0 and the only assertion made on
+        # it, `beta >= 0.0`, could not fail. See issue #89.
+        n = 6
+        r = np.ones((n, n)) - np.eye(n)
+        r[0, 1] = r[1, 0] = 20.0
+        assert not TestBetaSpread.is_of_negative_type(r)
 
-        u, beta = relational_fuzzy_c_means(r, n_clusters=3, beta_spread=True)
-        assert u.shape == (n, 3)
+        u, beta = relational_fuzzy_c_means(
+            r, n_clusters=2, beta_spread=True, random_state=0
+        )
+        assert u.shape == (n, 2)
         assert np.allclose(u.sum(axis=1), 1.0)
-        assert beta >= 0.0
+        assert beta > 0.0
+
+        # Flag plumbing only: `beta_total` is incremented solely inside the
+        # `if beta_spread:` branch, so this can never fail. It documents the
+        # opt-out, it is not a second control.
+        _, beta_off = relational_fuzzy_c_means(
+            r, n_clusters=2, beta_spread=False, random_state=0
+        )
+        assert beta_off == 0.0
 
     def test_out_of_sample_membership_shape_and_normalization(self):
         rng = np.random.default_rng(0)
@@ -243,3 +261,81 @@ class TestRelationalFuzzyCMeans:
         assert membership.shape == (1, 2)
         assert np.isclose(membership.sum(), 1.0)
         assert np.argmax(membership) == 0
+
+
+class TestBetaSpread:
+    """Issue #89: the beta-spread docstring stated its trigger condition backwards.
+
+    It claimed the correction was needed whenever ``r`` induces negative
+    relational distances, "always true for a genuinely non-Euclidean ``r``,
+    such as the iVAT minimax matrix". The iVAT matrix is the subdominant
+    ultrametric u(D), and ultrametrics have strict p-negative type for every
+    p >= 0 (Faver, Kochalski, Murugan, Verheggen, Wesson & Weston, *Roundness
+    properties of ultrametric spaces*, Glasgow Math. J. 56(3):519-535, 2014),
+    so it is the one input on which beta-spread can never fire.
+    """
+
+    @staticmethod
+    def is_of_negative_type(r: np.ndarray) -> bool:
+        """Schoenberg's criterion: a hollow symmetric ``r`` is of negative type
+        iff ``-0.5 J r J`` is PSD -- equivalently, iff some point configuration
+        has ``r`` as its matrix of squared distances."""
+        n = r.shape[0]
+        centering = np.eye(n) - np.ones((n, n)) / n
+        gram = -0.5 * centering @ r @ centering
+        eigenvalues = np.linalg.eigvalsh((gram + gram.T) / 2.0)
+        tolerance = 1e-10 * max(float(np.abs(eigenvalues).max()), 1.0)
+        return bool(eigenvalues.min() > -tolerance)
+
+    @staticmethod
+    def minimax_matrix(X: np.ndarray) -> np.ndarray:
+        ivat_matrix, _, _ = _compute_ivat(_pairwise_distances(X))
+        r = np.asarray(ivat_matrix, dtype=np.float64)
+        r = (r + r.T) / 2.0
+        np.fill_diagonal(r, 0.0)
+        return r
+
+    def test_ivat_matrix_is_an_ultrametric(self, rings):
+        X, _ = rings
+        r = self.minimax_matrix(X)
+        for k in range(0, r.shape[0], 7):  # strided; the full check is O(n^3)
+            bound = np.maximum(r[:, k][:, np.newaxis], r[k, :][np.newaxis, :])
+            assert np.all(
+                r <= bound + 1e-9
+            ), "minimax matrix violates u[i,j] <= max(u[i,k], u[k,j])"
+
+    def test_minimax_matrix_is_of_negative_type_at_both_powers(self, rings):
+        X, _ = rings
+        r = self.minimax_matrix(X)
+        assert self.is_of_negative_type(r)
+        assert self.is_of_negative_type(r**2)
+
+    def test_beta_spread_never_fires_on_a_minimax_matrix(self, rings):
+        X, _ = rings
+        r = self.minimax_matrix(X)
+        for label, matrix in (("u(D)", r), ("u(D)**2", r**2)):
+            _, beta = relational_fuzzy_c_means(
+                matrix, n_clusters=2, beta_spread=True, random_state=0
+            )
+            assert beta == 0.0, f"beta-spread fired on {label}, of negative type"
+
+    def test_ivatmeans_relational_fit_never_needs_beta_spread(self, rings):
+        X, _ = rings
+        model = IVATMeans(n_clusters=2, refine="relational", random_state=42)
+        model.fit(X)
+        assert model._relational_beta == 0.0
+
+
+class TestRelationalOutOfSample:
+    """The out-of-sample extension must agree with the partition it was fit on."""
+
+    def test_predict_on_training_data_reproduces_the_fitted_labels(self, rings):
+        """The single-linkage insertion of a training point is that point's own
+        row, so out-of-sample scoring must reproduce the in-sample partition.
+        This pins the fit and predict sides to the same units: any rescaling of
+        the training matrix that is not mirrored in the inserted edge breaks it.
+        """
+        X, _ = rings
+        model = IVATMeans(n_clusters=2, refine="relational", random_state=42)
+        model.fit(X)
+        assert np.array_equal(model.predict(X), model.labels_)

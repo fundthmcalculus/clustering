@@ -120,8 +120,18 @@ Do not go back to feature vectors and means. Feed `D'` (and iVAT-derived auto-`k
 ordering-based seeds) into a **relational fuzzy clustering** algorithm that operates
 *directly on a dissimilarity matrix* and returns soft memberships — **NERFCM**
 (Non-Euclidean Relational FCM, Hathaway & Bezdek 1994) or **FANNY** (Kaufman &
-Rousseeuw). NERFCM even has the β-spread trick for exactly the non-Euclidean
-dissimilarities iVAT produces.
+Rousseeuw). Feed it `D'` directly — no squaring, no correction term.
+
+**Do not claim β-spread as a selling point; it provably never fires here.**
+`D'` is the subdominant ultrametric `u(D)`, and ultrametrics have strict
+p-negative type for every `p ≥ 0` (Faver et al., *Roundness properties of
+ultrametric spaces*, Glasgow Math. J. 56(3):519–535, 2014). So `u(D)` already
+satisfies the relational dual's requirement — it is realizable as a matrix of
+*squared* Euclidean distances, which is exactly Chehreghani's minimax embedding
+in §6 ("squared distance = minimax"). β-spread is a safeguard for inputs
+*outside* that class; on `D'` it is inert. That is a point in the composition's
+favour (nothing to defend), not a feature to advertise. See GitHub issue #89.
+
 **Why it's novel & defensible.** Every ingredient is published and trusted, but the
 composition, *the first soft/fuzzy member of the VAT family, computed in the iVAT
 minimax space with no Euclidean-mean step*, does not exist. It covers exactly the case
