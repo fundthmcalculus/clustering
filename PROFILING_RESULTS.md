@@ -1,3 +1,14 @@
+> **Status (2026-08-30):** the headline finding below — that the Cython FCM
+> runs 2–3x *slower* than numpy on medium and large datasets — was a real
+> defect, not an inherent property of the approach. `_compute_weights_*` kept
+> an O(n_clusters²) `pow()` form that `fcm.py` had already been rewritten away
+> from. Fixed in #101 (issue #100); the compiled path now measures 1.2–4.3x
+> **faster** than numpy on the same shapes. The analysis below is retained
+> because its central lesson — that hand-written scalar loops lose to BLAS the
+> moment the work is expressible as a GEMM — is what the fix is built on: the
+> distance computation stays in numpy's BLAS and only the element-wise
+> membership update is compiled.
+
 # Performance Analysis: Why Cython is Slower
 
 ## Executive Summary

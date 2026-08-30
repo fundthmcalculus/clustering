@@ -49,8 +49,11 @@ src/tribbleclustering/
   util.py            # pairwise_distances (numba), synthetic cluster generators
 tests/               # pytest suite (correctness + benchmark-marked perf tests)
 benchmarks/          # dev-only scale/memory harness (NOT shipped in the wheel)
-docs/                # perf guidance, bibliography, novelty write-ups
-  papers/            #   committed prior-art PDFs
+docs/                # library docs only -- no research/novelty write-ups
+  design-notes.md    #   why IVATMeans has refine= and dissimilarity_power=;
+                     #   cited from the ivatmeans.py / nerfcm.py docstrings
+  perf-guidance.md   #   optimization guidance for developers of this package
+  papers/            #   committed prior-art PDFs cited from source docstrings
   sources/           #   git-ignored scratch cache for retrieved PDFs (do not commit)
 ```
 
@@ -64,6 +67,17 @@ There is no `experiments/` tree in this repo. It used to hold research spikes
 (fundthmcalculus/grad-school#26) alongside coursework, making this repo a pure
 library. Don't recreate `experiments/` here without discussing scope first —
 research spikes belong in `grad-school`, not this package.
+
+The **novelty and prior-art write-ups followed them** in issue #97
+(`bibliography.md`, `novel-niche.md`, `novelty-review.md`,
+`performance-novelty.md`, `vat-tsp-prior-art.md`,
+`vat-tsp-session2-novelty.md`, `popmusic-spacefilling.md`), and now live in
+`grad-school` under `ClusteringExperiments/docs/`. They are thesis material,
+not package documentation. What the library actually needs from them — the
+geometry argument behind `refine=` and `dissimilarity_power=` — was extracted
+into `docs/design-notes.md`, which stays. Add novelty/positioning prose to
+`grad-school`, not here; `docs/` holds only what a user or contributor of the
+package needs.
 
 ## Compiled-vs-pure-python fallback (important)
 

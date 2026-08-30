@@ -3,7 +3,7 @@
 iVAT's minimax recurrence recovers non-convex/chained structure, but the
 original back end represented each recovered cluster by a Euclidean mean and
 assigned points by nearest-centroid -- a geometry mismatch that discards the
-advantage on precisely the data iVAT is good at (see docs/novel-niche.md).
+advantage on precisely the data iVAT is good at (see docs/design-notes.md).
 These tests reproduce that failure with the legacy "euclidean" back end and
 verify the new "medoid" (default) and "relational" (NERFCM) back ends fix it.
 """
@@ -420,8 +420,8 @@ class TestDissimilarityPowerGeometry:
 
     The iVAT minimax matrix u(D) is of negative type at every power, so
     every ``p`` is an admissible NERFCM geometry; the powers measure
-    differently. p = 1 is Chehreghani's spine geometry (novel-niche.md
-    section 6); p = 2 is what the sweep in issue #95 measured better
+    differently. p = 1 is Chehreghani's spine geometry (design-notes.md
+    section 2); p = 2 is what the sweep in issue #95 measured better
     (ARI(labels_) 0.9474 -> 0.9993, 20-D memberships recovering from
     exactly-uniform). The default is 2.0; the iVAT cut is never touched,
     whatever the power.
