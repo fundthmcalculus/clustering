@@ -300,7 +300,8 @@ class IVATMeans(BaseClusterer):
 
     ``refine`` controls how the clusters iVAT finds are represented and how
     new points are assigned to them (see GitHub issue #54 /
-    ``docs/novel-niche.md``): iVAT's minimax recurrence recovers non-convex,
+    ``docs/design-notes.md`` section 1): iVAT's minimax recurrence recovers
+    non-convex,
     elongated and chained structure, but a Euclidean-mean prototype and
     nearest-centroid assignment discard that advantage (the mean of a ring is
     in the hole). The options are:
@@ -332,14 +333,14 @@ class IVATMeans(BaseClusterer):
     (ultrametrics have strict p-negative type for every ``p >= 0``), so any
     ``p`` is an admissible geometry for NERFCM -- but the memberships
     differ. ``p = 1`` is the geometry Chehreghani's minimax embedding
-    ("squared distance = minimax," ``docs/novel-niche.md`` section 6) and
+    ("squared distance = minimax," ``docs/design-notes.md`` section 2) and
     the repo's own NERFCM docs call the theoretical spine; ``p = 2``
     measures materially better (GitHub issue #95: ARI(labels_) 0.9474 ->
     0.9993, and membership_ that collapsed to exactly uniform in 20-D
     recovers to crispness 0.43--0.59), so it is the default. The choice is
     a measured geometry, not a correctness fix: see the module
-    :mod:`tribbleclustering.nerfcm` docstring and ``docs/novel-niche.md``
-    section 3 (Niche 1) for the literature on both sides.
+    :mod:`tribbleclustering.nerfcm` docstring and ``docs/design-notes.md``
+    section 2 for the literature on both sides.
     """
 
     def __init__(
@@ -512,8 +513,8 @@ class IVATMeans(BaseClusterer):
         # of the refinement's geometry, not of the front end's. u(D) is of
         # negative type at every power, so every ``p`` is admissible; the
         # default of 2.0 is what measures better on the sweep in issue #95,
-        # while ``p=1`` is the Chehreghani spine geometry (docs/novel-niche.md
-        # section 6).
+        # while ``p=1`` is the Chehreghani spine geometry (docs/design-notes.md
+        # section 2).
         #
         # Powering here, not upstream in fit(), on purpose: the recurrence is
         # max-min, so u(D**p) == u(D)**p for the same VAT order, but the cut

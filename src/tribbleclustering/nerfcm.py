@@ -8,7 +8,7 @@ matrix ``R`` -- it never falls back to a coordinate mean. That makes it the
 geometry-consistent back end for :class:`~tribbleclustering.IVATMeans`: fed
 the iVAT minimax matrix ``D'``, it stays in the same minimax/ultrametric
 space that the front end used to find the clusters in the first place (see
-``docs/novel-niche.md`` and GitHub issue #54).
+``docs/design-notes.md`` section 1 and GitHub issue #54).
 
 The relational distance of object ``j`` to a fuzzy cluster with membership
 column ``u_i`` is
@@ -34,7 +34,7 @@ singles out one power, and the powers measure differently. Two ends of
 the continuum are documented:
 
 - ``p = 1`` is the geometry Chehreghani's minimax embedding ("squared
-  distance = minimax," ``docs/novel-niche.md`` section 6) and this
+  distance = minimax," ``docs/design-notes.md`` section 2) and this
   repo's own docs call the theoretical spine.
 - ``p = 2`` measures materially better as the relational refinement of
   the iVAT cut (GitHub issue #95: ARI(labels_) 0.9474 -> 0.9993 across
@@ -59,7 +59,7 @@ for every ``p >= 0`` (Faver, Kochalski, Murugan, Verheggen, Wesson & Weston,
 "Roundness properties of ultrametric spaces," *Glasgow Math. J.*
 56(3):519-535, 2014). So ``u(D)`` is admissible as-is -- it is precisely
 Chehreghani's minimax embedding, in which squared Euclidean distance *equals*
-the minimax distance (``docs/novel-niche.md`` section 6) -- and beta-spread
+the minimax distance (``docs/design-notes.md`` section 2) -- and beta-spread
 provably never fires on it. The correction is inert on exactly the input this
 module was added for. See ``tests/test_ivatmeans_refine.py::TestBetaSpread``.
 """
