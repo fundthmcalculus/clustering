@@ -245,7 +245,16 @@ is the scaling wall.**
 
 ## Release / CI
 
-- **`pr.yaml`** runs on PRs to `main`/`master`: black → flake8 → mypy → pytest.
+- **`pr.yaml`** runs on PRs to `main`/`master`: black → flake8 → mypy → pytest,
+  on Python 3.11 with `--ci-fast`. This is the gate; keep it fast.
+- **`nightly.yaml`** runs at 04:00 UTC (and on `workflow_dispatch`) and covers
+  the three things `pr.yaml` structurally cannot: the full-size correctness
+  suite (no `--ci-fast` trimming), the `benchmark`-marked wall-clock
+  assertions, and a **Python 3.11/3.12/3.13/3.14 matrix** for the range
+  `requires-python` promises. A failure opens or comments on one accumulating
+  `nightly-failure` issue; that reporting lives in a separate `report` job so
+  four matrix legs can't race the dedupe. Don't move a check here that belongs
+  in the gate, and don't put a slow check in the gate that belongs here.
 - **`publish.yaml`** runs on `v*` tags: it rewrites the version in
   `pyproject.toml` from the tag, builds an sdist, and publishes to PyPI via
   trusted OIDC publishing. **To release: bump and push a `vX.Y.Z` tag** — do not

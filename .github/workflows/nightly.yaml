@@ -6,7 +6,10 @@ name: Nightly (full suite)
 #   * `ci_slow` scaling/plotting tests, and the full-size inputs the
 #     `ci_scale(full, fast)` fixture shrinks under --ci-fast;
 #   * everything marked `benchmark` -- the wall-clock assertions guarding the
-#     Cython/OpenMP speedups this package exists for.
+#     Cython/OpenMP speedups this package exists for;
+#   * every Python version except 3.11. `requires-python` claims `>=3.11`, but
+#     pr.yaml pins 3.11, so a C-API or Cython break on a newer interpreter is
+#     invisible until a user hits it. The matrix below covers the claim.
 #
 # A silent 20x loss in the compiled VAT path would pass every PR. It fails here.
 on:
@@ -14,9 +17,10 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch: {}
 
+# Least privilege at the workflow level: only the `report` job needs to write,
+# and it grants itself what it needs.
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: nightly
@@ -26,6 +30,14 @@ jobs:
   full-suite:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      # One red interpreter should not hide the state of the other three --
+      # "3.14 broke" and "everything broke" need different responses.
+      fail-fast: false
+      matrix:
+        # The full range `requires-python = ">=3.11"` promises. 3.11 stays
+        # first because it is what pr.yaml gates on.
+        python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -33,7 +45,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -57,14 +69,31 @@ jobs:
         # from a correctness failure -- they need very different responses.
         run: GITHUB_ACTIONS= CI= TRIBBLE_CI_FAST= pytest -m benchmark -v --durations=25
 
+  report:
+    # A job, not a step inside the matrix. With four legs the `if: failure()`
+    # step fired up to four times concurrently, and four copies of the dedupe
+    # below would race between `gh issue list` and `gh issue create` -- opening
+    # exactly the duplicate issues that dedupe exists to prevent. `needs` plus
+    # `if: failure()` fires this once per run, however many legs went red.
+    needs: full-suite
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read  # to read back which matrix legs failed
+    steps:
       - name: Report a failure
-        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           TITLE="Nightly full suite is failing"
+          # Name the interpreters that went red. One leg failing is a version
+          # problem; all four is a code problem, and the responses differ.
+          FAILED=$(gh run view "${{ github.run_id }}" --json jobs             --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")')
+          [ -n "$FAILED" ] || FAILED="(could not read job names -- see the run)"
           # `gh issue create --label` errors on an unknown label, and a failed
           # report is worse than a noisy one, so ensure the label exists first.
           gh label create nightly-failure --color B60205             --description "Opened automatically when the nightly suite fails" 2>/dev/null || true
@@ -77,13 +106,15 @@ jobs:
           existing=$(gh issue list --state open --label nightly-failure --limit 100             --json number,title --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")
           if [ -n "$existing" ]; then
             # One issue that accumulates nights, not one issue per night.
-            gh issue comment "$existing"               --body "Still failing on \`${{ github.sha }}\` -- [run]($RUN_URL)"
+            gh issue comment "$existing"               --body "Still failing on \`${{ github.sha }}\` -- failed: $FAILED -- [run]($RUN_URL)"
             echo "commented on #$existing"
           else
             {
-              echo "The nightly run failed. \`pr.yaml\` runs \`pytest --ci-fast\` and addopts deselect \`-m benchmark\`, so this is either a full-size correctness failure or a wall-clock benchmark regression -- neither is visible to the PR gate."
+              echo "The nightly run failed. \`pr.yaml\` runs \`pytest --ci-fast\` on Python 3.11 only, and addopts deselect \`-m benchmark\`, so this is a full-size correctness failure, a wall-clock benchmark regression, or a break on a Python version the PR gate never exercises -- none of which is visible to that gate."
               echo
-              echo "Check which step failed: \"full-size correctness suite\" vs \"benchmark suite\"."
+              echo "Failed jobs: $FAILED"
+              echo
+              echo "Check which step failed: \"full-size correctness suite\" vs \"benchmark suite\". If only some interpreters are red, it is a version-compatibility break, not a logic regression."
               echo
               echo "- Commit: \`${{ github.sha }}\`"
               echo "- Run: $RUN_URL"
