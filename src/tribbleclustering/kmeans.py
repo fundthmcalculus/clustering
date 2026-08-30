@@ -1,4 +1,4 @@
-"""K-Means clustering with optional GPU acceleration."""
+"""K-Means clustering."""
 
 from dataclasses import dataclass
 from typing import Optional
@@ -225,9 +225,6 @@ def kmeans(
         n_iter_=n_iter,
         converged=converged,
     )
-
-
-_GPU_KMEANS_MIN_SAMPLES = 5000
 
 
 class KMeans(BaseClusterer):

@@ -21,7 +21,7 @@ if it merely consumes from it.
 import numpy as np
 import pytest
 
-from tribbleclustering import KMeans, fuzzy_c_means, gpu
+from tribbleclustering import KMeans, fuzzy_c_means
 from tribbleclustering.fuzzycmeans import FuzzyCMeans
 from tribbleclustering.kmeans import kmeans
 
@@ -322,45 +322,3 @@ class TestKMeansFreeFunctionSeeding:
         a = kmeans(blobs, 3, initial_guess=guess, random_state=1)
         b = kmeans(blobs, 3, initial_guess=guess, random_state=2)
         assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
-
-
-class TestGpuFallbackSeeding:
-    """``gpu.py`` mirrors the CPU kernels and must expose the same knob. Only
-    the CPU-fallback branch runs here -- ``gpu.is_available()`` is False
-    without CUDA, so the device branches are NOT covered by these tests."""
-
-    def test_fcm_gpu_fallback_accepts_random_state(self, blobs):
-        a = gpu.fuzzy_c_means_gpu(blobs, 3, random_state=11)
-        b = gpu.fuzzy_c_means_gpu(blobs, 3, random_state=11)
-        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
-
-    def test_fcm_gpu_fallback_does_not_disturb_global_stream(self, blobs):
-        without, with_call = _global_draws_around(
-            lambda: gpu.fuzzy_c_means_gpu(blobs, 3, random_state=11)
-        )
-        assert np.array_equal(without, with_call)
-
-    def test_fcm_gpu_fallback_forwards_max_iter(self, blobs):
-        """The fallback used to drop max_iter on the floor."""
-        assert gpu.fuzzy_c_means_gpu(blobs, 3, max_iter=1, random_state=0).n_iter_ == 1
-
-    def test_fcm_gpu_survives_more_clusters_than_half_the_rows(self):
-        """n_samples < 2*n_clusters. The device branch drew with
-        ``replace=False`` and would have raised ValueError on this shape --
-        the same defect ``test_fcm_more_clusters_than_half_the_rows`` pins for
-        the CPU kernels. Only the fallback executes here (no CUDA), so this
-        pins the entry point's contract, NOT the device code."""
-        x = np.random.default_rng(0).normal(size=(10, 2))  # 10 rows, 2n = 12
-        res = gpu.fuzzy_c_means_gpu(x, 6, random_state=0)
-        assert np.asarray(res.cluster_centers_).shape == (6, 2)
-
-    def test_kmeans_gpu_fallback_accepts_random_state(self, blobs):
-        a = gpu.kmeans_gpu(blobs, 3, random_state=11)
-        b = gpu.kmeans_gpu(blobs, 3, random_state=11)
-        assert np.array_equal(a.cluster_centers_, b.cluster_centers_)
-
-    def test_kmeans_gpu_fallback_does_not_disturb_global_stream(self, blobs):
-        without, with_call = _global_draws_around(
-            lambda: gpu.kmeans_gpu(blobs, 3, random_state=11)
-        )
-        assert np.array_equal(without, with_call)
