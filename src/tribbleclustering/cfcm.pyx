@@ -480,7 +480,12 @@ def fuzzy_c_means_32(
     initial_guess = None,
     random_state = None,
 ) -> tuple:
-    x = np.asarray(x, dtype=np.float32)
+    # ascontiguousarray, not asarray: the kernel signature below is a
+    # ``[:, ::1]`` memoryview, so a strided view (``data[:, ::2]``, a
+    # transpose, an F-ordered load) would raise "ndarray is not
+    # C-contiguous" where fcm.fuzzy_c_means accepts it. No-op when the
+    # input is already contiguous, which is the common case. Issue #102.
+    x = np.ascontiguousarray(x, dtype=np.float32)
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
     cdef float[:, ::1] c_init
@@ -502,7 +507,7 @@ def fuzzy_c_means_32(
             for k in range(n_features):
                 c_init[i, k] = initial_guess[i, k]
     elif indices is not None:
-        indices_arr = np.asarray(indices, dtype=np.int64)
+        indices_arr = np.ascontiguousarray(indices, dtype=np.int64)
         if indices_arr.shape[0] == n:
             for i in range(n):
                 for k in range(n_features):
@@ -537,7 +542,12 @@ def fuzzy_c_means_64(
     initial_guess = None,
     random_state = None,
 ) -> tuple:
-    x = np.asarray(x, dtype=np.float64)
+    # ascontiguousarray, not asarray: the kernel signature below is a
+    # ``[:, ::1]`` memoryview, so a strided view (``data[:, ::2]``, a
+    # transpose, an F-ordered load) would raise "ndarray is not
+    # C-contiguous" where fcm.fuzzy_c_means accepts it. No-op when the
+    # input is already contiguous, which is the common case. Issue #102.
+    x = np.ascontiguousarray(x, dtype=np.float64)
     cdef int n_samples = x.shape[0]
     cdef int n_features = x.shape[1]
     cdef double[:, ::1] c_init
@@ -559,7 +569,7 @@ def fuzzy_c_means_64(
             for k in range(n_features):
                 c_init[i, k] = initial_guess[i, k]
     elif indices is not None:
-        indices_arr = np.asarray(indices, dtype=np.int64)
+        indices_arr = np.ascontiguousarray(indices, dtype=np.int64)
         if indices_arr.shape[0] == n:
             for i in range(n):
                 for k in range(n_features):
