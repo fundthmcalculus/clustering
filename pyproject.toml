@@ -4,7 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tribble-clustering"
-version = "0.2.1"
+# Kept in sync with the latest released tag by hand. publish.yaml rewrites this
+# from the `vX.Y.Z` tag at build time, so this value never reaches PyPI -- but a
+# stale one misleads anyone reading the repo. It sat at 0.2.1 through the 0.3.0
+# release because 0.2.x was bumped here and never tagged, so it never shipped.
+# To release: push a `vX.Y.Z` tag, then update this line to match.
+version = "0.3.0"
 description = "An optimized Visualization Assessment Tendency (VAT/IVAT) and fuzzy clustering (FCM) package"
 readme = "README.md"
 requires-python = ">=3.11"
