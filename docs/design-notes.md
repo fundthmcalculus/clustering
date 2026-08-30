@@ -47,11 +47,11 @@ nearest-centroid re-merges them.
 
 `refine=` is the knob that lets a caller stay in the front end's geometry:
 
-| `refine=` | prototype | assignment | when |
+| `refine=` | prototype | assignment | why |
 |---|---|---|---|
-| `"medoid"` (default) | cluster medoid — an actual data point | nearest medoid | keeps prototypes inside the cluster; safe general default |
-| `"relational"` | none; NERFCM memberships on `D'` | relational, no coordinates | stays entirely in minimax space; returns soft memberships |
-| `"euclidean"` | Euclidean mean | nearest centroid | the legacy behaviour, kept for reproducibility |
+| `"medoid"` (default) | the cluster's **minimax-linkage medoid** — the member minimizing the maximum in-cluster minimax distance (Bien & Tibshirani 2011) | crisp nearest-prototype under `metric` | the prototype is chosen in the front end's own geometry and is always a real point inside the cluster |
+| `"relational"` | none — NERFCM memberships fitted directly on `D'` | relational out-of-sample extension; uses `metric` only to find each new point's single nearest training neighbour | stays in minimax space end to end and returns a soft partition (`membership_`) |
+| `"euclidean"` | Euclidean mean | Euclidean nearest-centroid | the original behaviour, kept for backward compatibility; reintroduces the mismatch above |
 
 See GitHub issue #54 for the change, and
 `tests/test_ivatmeans_refine.py` for the two-moons/rings reproduction.
@@ -96,17 +96,17 @@ Only the entries the two decisions above rest on. The full bibliography moved
 to `grad-school` (`ClusteringExperiments/docs/bibliography.md`).
 
 - **Havens & Bezdek (2012)**, "An efficient formulation of the improved visual
-  assessment of cluster tendency (iVAT) algorithm," *IEEE TKDE* 24(5):813–822.
-  Committed copy: `docs/papers/Havens_Bezdek_2012_iVAT_efficient.pdf`.
+  assessment of cluster tendency (iVAT) algorithm," *IEEE TKDE* 24(5):813–822, 2012.
+  doi:10.1109/TKDE.2011.33. Committed copy: `docs/papers/Havens_Bezdek_2012_iVAT_efficient.pdf`.
 - **Chehreghani (2019/2020)**, "Minimax distance representation learning /
   embedding," arXiv:1904.13223 / *Machine Learning*. Minimax = single-link path
   distance; Euclidean embedding such that squared distance = minimax.
 - **Hathaway & Bezdek (1994)**, "NERF c-means: Non-Euclidean relational fuzzy
   clustering," *Pattern Recognition* 27(3):429–437. The `refine="relational"`
   back end.
-- **Faver, Kosta, et al. (2014)**, "Roundness properties of ultrametric
+- **Faver et al. (2014)**, "Roundness properties of ultrametric
   spaces," *Glasgow Math. J.* 56(3):519–535. Strict *p*-negative type of
   ultrametrics at every `p >= 0`.
 - **Bien & Tibshirani (2011)**, "Hierarchical clustering with prototypes via
-  minimax linkage," *JASA* 106(495):1075–1084. Medoid prototypes for non-convex
-  clusters; the `refine="medoid"` default.
+  minimax linkage," *Journal of the American Statistical Association*. Medoid
+  prototypes for non-convex clusters; the `refine="medoid"` default.
