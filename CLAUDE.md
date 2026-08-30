@@ -257,8 +257,13 @@ is the scaling wall.**
   in the gate, and don't put a slow check in the gate that belongs here.
 - **`publish.yaml`** runs on `v*` tags: it rewrites the version in
   `pyproject.toml` from the tag, builds an sdist, and publishes to PyPI via
-  trusted OIDC publishing. **To release: bump and push a `vX.Y.Z` tag** — do not
-  hand-edit the published version in `pyproject.toml`.
+  trusted OIDC publishing. **The tag is the source of truth for what ships —
+  editing `version` in `pyproject.toml` releases nothing.** To release: push a
+  `vX.Y.Z` tag. Then, in a follow-up PR, set `version` to match, so the repo
+  doesn't misstate what is on PyPI — it drifted to two minors behind before
+  v0.3.0, because 0.2.x was bumped there and never tagged. Changing `version`
+  requires `uv lock` (the lock records this project's own version) or CI's
+  `uv lock --check` fails.
 
 ## Working here
 
