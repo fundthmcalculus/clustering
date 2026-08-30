@@ -12,8 +12,8 @@ from dataclasses import dataclass
 # implementations sit behind a silent import-time fallback, so they have to stop
 # on the same iteration and return the same centers -- a compiled path with its
 # own tolerance quietly returns a different answer than the reference.
-DEF _CONV_RTOL = 1e-5
-DEF _CONV_ATOL = 1e-8
+cdef double _CONV_RTOL = 1e-5
+cdef double _CONV_ATOL = 1e-8
 
 
 @cython.cdivision(True)
@@ -330,7 +330,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
     c_np = np.asarray(c)
     # ||x||^2 does not depend on the centers -- computing it per iteration also
     # materialized a full (n_samples, n_features) temporary each time.
-    x_norm2_np = np.einsum("ij,ij->i", x_np, x_np)
+    x_norm2_np = np.sum(x_np**2, axis=1)
     c_norm2_np = np.empty(n, dtype=np.float32)  # ||c||^2, shape (n,)
     xc_np = np.empty((n_samples, n), dtype=np.float32)  # x @ c.T, shape (n_samples, n)
     x_norm2 = x_norm2_np
@@ -341,7 +341,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
         n_iter = iteration + 1
 
         # Gram components via numpy's BLAS, written into the reused buffers.
-        np.einsum("ij,ij->i", c_np, c_np, out=c_norm2_np)
+        np.sum(c_np**2, axis=1, out=c_norm2_np)
         np.dot(x_np, c_np.T, out=xc_np)
 
         _compute_distances_gram_32(x, c, x_norm2, c_norm2, xc, distances)
@@ -356,7 +356,9 @@ cdef tuple _fuzzy_c_means_kernel_32(
         converged = True
         for i in range(n):
             for k in range(n_features):
-                if fabs(c_new[i, k] - c[i, k]) > _CONV_ATOL + _CONV_RTOL * fabs(c[i, k]):
+                if fabs(c_new[i, k] - c[i, k]) > (
+                    _CONV_ATOL + _CONV_RTOL * fabs(c[i, k])
+                ):
                     converged = False
                     break
             if not converged:
@@ -371,7 +373,7 @@ cdef tuple _fuzzy_c_means_kernel_32(
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    np.einsum("ij,ij->i", c_np, c_np, out=c_norm2_np)
+    np.sum(c_np**2, axis=1, out=c_norm2_np)
     np.dot(x_np, c_np.T, out=xc_np)
     _compute_distances_gram_32(x, c, x_norm2, c_norm2, xc, distances)
     _compute_weights_32(distances, m, w_ij)
@@ -417,7 +419,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
     c_np = np.asarray(c)
     # ||x||^2 does not depend on the centers -- computing it per iteration also
     # materialized a full (n_samples, n_features) temporary each time.
-    x_norm2_np = np.einsum("ij,ij->i", x_np, x_np)
+    x_norm2_np = np.sum(x_np**2, axis=1)
     c_norm2_np = np.empty(n, dtype=np.float64)  # ||c||^2, shape (n,)
     xc_np = np.empty((n_samples, n), dtype=np.float64)  # x @ c.T, shape (n_samples, n)
     x_norm2 = x_norm2_np
@@ -428,7 +430,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
         n_iter = iteration + 1
 
         # Gram components via numpy's BLAS, written into the reused buffers.
-        np.einsum("ij,ij->i", c_np, c_np, out=c_norm2_np)
+        np.sum(c_np**2, axis=1, out=c_norm2_np)
         np.dot(x_np, c_np.T, out=xc_np)
 
         _compute_distances_gram_64(x, c, x_norm2, c_norm2, xc, distances)
@@ -443,7 +445,9 @@ cdef tuple _fuzzy_c_means_kernel_64(
         converged = True
         for i in range(n):
             for k in range(n_features):
-                if fabs(c_new[i, k] - c[i, k]) > _CONV_ATOL + _CONV_RTOL * fabs(c[i, k]):
+                if fabs(c_new[i, k] - c[i, k]) > (
+                    _CONV_ATOL + _CONV_RTOL * fabs(c[i, k])
+                ):
                     converged = False
                     break
             if not converged:
@@ -458,7 +462,7 @@ cdef tuple _fuzzy_c_means_kernel_64(
                 c[i, k] = c_new[i, k]
 
     # Final distance/weight computation with latest centers
-    np.einsum("ij,ij->i", c_np, c_np, out=c_norm2_np)
+    np.sum(c_np**2, axis=1, out=c_norm2_np)
     np.dot(x_np, c_np.T, out=xc_np)
     _compute_distances_gram_64(x, c, x_norm2, c_norm2, xc, distances)
     _compute_weights_64(distances, m, w_ij)
