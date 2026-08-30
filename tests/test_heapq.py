@@ -290,8 +290,12 @@ class TestPerformance:
         plt.savefig("vat_scaling_performance.png", dpi=150)
         print("\nPlot saved to 'vat_scaling_performance.png'")
 
-        # Times should generally increase with size (not a strict requirement, but expected)
-        assert mean_c[-1] >= mean_c[-2]
+        # Growth is asserted across the whole size span, not between the last two
+        # sizes. At n <= 2000 the compiled path runs in single-digit milliseconds
+        # and its 2-sigma band (printed above) routinely exceeds the gap between
+        # neighbouring sizes, so the adjacent-size form was a coin flip on a
+        # loaded runner -- measured failing 1 run in 3 locally.
+        assert mean_c[-1] > mean_c[0]
 
     def test_scaling_behavior(self):
         """Compare MST only: vat_prim_mst (heapq) vs vat_prim_mst_c.
@@ -377,8 +381,12 @@ class TestPerformance:
         plt.savefig("scaling_performance.png", dpi=150)
         print("\nPlot saved to 'scaling_performance.png'")
 
-        # Times should generally increase with size (not a strict requirement, but expected)
-        assert mean_c[-1] >= mean_c[-2]
+        # Growth is asserted across the whole size span, not between the last two
+        # sizes. At n <= 2000 the compiled path runs in single-digit milliseconds
+        # and its 2-sigma band (printed above) routinely exceeds the gap between
+        # neighbouring sizes, so the adjacent-size form was a coin flip on a
+        # loaded runner -- measured failing 1 run in 3 locally.
+        assert mean_c[-1] > mean_c[0]
 
 
 class TestEdgeCases:

@@ -24,7 +24,13 @@ COMPILE_ARGS = {
 }
 LINK_ARGS = {
     "msvc": [],  # /openmp pulls in the runtime automatically
-    "unix": ["-fopenmp"],
+    # -lm is not optional here. Under -O3 -ffast-math GCC rewrites vectorizable
+    # libm calls (pow/powf in the FCM membership loop) into libmvec entry points
+    # such as _ZGVdN8vv_powf, which live in libmvec.so.1. CPython links libm but
+    # not libmvec, so without -lm the extension builds and then fails at import
+    # with "undefined symbol: _ZGVdN8vv_powf". glibc's libm.so linker script
+    # pulls libmvec in AS_NEEDED.
+    "unix": ["-fopenmp", "-lm"],
 }
 
 

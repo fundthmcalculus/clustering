@@ -1,7 +1,8 @@
-"""Benchmark FCM memory layout optimization.
+"""Benchmark the compiled FCM kernel against the pure-numpy reference.
 
-This benchmark demonstrates the performance improvement from
-distance caching during FCM iterations.
+Both are driven from the same initial centers so they run the same number of
+iterations; otherwise the ratio measures two random draws rather than two
+kernels (see issue #100).
 """
 
 import time
@@ -21,10 +22,10 @@ from tribbleclustering.fcm import fuzzy_c_means as fuzzy_c_means_baseline
 @pytest.mark.benchmark
 @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
 def test_memory_optimization_benchmark():
-    """Benchmark distance caching optimization.
+    """Benchmark the compiled kernel against the pure-numpy reference.
 
-    Expected: Optimized version should be 1.2-1.4x faster
-    than baseline for typical convergence patterns.
+    Expected: the compiled kernel is faster; the assertion only fails it for a
+    real regression, since the pure path is BLAS-backed and already fast.
     """
     np.random.seed(42)
 
@@ -43,22 +44,26 @@ def test_memory_optimization_benchmark():
         ]
     ).astype(np.float64)
 
+    # Same starting centers for both, so both run the same iterations.
+    rng = np.random.default_rng(0)
+    start = x[rng.choice(x.shape[0], size=n_clusters, replace=False)].copy()
+
     # Warmup
-    fuzzy_c_means_baseline(x, n_clusters, m=2.0)
-    fuzzy_c_means_optimized(x, n_clusters, m=2.0)
+    fuzzy_c_means_baseline(x, n_clusters, m=2.0, initial_guess=start)
+    fuzzy_c_means_optimized(x, n_clusters, m=2.0, initial_guess=start)
 
     # Benchmark baseline
     times_baseline = []
     for _ in range(3):
         t0 = time.perf_counter()
-        fuzzy_c_means_baseline(x, n_clusters, m=2.0)
+        fuzzy_c_means_baseline(x, n_clusters, m=2.0, initial_guess=start)
         times_baseline.append(time.perf_counter() - t0)
 
     # Benchmark optimized
     times_optimized = []
     for _ in range(3):
         t0 = time.perf_counter()
-        fuzzy_c_means_optimized(x, n_clusters, m=2.0)
+        fuzzy_c_means_optimized(x, n_clusters, m=2.0, initial_guess=start)
         times_optimized.append(time.perf_counter() - t0)
 
     t_baseline = np.mean(times_baseline)
@@ -68,21 +73,21 @@ def test_memory_optimization_benchmark():
     print(f"\n{'Benchmark Results':=^60}")
     print(f"Dataset: {n_samples} samples, {n_features} features, {n_clusters} clusters")
     print(f"Baseline (pure Python):  {t_baseline*1000:7.2f} ms")
-    print(f"Optimized (distance caching): {t_optimized*1000:7.2f} ms")
+    print(f"Compiled (Cython):       {t_optimized*1000:7.2f} ms")
     print(f"Speedup: {speedup:.2f}x")
     print(f"{'':=^60}")
 
-    # The optimization should show at least some improvement
-    # On systems with good cache behavior, 1.2-1.4x improvement is typical
-    assert speedup >= 0.9, f"Optimization degraded performance: {speedup}x"
+    # Loose on purpose: the pure path is BLAS-backed, so rough parity is
+    # acceptable and only a real regression (issue #100 measured 0.27x) fails.
+    assert speedup >= 0.9, f"Compiled kernel is slower than pure numpy: {speedup}x"
 
 
 @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
 def test_memory_optimization_convergence_iterations():
     """Track iteration count during convergence.
 
-    The distance caching optimization should not significantly affect
-    the number of iterations to convergence.
+    The compiled kernel shares fcm.py's convergence test, so it should not
+    significantly affect the number of iterations to convergence.
     """
     np.random.seed(42)
 
