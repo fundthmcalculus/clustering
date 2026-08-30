@@ -78,6 +78,10 @@ jobs:
     needs: full-suite
     if: failure()
     runs-on: ubuntu-latest
+    # A few gh calls. If they hang, give up in minutes rather than holding the
+    # `nightly` concurrency group for the default six hours and blocking the
+    # next night behind it.
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write
@@ -92,7 +96,11 @@ jobs:
           TITLE="Nightly full suite is failing"
           # Name the interpreters that went red. One leg failing is a version
           # problem; all four is a code problem, and the responses differ.
-          FAILED=$(gh run view "${{ github.run_id }}" --json jobs             --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")')
+          # `|| FAILED=""` is load-bearing: under `set -e` a failed command
+          # substitution in an assignment aborts the step, which would swallow
+          # the whole failure report over a transient API error. Degrade to a
+          # worse report, never to no report.
+          FAILED=$(gh run view "${{ github.run_id }}" --json jobs             --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")') || FAILED=""
           [ -n "$FAILED" ] || FAILED="(could not read job names -- see the run)"
           # `gh issue create --label` errors on an unknown label, and a failed
           # report is worse than a noisy one, so ensure the label exists first.
