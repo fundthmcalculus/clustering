@@ -23,6 +23,21 @@ except ImportError:
     CYTHON_AVAILABLE = False
 
 
+def assert_same_result(got, ref):
+    """Every element of the returned tuple must match, not just the first.
+
+    `compute_vat_c` returns `(matrix, ..., order)` and `lin_kernighan_c`
+    returns `(tour, length)`; comparing only element 0 would let a
+    layout-dependent difference in the ordering or the tour length -- the
+    outputs a caller actually consumes -- pass unnoticed.
+    """
+    got = got if isinstance(got, tuple) else (got,)
+    ref = ref if isinstance(ref, tuple) else (ref,)
+    assert len(got) == len(ref)
+    for i, (g, r) in enumerate(zip(got, ref)):
+        assert_allclose(np.asarray(g), np.asarray(r), err_msg=f"return value {i}")
+
+
 @pytest.fixture
 def strided_points():
     """(n, d) point cloud that is a strided view, plus its contiguous twin."""
@@ -52,6 +67,9 @@ class TestCompiledAcceptsStridedInput:
 
     def test_cfcm_fuzzy_c_means(self, strided_points):
         view, contig = strided_points
+        # Deliberately one shared, contiguous initial_guess: `x` is the
+        # variable under test, and identical starts make the two runs
+        # comparable iteration for iteration.
         guess = contig[:3].copy()
 
         c_view, w_view, n_view, _ = cfcm.fuzzy_c_means(view, 3, initial_guess=guess)
@@ -64,6 +82,9 @@ class TestCompiledAcceptsStridedInput:
     def test_cfcm_matches_the_pure_path(self, strided_points):
         """The gap that motivated #102: one path accepted it, the other raised."""
         view, _ = strided_points
+        # Here the guess comes off `view` rather than the twin, to prove the
+        # strided array is genuinely usable end to end and not merely tolerated
+        # once a contiguous array has been threaded in beside it.
         guess = np.ascontiguousarray(view[:3])
 
         c_py, w_py = tc.fuzzy_c_means(view, 3, initial_guess=guess)
@@ -88,7 +109,7 @@ class TestCompiledAcceptsStridedInput:
 
     def test_pcvat_pairwise_distances(self, strided_points):
         view, contig = strided_points
-        assert_allclose(
+        assert_same_result(
             pcvat.pairwise_distances_c(view), pcvat.pairwise_distances_c(contig)
         )
 
@@ -96,25 +117,24 @@ class TestCompiledAcceptsStridedInput:
     def test_pcvat_vat_family(self, strided_distances, fn_name):
         view, contig = strided_distances
         fn = getattr(pcvat, fn_name)
-        # inplace=False by default, but pass copies anyway so a future in-place
-        # default cannot make this test compare a matrix against itself.
-        got = fn(view.copy())
-        ref = fn(contig.copy())
-        assert_allclose(np.asarray(got[0]), np.asarray(ref[0]))
+        # inplace=False by default (pcvat.pyx:728, :965), but pass copies anyway
+        # so a future in-place default cannot make this compare a matrix
+        # against itself.
+        assert_same_result(fn(view.copy()), fn(contig.copy()))
 
     def test_pcvat_prim_mst(self, strided_distances):
         view, contig = strided_distances
-        assert_allclose(
-            np.asarray(pcvat.vat_prim_mst_c(view)[0]),
-            np.asarray(pcvat.vat_prim_mst_c(contig)[0]),
-        )
+        assert_same_result(pcvat.vat_prim_mst_c(view), pcvat.vat_prim_mst_c(contig))
 
     def test_clk_lin_kernighan(self, strided_distances):
+        """Tour and length both, and both are reproducible.
+
+        The multi-start/OpenMP structure looks like it should vary per run; it
+        does not. Measured 8 runs on a 60-node instance: one distinct tour, one
+        distinct length. So comparing two runs is a fair test, not a flaky one.
+        """
         view, contig = strided_distances
-        assert_allclose(
-            np.asarray(clk.lin_kernighan_c(view)[0]),
-            np.asarray(clk.lin_kernighan_c(contig)[0]),
-        )
+        assert_same_result(clk.lin_kernighan_c(view), clk.lin_kernighan_c(contig))
 
 
 class TestPurePathAcceptsStridedInput:
@@ -130,10 +150,8 @@ class TestPurePathAcceptsStridedInput:
     def test_vat_family(self, strided_distances, fn_name):
         view, contig = strided_distances
         fn = getattr(tc, fn_name)
-        assert_allclose(
-            np.asarray(fn(view.copy())[0]), np.asarray(fn(contig.copy())[0])
-        )
+        assert_same_result(fn(view.copy()), fn(contig.copy()))
 
     def test_pairwise_distances(self, strided_points):
         view, contig = strided_points
-        assert_allclose(tc.pairwise_distances(view), tc.pairwise_distances(contig))
+        assert_same_result(tc.pairwise_distances(view), tc.pairwise_distances(contig))
