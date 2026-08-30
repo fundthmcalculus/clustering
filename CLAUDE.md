@@ -29,7 +29,7 @@ src/tribbleclustering/
   fcm.py             # pure-numpy fuzzy_c_means reference implementation
   cfcm.pyx           # Cython/OpenMP fuzzy_c_means + k-means (f32 + f64 fused variants)
   fuzzycmeans.py     # FuzzyCMeans — sklearn-style class wrapper over FCM
-  kmeans.py          # KMeans — sklearn-style class wrapper, optional GPU acceleration
+  kmeans.py          # KMeans — sklearn-style class wrapper over the Cython kernel
   nerfcm.py          # relational_fuzzy_c_means / relational_out_of_sample_membership —
                      #   NERFCM (Hathaway & Bezdek 1994) on a dissimilarity matrix; the
                      #   geometry-consistent IVATMeans(refine="relational") back end
@@ -42,10 +42,6 @@ src/tribbleclustering/
                      #   get_ivat_levels/get_ivat_hierarchy, IvatMeansResult, ClusterNode
   conivat.py         # ConiVAT — constraint-based iVAT (Rathore, Bezdek, Santi & Ratti,
                      #   2020): semi-supervised iVAT from must-link/cannot-link constraints
-  gpu.py             # CuPy pairwise-distance/FCM/k-means device kernels; optional,
-                     #   gated on gpu.is_available(), falls back to CPU when absent
-  gpu_vat.py         # fully on-device VAT front-end (CuPy): distances -> Borůvka MST ->
-                     #   ordering, kept resident on the GPU end-to-end
   util.py            # pairwise_distances (numba), synthetic cluster generators
 tests/               # pytest suite (correctness + benchmark-marked perf tests)
 benchmarks/          # dev-only scale/memory harness (NOT shipped in the wheel)
@@ -67,6 +63,14 @@ There is no `experiments/` tree in this repo. It used to hold research spikes
 (fundthmcalculus/grad-school#26) alongside coursework, making this repo a pure
 library. Don't recreate `experiments/` here without discussing scope first —
 research spikes belong in `grad-school`, not this package.
+
+**This package is CPU-only.** The CuPy back ends (`gpu.py`, `gpu_vat.py`) and
+the `[gpu]` extra were removed in issue #106: nothing in `src/` imported them,
+no CI runner has a CUDA device so the device branches were never exercised, and
+on a 12 GB consumer card with FP64 at ~1/64 of FP32 the payoff did not justify
+the tiling machinery — on the dtype this library deliberately defaults to.
+Don't reintroduce a GPU path without discussing it first. The prior work is
+preserved in PRs #24 and #76 and the `perf/gpu-vat-frontend` branch.
 
 The **novelty and prior-art write-ups followed them** in issue #97
 (`bibliography.md`, `novel-niche.md`, `novelty-review.md`,
@@ -127,10 +131,6 @@ Import from the top-level package (defined in `__init__.py`):
   `refine="medoid"` (default), `"relational"`, or `"euclidean"` — see the
   class docstring and issue #54); `LinKernighan` (`.solve`, `.fit`,
   `.fit_predict`, `.tour_`, `.tour_length_`); `ConiVAT`
-- **GPU (optional, CuPy):** `gpu.py`/`gpu_vat.py` provide device-resident
-  pairwise-distance, FCM, k-means, and VAT/MST kernels; not re-exported from
-  `__init__.py` — import from `tribbleclustering.gpu`/`tribbleclustering.gpu_vat`
-  directly, guarding with `gpu.is_available()`
 - **Helpers:** `pairwise_distances`
 
 When you add or rename anything user-facing, update `__all__` in `__init__.py` —

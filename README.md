@@ -31,7 +31,7 @@ city_distances = pairwise_distances(cluster_cities)
 print(compute_ivat(city_distances))
 ```
 
-For K-Means (scikit-learn-compatible interface, optional GPU acceleration):
+For K-Means (scikit-learn-compatible interface):
 
 ```python
 from tribbleclustering import KMeans
@@ -56,18 +56,3 @@ print(f"Cluster centers: {model.cluster_centers_}")
 print(f"Labels: {model.labels_}")
 ```
 
-## GPU acceleration (optional)
-
-Installing the `gpu` extra (`pip install tribble-clustering[gpu]`) enables
-CuPy-backed, device-resident kernels for pairwise distances, FCM, k-means, and
-VAT/MST (`tribbleclustering.gpu`, `tribbleclustering.gpu_vat`). These are not
-re-exported from the top-level package — import them directly and guard with
-`gpu.is_available()`, which falls back to `False` (and callers should fall
-back to the CPU path) when no CUDA device is present:
-
-```python
-from tribbleclustering import gpu
-
-if gpu.is_available():
-    ...  # use gpu.pairwise_distances_gpu / gpu.fuzzy_c_means_gpu / gpu.kmeans_gpu
-```

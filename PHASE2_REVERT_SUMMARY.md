@@ -105,7 +105,7 @@ If further optimization is desired, consider:
 
 1. **Use BLAS from Cython**: Call CBLAS routines instead of explicit loops
 2. **Numba JIT**: Often better than Cython for numerical code
-3. **GPU acceleration**: Actual parallelism (CUDA with CuPy)
+3. ~~**GPU acceleration**: Actual parallelism (CUDA with CuPy)~~ — tried and removed again in issue #106; see `docs/perf-guidance.md` §Optimization&nbsp;#2 for why this direction is closed
 4. **Pure NumPy optimization**: Use einsum, broadcasting, or other vectorization tricks
 5. **Accept Python baseline**: For medium/large datasets, Python is already optimal
 

@@ -12,7 +12,7 @@
 1. [Overview](#overview)
 2. [Current Performance Baseline](#current-performance-baseline)
 3. [Optimization #1: SIMD Vectorization](#optimization-1-simd-vectorization)
-4. [Optimization #2: GPU Acceleration with CUDA](#optimization-2-gpu-acceleration-with-cuda)
+4. [Optimization #2: GPU Acceleration with CUDA](#optimization-2-gpu-acceleration-with-cuda) — **not pursued, see the note in that section**
 5. [Optimization #3: Approximate Nearest Neighbors](#optimization-3-approximate-nearest-neighbors)
 6. [Optimization #4: Memory Layout in FCM](#optimization-4-memory-layout-in-fcm)
 7. [Optimization #5: Prim's MST Cache Optimization](#optimization-5-prims-mst-cache-optimization)
@@ -309,6 +309,21 @@ t_original = time.perf_counter() - t0
 ---
 
 ## Optimization #2: GPU Acceleration with CUDA
+
+> **Status (2026-08-30): this direction is closed — do not implement from this
+> section.** A CuPy version of it shipped and was removed again in issue #106.
+> The reasons, so they don't need rediscovering: nothing in `src/` ever imported
+> the device modules; no CI runner has a CUDA device, so the device branches were
+> never exercised; and the target card is a 12 GB consumer part where
+> **FP64 runs at ~1/64 of FP32**, while this library keeps float64 as its default
+> to preserve the "exact VAT" positioning. Tiling an n×n matrix through 12 GB is
+> a lot of machinery for a bounded win on a dtype the library doesn't default to.
+>
+> The section is kept for its hardware analysis and its kernel-shape sketches,
+> which remain a fair account of what a GPU port would involve. Treat it as
+> background, not as a plan. The code it describes lives on in PRs #24 and #76
+> and the `perf/gpu-vat-frontend` branch.
+
 
 ### Why GPU Acceleration?
 
