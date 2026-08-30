@@ -87,11 +87,11 @@ class TestFCMCorrectness:
         )
         c_cy, w_cy, _, _ = result_cy  # Cython returns 4-tuple
 
-        # With same initial guess, results should match closely
-        # Note: differences may occur due to floating-point rounding and convergence path
-        # differences from distance caching optimization
-        assert_allclose(c_py, c_cy, rtol=1e-3, atol=1e-5)
-        assert_allclose(w_py, w_cy, rtol=1e-3, atol=1e-5)
+        # Same start, same convergence test (issue #100), so the two paths run
+        # the same iterations and agree to BLAS rounding -- the tolerance only
+        # absorbs a differently-ordered dot product.
+        assert_allclose(c_py, c_cy, rtol=1e-6, atol=1e-8)
+        assert_allclose(w_py, w_cy, rtol=1e-6, atol=1e-8)
 
     def test_python_with_initial_guess(self, synthetic_data):
         """Test Python implementation with initial cluster centers."""
@@ -132,10 +132,9 @@ class TestFCMCorrectness:
         )
         c_cy, w_cy, _, _ = result_cy  # Cython returns 4-tuple
 
-        # Tolerances account for floating-point rounding differences and convergence path
-        # differences from distance caching optimization
-        assert_allclose(c_py, c_cy, rtol=1e-3, atol=1e-5)
-        assert_allclose(w_py, w_cy, rtol=1e-3, atol=1e-5)
+        # See test_cython_matches_python: agreement is to BLAS rounding.
+        assert_allclose(c_py, c_cy, rtol=1e-6, atol=1e-8)
+        assert_allclose(w_py, w_cy, rtol=1e-6, atol=1e-8)
 
     def test_python_error_both_indices_and_guess(self, synthetic_data):
         """Test that Python raises error when both indices and initial_guess are provided."""
@@ -196,9 +195,14 @@ class TestFCMPerformance:
         np.random.seed(42)
         x = np.random.randn(100, 5).astype(np.float64)
         n_clusters = 3
+        start = self._shared_start(x, n_clusters)
 
-        time_py = self._time_implementation(fuzzy_c_means_python, x, n_clusters)
-        time_cy = self._time_implementation(fuzzy_c_means_cython, x, n_clusters)
+        time_py = self._time_implementation(
+            fuzzy_c_means_python, x, n_clusters, initial_guess=start
+        )
+        time_cy = self._time_implementation(
+            fuzzy_c_means_cython, x, n_clusters, initial_guess=start
+        )
 
         print("\nSmall dataset (100 samples, 5 features, 3 clusters):")
         print(f"  Python: {time_py:.4f}s")
@@ -214,12 +218,13 @@ class TestFCMPerformance:
         np.random.seed(42)
         x = np.random.randn(1000, 10).astype(np.float64)
         n_clusters = 5
+        start = self._shared_start(x, n_clusters)
 
         time_py = self._time_implementation(
-            fuzzy_c_means_python, x, n_clusters, iterations=1
+            fuzzy_c_means_python, x, n_clusters, iterations=1, initial_guess=start
         )
         time_cy = self._time_implementation(
-            fuzzy_c_means_cython, x, n_clusters, iterations=1
+            fuzzy_c_means_cython, x, n_clusters, iterations=1, initial_guess=start
         )
 
         print("\nMedium dataset (1000 samples, 10 features, 5 clusters):")
@@ -236,12 +241,13 @@ class TestFCMPerformance:
         np.random.seed(42)
         x = np.random.randn(5000, 10).astype(np.float64)
         n_clusters = 8
+        start = self._shared_start(x, n_clusters)
 
         time_py = self._time_implementation(
-            fuzzy_c_means_python, x, n_clusters, iterations=1
+            fuzzy_c_means_python, x, n_clusters, iterations=1, initial_guess=start
         )
         time_cy = self._time_implementation(
-            fuzzy_c_means_cython, x, n_clusters, iterations=1
+            fuzzy_c_means_cython, x, n_clusters, iterations=1, initial_guess=start
         )
 
         print("\nLarge dataset (5000 samples, 10 features, 8 clusters):")
@@ -252,14 +258,27 @@ class TestFCMPerformance:
         assert time_cy <= time_py * 2.0, "Cython should not be significantly slower"
 
     @staticmethod
-    def _time_implementation(func, x, n_clusters, iterations=3):
-        """Time a function over multiple iterations."""
+    def _time_implementation(func, x, n_clusters, iterations=3, initial_guess=None):
+        """Time a function over multiple iterations.
+
+        ``initial_guess`` is not optional in spirit: without it each
+        implementation draws its own random centers, converges in its own
+        number of iterations, and the ratio below measures the luck of two
+        draws rather than the speed of two kernels. Issue #100 was diagnosed
+        through exactly that confound.
+        """
         times = []
         for _ in range(iterations):
             start = time.time()
-            func(x.copy(), n_clusters)
+            func(x.copy(), n_clusters, initial_guess=initial_guess)
             times.append(time.time() - start)
         return min(times)
+
+    @staticmethod
+    def _shared_start(x, n_clusters, seed=0):
+        """Centers both implementations start from, drawn away from the data."""
+        rng = np.random.default_rng(seed)
+        return x[rng.choice(x.shape[0], size=n_clusters, replace=False)].copy()
 
 
 class TestFCMNumericalStability:
@@ -283,6 +302,55 @@ class TestFCMNumericalStability:
 
         assert np.all(np.isfinite(c))
         assert np.all(np.isfinite(w))
+
+    @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
+    def test_coincident_point_membership_matches_python(self):
+        """A point sitting exactly on a center takes crisp membership (issue #100).
+
+        The compiled kernel used to hand the coincident cluster a membership of
+        0 and every *other* cluster a membership of 1 -- the inverse of the
+        intended convention, and a silently different answer from
+        ``fcm._get_weights`` on the same input.
+        """
+        x = np.array(
+            [[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [1.1, 1.1], [5.0, 5.0]],
+            dtype=np.float64,
+        )
+        initial_guess = np.array([[0.0, 0.0], [1.0, 1.0], [5.0, 5.0]])
+
+        _, w_py = fuzzy_c_means_python(x, 3, m=2.0, initial_guess=initial_guess)
+        _, w_cy, _, _ = fuzzy_c_means_cython(x, 3, m=2.0, initial_guess=initial_guess)
+
+        # Rows 0, 1 and 4 sit on a center; each must be crisp on that center.
+        assert_allclose(w_cy.sum(axis=1), 1.0, atol=1e-12)
+        assert_allclose(w_cy, w_py, rtol=1e-6, atol=1e-9)
+
+    @pytest.mark.skipif(not CYTHON_AVAILABLE, reason="Cython extension not available")
+    @pytest.mark.parametrize(
+        "n_samples, n_features, n_clusters", [(100, 5, 3), (500, 15, 5), (1000, 10, 5)]
+    )
+    def test_cython_stops_on_the_same_iteration_as_python(
+        self, n_samples, n_features, n_clusters
+    ):
+        """Both paths share fcm.py's rtol=1e-5/atol=1e-8 convergence test.
+
+        They sit behind a silent import-time fallback, so a compiled kernel
+        with its own stopping rule returns a different answer than the
+        reference for the same call -- and makes every speed comparison
+        between them a comparison of unequal work.
+        """
+        rng = np.random.default_rng(0)
+        x = rng.standard_normal((n_samples, n_features)) * 10.0
+        initial_guess = x[rng.choice(n_samples, size=n_clusters, replace=False)].copy()
+
+        res_py = fuzzy_c_means_python(x, n_clusters, m=2.0, initial_guess=initial_guess)
+        c_cy, w_cy, n_iter_cy, _ = fuzzy_c_means_cython(
+            x, n_clusters, m=2.0, initial_guess=initial_guess
+        )
+
+        assert n_iter_cy == res_py.n_iter_
+        assert_allclose(c_cy, res_py.cluster_centers_, rtol=1e-6, atol=1e-8)
+        assert_allclose(w_cy, res_py.membership_matrix_, rtol=1e-6, atol=1e-8)
 
     def test_python_large_m_value(self):
         """Test Python with large fuzziness parameter."""
