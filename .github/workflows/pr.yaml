@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.11'
+          python-version: '3.15'
 
       - name: Check the lockfile matches pyproject.toml
         # Runs BEFORE the dependency install: the check takes ~1s and the
