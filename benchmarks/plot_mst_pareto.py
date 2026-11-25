@@ -96,7 +96,9 @@ def main(path: str, dtype: str = "f64") -> None:
             kw = dict(color=COLORS[m], linewidth=2, marker="o", markersize=5)
             axes[0].plot(ns, [r["time_ms"] / 1e3 for r in mr], label=LABEL[m], **kw)
             axes[1].plot(ns, [max(r["delta_gb"], 1e-3) for r in mr], **kw)
-        nmax = max(r["n"] for r in tr)
+        # Largest n at which the most methods ran (bigger n skip some for RAM).
+        count = {n: sum(r["n"] == n for r in tr) for n in {r["n"] for r in tr}}
+        nmax = max(count, key=lambda n: (count[n], n))
         top = [r for r in tr if r["n"] == nmax]
         pts = [(max(r["delta_gb"], 1e-3), r["time_ms"] / 1e3) for r in top]
         front = _pareto(pts)
@@ -110,6 +112,7 @@ def main(path: str, dtype: str = "f64") -> None:
             zorder=1,
             label="Pareto front",
         )
+        groups: list[list[int]] = []  # near-coincident points share a label
         for i, r in enumerate(top):
             on = i in front
             axes[2].scatter(
@@ -120,9 +123,20 @@ def main(path: str, dtype: str = "f64") -> None:
                 linewidth=2,
                 zorder=3,
             )
+            for g in groups:
+                x0, y0 = pts[g[0]]
+                if abs(pts[i][0] / x0 - 1) < 0.08 and abs(pts[i][1] / y0 - 1) < 0.08:
+                    g.append(i)
+                    break
+            else:
+                groups.append([i])
+        for g in groups:
+            text = " / ".join(
+                LABEL[top[i]["method"]] + (" *" if i in front else "") for i in g
+            )
             axes[2].annotate(
-                LABEL[r["method"]] + (" *" if on else ""),
-                pts[i],
+                text if len(g) < 3 else text.replace(" / ", "\n"),
+                pts[g[0]],
                 fontsize=7,
                 color=INK,
                 xytext=(6, 4),

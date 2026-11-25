@@ -1,6 +1,6 @@
 {
  "meta": {
-  "when": "2026-11-25T03:11:37+00:00",
+  "when": "2026-11-25T03:19:34+00:00",
   "host": "vm",
   "cpus": 4,
   "platform": "Linux-6.18.44-fc-v880-x86_64-with-glibc2.39",
@@ -14,191 +14,255 @@
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 63.62702699993861,
-   "delta_gb": 0.034086912
+   "time_ms": 63.65214399988872,
+   "delta_gb": 0.034103296
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 19.199459999981627,
-   "delta_gb": 0.032182272
+   "time_ms": 20.176156999923478,
+   "delta_gb": 0.032186368
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 21.078664000015124,
-   "delta_gb": 0.00014336
+   "time_ms": 23.467455999934828,
+   "delta_gb": 0.00022528
   },
   {
    "method": "dlmst_py",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 179.53386599992882,
-   "delta_gb": 0.095997952
+   "time_ms": 176.98205600004258,
+   "delta_gb": 0.096190464
   },
   {
    "method": "dlmst_py_points",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 304.70509800011314,
-   "delta_gb": 0.097312768
+   "time_ms": 240.3183750000153,
+   "delta_gb": 0.097386496
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 16.026306999947337,
-   "delta_gb": 0.032350208
+   "time_ms": 17.70070299994586,
+   "delta_gb": 0.032280576
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 17.959826999913275,
-   "delta_gb": 0.000548864
+   "time_ms": 14.923199999884673,
+   "delta_gb": 0.000536576
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 47.65647999988687,
-   "delta_gb": 0.032292864
+   "time_ms": 37.81791799997336,
+   "delta_gb": 0.03231744
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 34.18325899997399,
-   "delta_gb": 0.000479232
+   "time_ms": 36.69466700011981,
+   "delta_gb": 0.00043008
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 21.080959999835613,
+   "delta_gb": 0.032382976
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 25.447666999980356,
+   "delta_gb": 0.032456704
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 24.07103299992741,
+   "delta_gb": 0.000610304
   },
   {
    "method": "ivat_numba",
    "task": "ivat",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 115.12799000001905,
-   "delta_gb": 0.096944128
+   "time_ms": 105.209584000022,
+   "delta_gb": 0.096997376
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 31.410023000034926,
-   "delta_gb": 0.06418432
+   "time_ms": 36.28191200004949,
+   "delta_gb": 0.064188416
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 30.036180000024615,
-   "delta_gb": 0.032182272
+   "time_ms": 27.58688600010828,
+   "delta_gb": 0.032186368
   },
   {
    "method": "ivat_dlmst_py_points",
    "task": "ivat",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 311.68855199985046,
-   "delta_gb": 0.097312768
+   "time_ms": 349.896015000013,
+   "delta_gb": 0.0973824
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 22.454079999988608,
-   "delta_gb": 0.064188416
+   "time_ms": 29.677110999955403,
+   "delta_gb": 0.064253952
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 2000,
    "dtype": "f64",
-   "time_ms": 19.967618999999104,
-   "delta_gb": 0.032354304
+   "time_ms": 44.82168100003037,
+   "delta_gb": 0.032489472
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 26.420425999958752,
+   "delta_gb": 0.063930368
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 31.71258400016086,
+   "delta_gb": 0.032407552
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 19.18432499996925,
-   "delta_gb": 0.0161792
+   "time_ms": 14.09632100012459,
+   "delta_gb": 0.016187392
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 24.572767000108797,
-   "delta_gb": 0.00014336
+   "time_ms": 24.6648129998448,
+   "delta_gb": 0.000192512
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 14.49490999993941,
-   "delta_gb": 0.016236544
+   "time_ms": 32.71407400006865,
+   "delta_gb": 0.016252928
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 11.281635999921491,
-   "delta_gb": 0.00022528
+   "time_ms": 15.836675999935323,
+   "delta_gb": 0.000253952
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 31.540116999849488,
-   "delta_gb": 0.01619968
+   "time_ms": 32.193081000059465,
+   "delta_gb": 0.016211968
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 34.682492999991155,
-   "delta_gb": 0.000241664
+   "time_ms": 34.38603100016735,
+   "delta_gb": 0.00024576
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 15.114432000018496,
+   "delta_gb": 0.016379904
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 19.885212999952273,
+   "delta_gb": 0.016388096
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 39.19966800003749,
+   "delta_gb": 0.000434176
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 34.288514999843756,
-   "delta_gb": 0.032186368
+   "time_ms": 36.41710800002329,
+   "delta_gb": 0.032190464
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 35.16657899990605,
-   "delta_gb": 0.016183296
+   "time_ms": 29.117175999999745,
+   "delta_gb": 0.016187392
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 47.35080700015715,
+   "time_ms": 23.257583000031445,
    "delta_gb": 0.032124928
   },
   {
@@ -206,231 +270,327 @@
    "task": "ivat",
    "n": 2000,
    "dtype": "f32",
-   "time_ms": 20.67097700000886,
-   "delta_gb": 0.016207872
+   "time_ms": 14.228348999949958,
+   "delta_gb": 0.016154624
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 25.264027999810423,
+   "delta_gb": 0.031911936
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 22.91947200001232,
+   "delta_gb": 0.016297984
   },
   {
    "method": "prim_numba",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 237.74972199998956,
-   "delta_gb": 0.132173824
+   "time_ms": 266.0876290001397,
+   "delta_gb": 0.132190208
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 74.24911300017811,
-   "delta_gb": 0.12818432
+   "time_ms": 70.91083999989678,
+   "delta_gb": 0.128188416
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 83.32230299993171,
-   "delta_gb": 0.00014336
+   "time_ms": 83.54940800018085,
+   "delta_gb": 0.000147456
   },
   {
    "method": "dlmst_py",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 627.769692999891,
-   "delta_gb": 0.229015552
+   "time_ms": 501.5702840000813,
+   "delta_gb": 0.229036032
   },
   {
    "method": "dlmst_py_points",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 944.7565230000237,
-   "delta_gb": 0.168722432
+   "time_ms": 835.0589909998689,
+   "delta_gb": 0.168771584
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 72.54624100005458,
-   "delta_gb": 0.128540672
+   "time_ms": 74.39449399998921,
+   "delta_gb": 0.12853248
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 47.55737599998611,
-   "delta_gb": 0.00088064
+   "time_ms": 43.39390099994489,
+   "delta_gb": 0.00090112
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 203.6092959999678,
-   "delta_gb": 0.128483328
+   "time_ms": 147.5142379999852,
+   "delta_gb": 0.128507904
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 124.34877000009692,
-   "delta_gb": 0.000872448
+   "time_ms": 94.44764299996677,
+   "delta_gb": 0.000815104
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 112.15580699990824,
+   "delta_gb": 0.128385024
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 67.71228999991763,
+   "delta_gb": 0.128598016
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 63.035074000026725,
+   "delta_gb": 0.000811008
   },
   {
    "method": "ivat_numba",
    "task": "ivat",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 458.82439799993335,
-   "delta_gb": 0.385257472
+   "time_ms": 438.80757000010817,
+   "delta_gb": 0.385355776
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 188.2541290001427,
-   "delta_gb": 0.256188416
+   "time_ms": 219.84150100001898,
+   "delta_gb": 0.256192512
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 174.92261999996117,
-   "delta_gb": 0.12818432
+   "time_ms": 187.37116000011156,
+   "delta_gb": 0.128188416
   },
   {
    "method": "ivat_dlmst_py_points",
    "task": "ivat",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 1126.1049029999413,
-   "delta_gb": 0.338624512
+   "time_ms": 1380.5682400000023,
+   "delta_gb": 0.338649088
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 86.66453699993326,
-   "delta_gb": 0.25645056
+   "time_ms": 104.48416100007307,
+   "delta_gb": 0.256454656
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 4000,
    "dtype": "f64",
-   "time_ms": 83.05692399994768,
-   "delta_gb": 0.128917504
+   "time_ms": 68.22950400010086,
+   "delta_gb": 0.128950272
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 104.26499699997294,
+   "delta_gb": 0.256176128
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 116.20558200002051,
+   "delta_gb": 0.12879872
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 70.89635300008013,
-   "delta_gb": 0.06418432
+   "time_ms": 69.3469489999643,
+   "delta_gb": 0.064192512
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 100.39659700009906,
-   "delta_gb": 0.00014336
+   "time_ms": 94.35773599989261,
+   "delta_gb": 0.000151552
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 99.99744399988231,
-   "delta_gb": 0.064278528
+   "time_ms": 56.71403199994529,
+   "delta_gb": 0.064290816
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 62.41714499992668,
-   "delta_gb": 0.000475136
+   "time_ms": 66.37029000012262,
+   "delta_gb": 0.00049152
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 111.69184499999574,
-   "delta_gb": 0.06424576
+   "time_ms": 130.2984240001024,
+   "delta_gb": 0.064249856
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 124.61439599996993,
-   "delta_gb": 0.000380928
+   "time_ms": 135.76904000001377,
+   "delta_gb": 0.000385024
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 68.96929100003035,
+   "delta_gb": 0.06438912
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 56.99835800010078,
+   "delta_gb": 0.064417792
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 56.96311599990622,
+   "delta_gb": 0.000507904
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 113.73129799994786,
-   "delta_gb": 0.128188416
+   "time_ms": 103.70007899996381,
+   "delta_gb": 0.128192512
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 115.74584799996046,
-   "delta_gb": 0.06418432
+   "time_ms": 103.78207600001588,
+   "delta_gb": 0.064188416
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 73.18679700006214,
-   "delta_gb": 0.128221184
+   "time_ms": 58.37387399992622,
+   "delta_gb": 0.128098304
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 4000,
    "dtype": "f32",
-   "time_ms": 51.63022600004297,
-   "delta_gb": 0.064278528
+   "time_ms": 104.41035100006957,
+   "delta_gb": 0.064499712
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 71.36697099986122,
+   "delta_gb": 0.127971328
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 82.73913099992569,
+   "delta_gb": 0.064393216
   },
   {
    "method": "prim_numba",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 1038.6525730000358,
-   "delta_gb": 0.517361664
+   "time_ms": 1034.8819590001312,
+   "delta_gb": 0.517382144
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 427.51549700005853,
-   "delta_gb": 0.51218432
+   "time_ms": 459.76283799996054,
+   "delta_gb": 0.512188416
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 386.7348359999596,
+   "time_ms": 448.4051140000247,
    "delta_gb": 0.000581632
   },
   {
@@ -438,39 +598,39 @@
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 2271.620213999995,
-   "delta_gb": 0.645623808
+   "time_ms": 2239.705809999805,
+   "delta_gb": 0.645619712
   },
   {
    "method": "dlmst_py_points",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 3284.2843729999913,
-   "delta_gb": 0.169377792
+   "time_ms": 3196.487382999976,
+   "delta_gb": 0.16943104
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 465.0145260000045,
-   "delta_gb": 0.51339264
+   "time_ms": 414.17215299998134,
+   "delta_gb": 0.513335296
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 191.7740829999275,
-   "delta_gb": 0.002134016
+   "time_ms": 145.77612299990506,
+   "delta_gb": 0.002043904
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 992.3449469999923,
+   "time_ms": 942.2022770002059,
    "delta_gb": 0.51329024
   },
   {
@@ -478,375 +638,535 @@
    "task": "order",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 507.77282400008517,
-   "delta_gb": 0.001957888
+   "time_ms": 459.1051909999351,
+   "delta_gb": 0.001826816
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 469.32783800002653,
+   "delta_gb": 0.512385024
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 356.582188999937,
+   "delta_gb": 0.513363968
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 253.55416699994748,
+   "delta_gb": 0.001994752
   },
   {
    "method": "ivat_numba",
    "task": "ivat",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 2475.051721,
-   "delta_gb": 1.536356352
+   "time_ms": 2177.3253500000465,
+   "delta_gb": 1.53614336
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 1058.0564200001845,
-   "delta_gb": 1.024188416
+   "time_ms": 1004.4182919998548,
+   "delta_gb": 1.024192512
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 984.807438000189,
-   "delta_gb": 0.51218432
+   "time_ms": 972.2915740001099,
+   "delta_gb": 0.512188416
   },
   {
    "method": "ivat_dlmst_py_points",
    "task": "ivat",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 5281.185733000029,
-   "delta_gb": 1.337024512
+   "time_ms": 4477.975899000057,
+   "delta_gb": 1.337032704
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 468.4002369999689,
-   "delta_gb": 1.025396736
+   "time_ms": 452.0861450000666,
+   "delta_gb": 1.02535168
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 8000,
    "dtype": "f64",
-   "time_ms": 273.1394069999169,
-   "delta_gb": 0.514199552
+   "time_ms": 238.12807900003463,
+   "delta_gb": 0.514183168
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 627.7308290000292,
+   "delta_gb": 1.025011712
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 315.622717999986,
+   "delta_gb": 0.513757184
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 329.01807799999006,
-   "delta_gb": 0.25618432
+   "time_ms": 266.32712099990385,
+   "delta_gb": 0.256192512
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 516.5257480000491,
-   "delta_gb": 0.000380928
+   "time_ms": 467.28947699989476,
+   "delta_gb": 0.000434176
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 244.3585850001,
-   "delta_gb": 0.25708544
+   "time_ms": 195.3377370000453,
+   "delta_gb": 0.257060864
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 183.09533100000408,
-   "delta_gb": 0.001409024
+   "time_ms": 204.16426399992815,
+   "delta_gb": 0.001421312
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 585.7824940001137,
-   "delta_gb": 0.257040384
+   "time_ms": 521.2055080000937,
+   "delta_gb": 0.257019904
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 571.2748250000459,
+   "time_ms": 515.3068780000467,
    "delta_gb": 0.001298432
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 284.6190339998884,
+   "delta_gb": 0.25638912
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 237.63257099994917,
+   "delta_gb": 0.25718784
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 244.8062309999841,
+   "delta_gb": 0.001318912
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 523.1569570000829,
-   "delta_gb": 0.512188416
+   "time_ms": 594.4834350000292,
+   "delta_gb": 0.512196608
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 485.3511950000211,
-   "delta_gb": 0.25618432
+   "time_ms": 510.9791959998802,
+   "delta_gb": 0.256188416
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 312.14475899992067,
-   "delta_gb": 0.51308544
+   "time_ms": 326.69386699990355,
+   "delta_gb": 0.513073152
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 8000,
    "dtype": "f32",
-   "time_ms": 247.65334600010647,
-   "delta_gb": 0.257441792
+   "time_ms": 281.1652140001115,
+   "delta_gb": 0.257359872
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 276.5493479998895,
+   "delta_gb": 0.512704512
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 299.4768410001143,
+   "delta_gb": 0.25729024
   },
   {
    "method": "prim_numba",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 4169.446936999975,
-   "delta_gb": 2.06153728
+   "time_ms": 4412.927125000124,
+   "delta_gb": 2.061553664
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 1795.2288180001688,
-   "delta_gb": 2.04818432
+   "time_ms": 1778.2180879999032,
+   "delta_gb": 2.048188416
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 2019.5202109998718,
-   "delta_gb": 0.00118784
+   "time_ms": 1988.6056479999752,
+   "delta_gb": 0.001142784
   },
   {
    "method": "dlmst_py",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 8637.622383000007,
-   "delta_gb": 2.180882432
+   "time_ms": 8276.469973999838,
+   "delta_gb": 2.180911104
   },
   {
    "method": "dlmst_py_points",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 13494.888907000131,
-   "delta_gb": 0.1702912
+   "time_ms": 12649.597756000048,
+   "delta_gb": 0.202313728
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 1759.8839140000564,
-   "delta_gb": 2.050658304
+   "time_ms": 1619.4328669998868,
+   "delta_gb": 2.050605056
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 575.6280089999564,
-   "delta_gb": 0.00407552
+   "time_ms": 529.7923589998845,
+   "delta_gb": 0.004087808
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 3569.124120999959,
-   "delta_gb": 2.050543616
+   "time_ms": 3583.920861000024,
+   "delta_gb": 2.050555904
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 1843.0096499998854,
-   "delta_gb": 0.003641344
+   "time_ms": 1896.310584000048,
+   "delta_gb": 0.00376832
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 2048.546146000035,
+   "delta_gb": 2.048385024
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 1675.1156069999524,
+   "delta_gb": 2.050469888
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 913.4340939999674,
+   "delta_gb": 0.00370688
   },
   {
    "method": "ivat_numba",
    "task": "ivat",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 9072.063671000024,
-   "delta_gb": 6.144651264
+   "time_ms": 8793.943901000148,
+   "delta_gb": 6.144507904
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 4293.21379299995,
-   "delta_gb": 4.096188416
+   "time_ms": 4602.0277719999285,
+   "delta_gb": 4.096192512
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 3744.3137660000048,
-   "delta_gb": 2.04818432
+   "time_ms": 4046.3871819999895,
+   "delta_gb": 2.048188416
   },
   {
    "method": "ivat_dlmst_py_points",
    "task": "ivat",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 18248.87879400012,
-   "delta_gb": 5.166915584
+   "time_ms": 18558.337623999934,
+   "delta_gb": 5.166993408
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 1786.7625769999904,
-   "delta_gb": 4.09860096
+   "time_ms": 2015.0669350000499,
+   "delta_gb": 4.098617344
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 16000,
    "dtype": "f64",
-   "time_ms": 949.186692000012,
-   "delta_gb": 2.052083712
+   "time_ms": 1185.4355560001295,
+   "delta_gb": 2.052096
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 2097.058213000082,
+   "delta_gb": 4.098281472
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 1143.3671549998508,
+   "delta_gb": 2.051514368
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 1349.7849640000368,
-   "delta_gb": 1.02418432
+   "time_ms": 1361.7561510000087,
+   "delta_gb": 1.024188416
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 2179.35677100013,
-   "delta_gb": 0.0011264
+   "time_ms": 1998.7908949999564,
+   "delta_gb": 0.001097728
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 1351.3118939999913,
-   "delta_gb": 1.025695744
+   "time_ms": 1197.488420000127,
+   "delta_gb": 1.025708032
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 758.939466000129,
-   "delta_gb": 0.002420736
+   "time_ms": 666.3169870000729,
+   "delta_gb": 0.002428928
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 2866.8939489998593,
-   "delta_gb": 1.025646592
+   "time_ms": 3055.1557940000293,
+   "delta_gb": 1.025609728
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 2043.1417639999836,
-   "delta_gb": 0.002174976
+   "time_ms": 1929.6224160000293,
+   "delta_gb": 0.00223232
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1412.2589809999226,
+   "delta_gb": 1.024385024
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1137.0561719998022,
+   "delta_gb": 1.025581056
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 920.5440050000107,
+   "delta_gb": 0.002039808
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 2969.827038999938,
-   "delta_gb": 2.048188416
+   "time_ms": 3051.663994999899,
+   "delta_gb": 2.048192512
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 2589.2129480000676,
-   "delta_gb": 1.02418432
+   "time_ms": 2801.6390710001815,
+   "delta_gb": 1.024188416
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 1321.9675899999856,
-   "delta_gb": 2.04969984
+   "time_ms": 1603.8497749998442,
+   "delta_gb": 2.049662976
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 16000,
    "dtype": "f32",
-   "time_ms": 807.9896899998857,
-   "delta_gb": 1.026424832
+   "time_ms": 694.8037150000346,
+   "delta_gb": 1.026486272
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1669.0797370001746,
+   "delta_gb": 2.049257472
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1064.0298169998914,
+   "delta_gb": 1.025982464
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 4132.645836999927,
-   "delta_gb": 4.60818432
+   "time_ms": 3973.4701780000705,
+   "delta_gb": 4.608188416
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 4851.567758000101,
-   "delta_gb": 0.00188416
+   "time_ms": 5032.139571000016,
+   "delta_gb": 0.001716224
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 3861.8987329998617,
-   "delta_gb": 4.611928064
+   "time_ms": 3553.4953410001435,
+   "delta_gb": 4.611842048
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 1478.808772000093,
-   "delta_gb": 0.006057984
+   "time_ms": 1496.739967999929,
+   "delta_gb": 0.006144
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 9291.265018999866,
+   "time_ms": 10334.346115000017,
    "delta_gb": 4.611784704
   },
   {
@@ -854,8 +1174,32 @@
    "task": "order",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 5109.504695999931,
-   "delta_gb": 0.005431296
+   "time_ms": 5065.124977000096,
+   "delta_gb": 0.005517312
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 4707.946252000056,
+   "delta_gb": 4.608434176
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 3437.7524569999878,
+   "delta_gb": 4.61154304
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 2122.2071990000586,
+   "delta_gb": 0.005419008
   },
   {
    "method": "ivat_c",
@@ -883,88 +1227,143 @@
    "task": "ivat",
    "n": 24000,
    "dtype": "f64",
-   "time_ms": 2320.440134000137,
-   "delta_gb": 4.614057984
+   "time_ms": 2097.153237999919,
+   "delta_gb": 4.614152192
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f64",
+   "skipped": "needs ~13.8 GB"
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 2839.2878859999655,
+   "delta_gb": 4.613132288
   },
   {
    "method": "prim_c",
    "task": "order",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 3392.2957899999346,
-   "delta_gb": 2.30418432
+   "time_ms": 3127.6331510000546,
+   "delta_gb": 2.304188416
   },
   {
    "method": "prim_c_points",
    "task": "order",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 4633.116315000052,
-   "delta_gb": 0.001830912
+   "time_ms": 4812.329015000159,
+   "delta_gb": 0.001785856
   },
   {
    "method": "dlmst_c",
    "task": "order",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 2642.5312510000367,
-   "delta_gb": 2.306482176
+   "time_ms": 2627.05946899996,
+   "delta_gb": 2.306420736
   },
   {
    "method": "dlmst_c_points",
    "task": "order",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 1306.7209529999673,
-   "delta_gb": 0.003469312
+   "time_ms": 1332.0461339999383,
+   "delta_gb": 0.003477504
   },
   {
    "method": "dlmst_c_1t",
    "task": "order",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 6760.188754999945,
-   "delta_gb": 2.30643712
+   "time_ms": 6584.504963999962,
+   "delta_gb": 2.306453504
   },
   {
    "method": "dlmst_c_points_1t",
    "task": "order",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 4274.202442999922,
-   "delta_gb": 0.0031744
+   "time_ms": 4462.08399000011,
+   "delta_gb": 0.003137536
+  },
+  {
+   "method": "prim_rust",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 3045.2519190000658,
+   "delta_gb": 2.304385024
+  },
+  {
+   "method": "dlmst_rust",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 2466.514777999919,
+   "delta_gb": 2.306289664
+  },
+  {
+   "method": "dlmst_rust_points",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 1925.802689999955,
+   "delta_gb": 0.003108864
   },
   {
    "method": "ivat_c",
    "task": "ivat",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 7510.038981999969,
-   "delta_gb": 4.608188416
+   "time_ms": 7239.644812000051,
+   "delta_gb": 4.608192512
   },
   {
    "method": "ivat_c_inplace",
    "task": "ivat",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 6853.714423999918,
-   "delta_gb": 2.304180224
+   "time_ms": 6920.358114999999,
+   "delta_gb": 2.304188416
   },
   {
    "method": "ivat_dlmst_c",
    "task": "ivat",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 3753.532146999987,
-   "delta_gb": 4.610412544
+   "time_ms": 3643.265496999902,
+   "delta_gb": 4.610502656
   },
   {
    "method": "ivat_dlmst_c_points",
    "task": "ivat",
    "n": 24000,
    "dtype": "f32",
-   "time_ms": 1853.8789690001067,
-   "delta_gb": 2.307407872
+   "time_ms": 1943.08305200002,
+   "delta_gb": 2.307497984
+  },
+  {
+   "method": "ivat_dlmst_rust",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 3226.292381999883,
+   "delta_gb": 4.610002944
+  },
+  {
+   "method": "ivat_dlmst_rust_points",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 2583.906948000049,
+   "delta_gb": 2.306813952
   }
  ]
 }
