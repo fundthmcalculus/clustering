@@ -1,0 +1,970 @@
+{
+ "meta": {
+  "when": "2026-11-25T03:11:37+00:00",
+  "host": "vm",
+  "cpus": 4,
+  "platform": "Linux-6.18.44-fc-v880-x86_64-with-glibc2.39",
+  "python": "3.13.18",
+  "d": 10,
+  "clusters": 8
+ },
+ "rows": [
+  {
+   "method": "prim_numba",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 63.62702699993861,
+   "delta_gb": 0.034086912
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 19.199459999981627,
+   "delta_gb": 0.032182272
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 21.078664000015124,
+   "delta_gb": 0.00014336
+  },
+  {
+   "method": "dlmst_py",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 179.53386599992882,
+   "delta_gb": 0.095997952
+  },
+  {
+   "method": "dlmst_py_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 304.70509800011314,
+   "delta_gb": 0.097312768
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 16.026306999947337,
+   "delta_gb": 0.032350208
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 17.959826999913275,
+   "delta_gb": 0.000548864
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 47.65647999988687,
+   "delta_gb": 0.032292864
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 34.18325899997399,
+   "delta_gb": 0.000479232
+  },
+  {
+   "method": "ivat_numba",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 115.12799000001905,
+   "delta_gb": 0.096944128
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 31.410023000034926,
+   "delta_gb": 0.06418432
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 30.036180000024615,
+   "delta_gb": 0.032182272
+  },
+  {
+   "method": "ivat_dlmst_py_points",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 311.68855199985046,
+   "delta_gb": 0.097312768
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 22.454079999988608,
+   "delta_gb": 0.064188416
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f64",
+   "time_ms": 19.967618999999104,
+   "delta_gb": 0.032354304
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 19.18432499996925,
+   "delta_gb": 0.0161792
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 24.572767000108797,
+   "delta_gb": 0.00014336
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 14.49490999993941,
+   "delta_gb": 0.016236544
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 11.281635999921491,
+   "delta_gb": 0.00022528
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 31.540116999849488,
+   "delta_gb": 0.01619968
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 34.682492999991155,
+   "delta_gb": 0.000241664
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 34.288514999843756,
+   "delta_gb": 0.032186368
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 35.16657899990605,
+   "delta_gb": 0.016183296
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 47.35080700015715,
+   "delta_gb": 0.032124928
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 2000,
+   "dtype": "f32",
+   "time_ms": 20.67097700000886,
+   "delta_gb": 0.016207872
+  },
+  {
+   "method": "prim_numba",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 237.74972199998956,
+   "delta_gb": 0.132173824
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 74.24911300017811,
+   "delta_gb": 0.12818432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 83.32230299993171,
+   "delta_gb": 0.00014336
+  },
+  {
+   "method": "dlmst_py",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 627.769692999891,
+   "delta_gb": 0.229015552
+  },
+  {
+   "method": "dlmst_py_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 944.7565230000237,
+   "delta_gb": 0.168722432
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 72.54624100005458,
+   "delta_gb": 0.128540672
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 47.55737599998611,
+   "delta_gb": 0.00088064
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 203.6092959999678,
+   "delta_gb": 0.128483328
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 124.34877000009692,
+   "delta_gb": 0.000872448
+  },
+  {
+   "method": "ivat_numba",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 458.82439799993335,
+   "delta_gb": 0.385257472
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 188.2541290001427,
+   "delta_gb": 0.256188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 174.92261999996117,
+   "delta_gb": 0.12818432
+  },
+  {
+   "method": "ivat_dlmst_py_points",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 1126.1049029999413,
+   "delta_gb": 0.338624512
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 86.66453699993326,
+   "delta_gb": 0.25645056
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f64",
+   "time_ms": 83.05692399994768,
+   "delta_gb": 0.128917504
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 70.89635300008013,
+   "delta_gb": 0.06418432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 100.39659700009906,
+   "delta_gb": 0.00014336
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 99.99744399988231,
+   "delta_gb": 0.064278528
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 62.41714499992668,
+   "delta_gb": 0.000475136
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 111.69184499999574,
+   "delta_gb": 0.06424576
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 124.61439599996993,
+   "delta_gb": 0.000380928
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 113.73129799994786,
+   "delta_gb": 0.128188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 115.74584799996046,
+   "delta_gb": 0.06418432
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 73.18679700006214,
+   "delta_gb": 0.128221184
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 4000,
+   "dtype": "f32",
+   "time_ms": 51.63022600004297,
+   "delta_gb": 0.064278528
+  },
+  {
+   "method": "prim_numba",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 1038.6525730000358,
+   "delta_gb": 0.517361664
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 427.51549700005853,
+   "delta_gb": 0.51218432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 386.7348359999596,
+   "delta_gb": 0.000581632
+  },
+  {
+   "method": "dlmst_py",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 2271.620213999995,
+   "delta_gb": 0.645623808
+  },
+  {
+   "method": "dlmst_py_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 3284.2843729999913,
+   "delta_gb": 0.169377792
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 465.0145260000045,
+   "delta_gb": 0.51339264
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 191.7740829999275,
+   "delta_gb": 0.002134016
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 992.3449469999923,
+   "delta_gb": 0.51329024
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 507.77282400008517,
+   "delta_gb": 0.001957888
+  },
+  {
+   "method": "ivat_numba",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 2475.051721,
+   "delta_gb": 1.536356352
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 1058.0564200001845,
+   "delta_gb": 1.024188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 984.807438000189,
+   "delta_gb": 0.51218432
+  },
+  {
+   "method": "ivat_dlmst_py_points",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 5281.185733000029,
+   "delta_gb": 1.337024512
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 468.4002369999689,
+   "delta_gb": 1.025396736
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f64",
+   "time_ms": 273.1394069999169,
+   "delta_gb": 0.514199552
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 329.01807799999006,
+   "delta_gb": 0.25618432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 516.5257480000491,
+   "delta_gb": 0.000380928
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 244.3585850001,
+   "delta_gb": 0.25708544
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 183.09533100000408,
+   "delta_gb": 0.001409024
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 585.7824940001137,
+   "delta_gb": 0.257040384
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 571.2748250000459,
+   "delta_gb": 0.001298432
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 523.1569570000829,
+   "delta_gb": 0.512188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 485.3511950000211,
+   "delta_gb": 0.25618432
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 312.14475899992067,
+   "delta_gb": 0.51308544
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 8000,
+   "dtype": "f32",
+   "time_ms": 247.65334600010647,
+   "delta_gb": 0.257441792
+  },
+  {
+   "method": "prim_numba",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 4169.446936999975,
+   "delta_gb": 2.06153728
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 1795.2288180001688,
+   "delta_gb": 2.04818432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 2019.5202109998718,
+   "delta_gb": 0.00118784
+  },
+  {
+   "method": "dlmst_py",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 8637.622383000007,
+   "delta_gb": 2.180882432
+  },
+  {
+   "method": "dlmst_py_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 13494.888907000131,
+   "delta_gb": 0.1702912
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 1759.8839140000564,
+   "delta_gb": 2.050658304
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 575.6280089999564,
+   "delta_gb": 0.00407552
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 3569.124120999959,
+   "delta_gb": 2.050543616
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 1843.0096499998854,
+   "delta_gb": 0.003641344
+  },
+  {
+   "method": "ivat_numba",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 9072.063671000024,
+   "delta_gb": 6.144651264
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 4293.21379299995,
+   "delta_gb": 4.096188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 3744.3137660000048,
+   "delta_gb": 2.04818432
+  },
+  {
+   "method": "ivat_dlmst_py_points",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 18248.87879400012,
+   "delta_gb": 5.166915584
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 1786.7625769999904,
+   "delta_gb": 4.09860096
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f64",
+   "time_ms": 949.186692000012,
+   "delta_gb": 2.052083712
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1349.7849640000368,
+   "delta_gb": 1.02418432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 2179.35677100013,
+   "delta_gb": 0.0011264
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1351.3118939999913,
+   "delta_gb": 1.025695744
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 758.939466000129,
+   "delta_gb": 0.002420736
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 2866.8939489998593,
+   "delta_gb": 1.025646592
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 2043.1417639999836,
+   "delta_gb": 0.002174976
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 2969.827038999938,
+   "delta_gb": 2.048188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 2589.2129480000676,
+   "delta_gb": 1.02418432
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 1321.9675899999856,
+   "delta_gb": 2.04969984
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 16000,
+   "dtype": "f32",
+   "time_ms": 807.9896899998857,
+   "delta_gb": 1.026424832
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 4132.645836999927,
+   "delta_gb": 4.60818432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 4851.567758000101,
+   "delta_gb": 0.00188416
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 3861.8987329998617,
+   "delta_gb": 4.611928064
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 1478.808772000093,
+   "delta_gb": 0.006057984
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 9291.265018999866,
+   "delta_gb": 4.611784704
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 5109.504695999931,
+   "delta_gb": 0.005431296
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f64",
+   "skipped": "needs ~13.8 GB"
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f64",
+   "skipped": "needs ~13.8 GB"
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f64",
+   "skipped": "needs ~13.8 GB"
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f64",
+   "time_ms": 2320.440134000137,
+   "delta_gb": 4.614057984
+  },
+  {
+   "method": "prim_c",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 3392.2957899999346,
+   "delta_gb": 2.30418432
+  },
+  {
+   "method": "prim_c_points",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 4633.116315000052,
+   "delta_gb": 0.001830912
+  },
+  {
+   "method": "dlmst_c",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 2642.5312510000367,
+   "delta_gb": 2.306482176
+  },
+  {
+   "method": "dlmst_c_points",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 1306.7209529999673,
+   "delta_gb": 0.003469312
+  },
+  {
+   "method": "dlmst_c_1t",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 6760.188754999945,
+   "delta_gb": 2.30643712
+  },
+  {
+   "method": "dlmst_c_points_1t",
+   "task": "order",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 4274.202442999922,
+   "delta_gb": 0.0031744
+  },
+  {
+   "method": "ivat_c",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 7510.038981999969,
+   "delta_gb": 4.608188416
+  },
+  {
+   "method": "ivat_c_inplace",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 6853.714423999918,
+   "delta_gb": 2.304180224
+  },
+  {
+   "method": "ivat_dlmst_c",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 3753.532146999987,
+   "delta_gb": 4.610412544
+  },
+  {
+   "method": "ivat_dlmst_c_points",
+   "task": "ivat",
+   "n": 24000,
+   "dtype": "f32",
+   "time_ms": 1853.8789690001067,
+   "delta_gb": 2.307407872
+  }
+ ]
+}
