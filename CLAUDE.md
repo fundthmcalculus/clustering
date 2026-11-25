@@ -24,6 +24,11 @@ src/tribbleclustering/
                      #   KMeans, FuzzyCMeans, IVATMeans, ConiVAT
   pvat.py            # VAT/IVAT core: numba-JIT Prim MST, compute_vat/compute_ivat
   pqvat.py           # alternate fully-inlined numba Prim MST (vat_prim_mst_numba); not exported
+  dlmst.py           # certificate-and-filter MST (skeleton of Khanna-Putterman-Song,
+                     #   arXiv:2611.31187, Alg. 2) -> VAT order / IVAT from the MST;
+                     #   numpy reference + public dispatchers (see docs/dlmst.md)
+  cdlmst.pyx         # Cython/OpenMP dlmst: row-parallel passes, matrix or points input
+                     #   (`floating` fused type gives the f32 + f64 variants)
   pcvat.pyx          # Cython/OpenMP VAT/IVAT: pairwise_distances_c, compute_vat_c,
                      #   compute_ivat_c, vat_prim_mst_c (f32 + f64 fused variants)
   fcm.py             # pure-numpy fuzzy_c_means reference implementation
@@ -85,7 +90,7 @@ package needs.
 
 ## Compiled-vs-pure-python fallback (important)
 
-The Cython extensions (`pcvat`, `cfcm`, `clk`) are **optional at runtime**. The
+The Cython extensions (`pcvat`, `cfcm`, `clk`, `cdlmst`) are **optional at runtime**. The
 sklearn-style wrappers try to import the compiled kernel and silently fall back
 to the pure-Python/numba path if it isn't built:
 
@@ -114,7 +119,9 @@ except ImportError:
 Import from the top-level package (defined in `__init__.py`):
 
 - **VAT/IVAT (functional):** `compute_vat`, `compute_ivat`, `vat_prim_mst`,
-  `get_ivat_levels`, `get_ivat_hierarchy`
+  `get_ivat_levels`, `get_ivat_hierarchy`; certificate-and-filter MST
+  variants `vat_order_dlmst`, `compute_vat_dlmst`, `compute_ivat_dlmst`
+  (same outputs; `from_points=True` skips the distance matrix)
 - **Result types:** `IvatMeansResult`, `ClusterNode`
 - **FCM (functional):** `fuzzy_c_means`
 - **Relational FCM (functional):** `relational_fuzzy_c_means`,
@@ -237,7 +244,14 @@ fresh subprocess for trustworthy peak-RSS numbers (see `benchmarks/README.md`).
 ```bash
 python -m benchmarks.scale_bench --quick                       # sanity check
 python -m benchmarks.scale_bench --sizes 16000 32000 --max-gb 55
+python -m benchmarks.mst_pareto --sizes 2000 8000 24000   # time AND memory, all MST paths
+python -m benchmarks.plot_mst_pareto benchmarks/baselines/mst_pareto_<host>.json
 ```
+
+`benchmarks/rust_dlmst/` is a dev-only Rust port of `cdlmst` (no crates, loaded
+via ctypes, built with `cargo build --release` on first use) used purely as a
+language comparison in `mst_pareto`. It is not part of the package build;
+don't wire it into `setup.py`.
 
 Baselines are written to `benchmarks/baselines/<tag>_<host>.json`. The core
 finding driving the roadmap: **memory (IVAT's 3-matrix footprint), not compute,

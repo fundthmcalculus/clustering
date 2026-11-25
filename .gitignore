@@ -149,6 +149,7 @@ cython_debug/
 /src/tribbleclustering/cfcm.c
 /src/tribbleclustering/pcvat.c
 /src/tribbleclustering/clk.c
+/src/tribbleclustering/cdlmst.c
 /.claude/settings.local.json
 /**/*.gif
 /**/*.png

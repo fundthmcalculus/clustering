@@ -6,6 +6,7 @@ from .pvat import (
     compute_ivat,
 )
 
+from .dlmst import compute_ivat_dlmst, compute_vat_dlmst, vat_order_dlmst
 from .util import pairwise_distances
 
 from .fcm import fuzzy_c_means, FuzzyCMeansResult
@@ -37,6 +38,9 @@ __all__ = [
     "vat_prim_mst",
     "compute_vat",
     "compute_ivat",
+    "vat_order_dlmst",
+    "compute_vat_dlmst",
+    "compute_ivat_dlmst",
     "IvatMeansResult",
     "get_ivat_levels",
     "ClusterNode",
