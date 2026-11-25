@@ -84,7 +84,8 @@ python -m benchmarks.mst_stage --sizes 4000 8000 16000 24000
 ```
 
 The reference run was on 4 CPUs, 15 GB of RAM, d=10 and 8 blobs, recorded in
-`baselines/mst_pareto_vm.json`, with plots `baselines/mst_pareto_{order,ivat}_{f64,f32}.png`.
+`baselines/mst_pareto_vm.json`. The plots are git-ignored (`*.png`); running
+`plot_mst_pareto` regenerates them next to the JSON.
 Methods that would need more than 12 GB were skipped. The skip estimate is
 conservative for the in-place IVAT.
 
